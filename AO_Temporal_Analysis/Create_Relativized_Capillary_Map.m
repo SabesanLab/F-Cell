@@ -10,7 +10,7 @@ close all;
 if ~exist('contains','builtin')
     contains = @(t,p)~isempty(strfind(t,p));
 end
-mov_path = pwd;
+mov_path = uigetdir(pwd,'Select the directory of piped avis to create a capillary map from.');
 
 
 fNames = read_folder_contents(mov_path,'avi');
@@ -61,10 +61,10 @@ undefsd = (isnan(varImages) | isinf(varImages) );
 
 edgemask = 15;
 varImages( undefsd ) = 0;
-varImages(1:edgemask,:,:) = 0;
-varImages(:,1:edgemask,:) = 0;
-varImages(end-edgemask-1:end,:,:) = 0;
-varImages(:,end-edgemask-1:end,:) = 0;
+% varImages(1:edgemask,:,:) = 0;
+% varImages(:,1:edgemask,:) = 0;
+% varImages(end-edgemask-1:end,:,:) = 0;
+% varImages(:,end-edgemask-1:end,:) = 0;
 
 gausfiltImages = zeros(size(varImages));
 sum_map = zeros(size(varImages,1),size(varImages,2));
@@ -86,34 +86,24 @@ sdImage(isinf(sdImage))=1;
 sdImage(isnan(sdImage))=1;
 
 
-sdImage(1:edgemask,:)=min(sdImage(:));
-sdImage(:,1:edgemask)=min(sdImage(:));
-sdImage(end-edgemask+1:end,:)=min(sdImage(:));
-sdImage(:,end-edgemask+1:end)=min(sdImage(:));
+% sdImage(1:edgemask,:)=min(sdImage(:));
+% sdImage(:,1:edgemask)=min(sdImage(:));
+% sdImage(end-edgemask+1:end,:)=min(sdImage(:));
+% sdImage(:,end-edgemask+1:end)=min(sdImage(:));
 
 notmin = sdImage~=min(sdImage(:));
 
 sdImagemin = min(sdImage(notmin));
 sdImageminsub = sdImage-sdImagemin;
-sdImagestretched = 255*sdImageminsub./max(sdImageminsub(:));
+sdImagestretched = sdImageminsub./max(sdImageminsub(:));
 
 % sdImagestretched= double(adapthisteq(uint8(sdImagestretched), 'NumTiles', [4 4], 'Distribution','uniform'));
 
 figure(1); imagesc( sdImagestretched ); colormap gray; axis image;
 
-edges = 0:2:255;
-binned = discretize(sdImagestretched(notmin),edges);
-
-edges(mode(binned))
-
-threshold = median(sdImagestretched(notmin))  + 0.8.*std(sdImagestretched(notmin));
-
-capillary_mask = imclose(sdImagestretched>threshold, strel('disk',7));
-capillary_mask(1:edgemask,:)=true;
-capillary_mask(:,1:edgemask)=true;
-capillary_mask(end-edgemask+1:end,:)=true;
-capillary_mask(:,end-edgemask+1:end)=true;
+capillary_mask = imbinarize(sdImagestretched,adaptthresh(sdImagestretched,0.55));
+capillary_mask = imclose(capillary_mask, strel('disk',7));
 
 
 figure(2); imagesc( capillary_mask ); colormap gray; axis image;
-save('ALL_TRIALS_cap_map.mat','capillary_mask');
+save(fullfile(mov_path, 'ALL_TRIALS_cap_map.mat'),'capillary_mask');
