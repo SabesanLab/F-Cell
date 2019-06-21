@@ -70,7 +70,7 @@ options['initialdir'] = dmp_folder_path
 
 image_folder_path = filedialog.askdirectory(**options)
 
-stimend = 108
+stimend = 90
 stimbegin = 72
 
 # progo = ttk.Progressbar(root, length=len(os.listdir(dmp_folder_path)))
@@ -217,7 +217,7 @@ for thisfile in os.listdir(dmp_folder_path):
                         print(err)
                         print("Failed to process video: " + writtenfile[0] + "!")
             else:
-                print("Accompanying AVI not found, or not enough images in stimulus region to continue the pipeline.")
+                print(thisfile+ "'s accompanying AVI not found, or not enough images in stimulus region to continue the pipeline.")
 
         except(ValueError, RuntimeError) as err:
             print(err)

@@ -107,26 +107,30 @@ end
 
 %% Histograms of the response from each mat file.
 
-% [~, edges]=histcounts(single_cone_response(valid,1),10);
-% 
-% binwidth = diff(edges);
+lessthanvalid = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid & valid_densitometry;
 
-figure; hold on;
 for i=1:length(single_cone_mat_files)
+    
+    figure; hold on;
     if logmode
-        histogram(single_cone_response(valid,i),'BinWidth',log10(1.2));
+        histogram(single_cone_response(lessthanvalid,i),'BinWidth',log10(1.05));
+        histogram(single_cone_response(valid & ~lessthanvalid,i),'BinWidth',log10(1.05));        
     else
         histogram(single_cone_response(valid,i),'BinWidth',0.2);
     end
+    title(strrep(single_cone_mat_files{i},'_','\_'));
+    
+    if saveplots
+        saveas(gcf, [single_cone_mat_files{i} '_allresps_histogramsplot.png']);
+    end
 end
+% legend(single_cone_mat_files);
 
 xlabel('Aggregate Response');
 ylabel('Number of Cones');
 
 % axis([0 4 -1 10])
-if saveplots
-    saveas(gcf, 'allresps_histogramsplot.svg');
-end
+
 
 %% Vs plots
 
@@ -135,7 +139,7 @@ for i=1:length(single_cone_mat_files)
     plot(single_cone_control_response(:,i),single_cone_response(:,i),'.');
     if logmode
         plot([-0.5 1.5],[-0.5 1.5],'k');
-        axis equal;axis([-0.5 .5 -0.5 .5]); 
+        axis equal;axis([-0.5 1 -0.5 1]); 
     else
         plot([-10 10],[-10 10],'k');
         axis equal; axis([-0.5 2 -0.5 15]); 

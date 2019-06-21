@@ -32,13 +32,13 @@
 clear;
 
 
-CUTOFF = 13;
-NUMTRIALS= 25;
+CUTOFF = 5;
+NUMTRIALS= 5;
 CRITICAL_REGION = 72:90; % 72:90;
 window_size = 5;
 half_window = floor(window_size/2);
 
-pipeline_type = 'moving_rms';
+pipeline_type = 'moving_rms'; % Legacy mode is 'stddev'
 
 CELL_OF_INTEREST = [];
 
@@ -335,9 +335,10 @@ for i=1:numstimcoords
         end
     end
     
-    if any(i==CELL_OF_INTEREST) && stim_trial_count(i)>CUTOFF %&& (densitometry_fit_amplitude(i) < 0.1) && valid_densitometry(i)
+    if any(i==CELL_OF_INTEREST) && stim_trial_count(i)>=CUTOFF %&& (densitometry_fit_amplitude(i) < 0.1) && valid_densitometry(i)
         figure(1); clf;
-        subplot(3,1,1); plot( bsxfun(@minus,nonorm_ref, nonorm_ref(:,2))');%axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -150 150]); xlabel('Time index'); ylabel('Raw Response');        
+        [~, firstinds] = max(~isnan(nonorm_ref),[],2); % Find all of the first non-Nan indexes in our rows.
+        subplot(3,1,1); plot( bsxfun(@minus,nonorm_ref, nonorm_ref(sub2ind(size(nonorm_ref),(1:size(nonorm_ref,1))',firstinds)))');%axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -150 150]); xlabel('Time index'); ylabel('Raw Response');        
         subplot(3,1,2); %hold on;
 %         for m=1:size(all_times_ref,1)
 %             goodinds = find(~isnan(all_times_ref(m,:)));
@@ -345,11 +346,11 @@ for i=1:numstimcoords
 %         end
 %         hold off;
         plot(all_times_ref');
-        axis([0 160 -20 20]); xlabel('Time index'); ylabel('Standardized Response');
+        axis([0 180 -10 10]); xlabel('Time index'); ylabel('Standardized Response');
         
         subplot(3,1,3); plot(stim_cell_median(i,:)); hold on;
-                        plot(stim_cell_var(i,:));
-                        plot(stim_cell_stddev); hold off; %axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -2 10]); xlabel('Time index'); ylabel('Response');
+                        plot(stim_cell_var(i,:));hold off;
+%                         plot(stim_cell_stddev);  %axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -2 10]); xlabel('Time index'); ylabel('Response');
 %         subplot(4,1,4); plot(stim_prestim_means(i,:),'*'); xlabel('Trial #'); ylabel('Prestimulus mean (A.U.)'); axis([0 50 0 255]);
         title(['Cell #:' num2str(i) ' Resp Range: ', num2str(stim_resp_range(i))]);
         drawnow;
@@ -376,7 +377,7 @@ for i=1:numstimcoords
 %         end
 %         saveas(gcf, ['Cell_' num2str(i) '_stimulus_densitometry.png']);
         
-%         pause;
+        pause;
     end
 
 end
@@ -454,7 +455,7 @@ for i=1:size(std_dev_sub,1)
            title(['FitAmp: ' num2str(densitometry_fit_amplitude(i))]);axis([0 2 0 1.5]);
            drawnow; 
            
-           saveas(gcf, ['Cell_' num2str(i) '_stimulus.png']);
+%            saveas(gcf, ['Cell_' num2str(i) '_stimulus.png']);
         end
         
         % Control only
