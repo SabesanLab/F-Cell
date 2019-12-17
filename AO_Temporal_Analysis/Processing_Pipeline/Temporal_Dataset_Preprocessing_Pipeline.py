@@ -23,7 +23,7 @@ except:
     options['title'] = 'Please select your [MATLABROOT]\extern\engines\python folder to link to MATLAB.'
     matlab_folder_path = filedialog.askdirectory(**options)
 
-    ctypes.windll.shell32.ShellExecuteW(None, u"runas",  "C:\\Python36\\python.exe", u"setup.py install", matlab_folder_path, 1)
+    ctypes.windll.shell32.ShellExecuteW(None, u"runas",  "C:\\Python37\\python.exe", u"setup.py install", matlab_folder_path, 1)
 
     try:
         import matlab.engine

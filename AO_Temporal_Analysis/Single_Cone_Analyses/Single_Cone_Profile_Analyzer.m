@@ -8,7 +8,7 @@
 clear;
 close all;
 
-saveplots = false;
+saveplots = true;
 logmode = true;
 DENSTOMETRY_THRESHOLD = 0.1;
 RESPONSE_THRESHOLD = 0.3;
@@ -32,6 +32,9 @@ single_cone_response = nan(size(allcoords,1), length(single_cone_mat_files));
 single_cone_control_response = nan(size(allcoords,1), length(single_cone_mat_files));
 trial_validity = false(size(allcoords,1), length(single_cone_mat_files));
 
+all_stim_raw_time_inds = cell(length(single_cone_mat_files),1);
+all_stim_raw_reflectance_responses = cell(length(single_cone_mat_files),1);
+
 for i=1:length(single_cone_mat_files)
     single_cone_mat_files{i}
     load(fullfile(profile_dir,single_cone_mat_files{i}));
@@ -53,6 +56,10 @@ for i=1:length(single_cone_mat_files)
         single_cone_response(:,i) = log10(single_cone_response(:,i)+1);
         single_cone_control_response(:,i) = log10(single_cone_control_response(:,i)+1);
     end
+    
+    
+    all_stim_raw_reflectance_responses{i} =allstimsignals;    
+    
 end
 
 valid = all(~isnan(single_cone_response),2) & all(trial_validity,2);
@@ -76,6 +83,31 @@ ylabel('Absolute Mean reponse');
 if saveplots
     saveas(gcf, ['comparative_responses.png']); 
 end
+
+%% Compare Cone Responses 1:1
+
+figure; hold on;
+for k=1:length(valid) % Display each cone
+    if valid(k)
+        for i=1:length(single_cone_mat_files)
+           
+           subplot(length(single_cone_mat_files),1,i); hold on;
+
+            plot(all_stim_raw_reflectance_responses{i}{k}');
+
+            eachaxis(i,:) = axis;
+        end
+        
+        % Make all the axes the same.
+        for i=1:length(single_cone_mat_files)
+            subplot(length(single_cone_mat_files),1,i);
+            axis([max(eachaxis(:,1:2)) min(eachaxis(:,3)) max(eachaxis(:,4))]);
+        end
+%         title(num2str(corrcoef(all_stim_raw_reflectance_responses{i}{k})))
+        pause; clf;
+    end
+end
+
 
 %% Bland-Altman plot
 
@@ -107,14 +139,15 @@ end
 
 %% Histograms of the response from each mat file.
 
-lessthanvalid = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid & valid_densitometry;
-
+% lessthanvalid = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid & valid_densitometry;
+lessthanvalid = valid;
+figure;hold on;
 for i=1:length(single_cone_mat_files)
     
-    figure; hold on;
+     
     if logmode
-        histogram(single_cone_response(lessthanvalid,i),'BinWidth',log10(1.05));
-        histogram(single_cone_response(valid & ~lessthanvalid,i),'BinWidth',log10(1.05));        
+        histogram(single_cone_control_response(lessthanvalid,i),'BinWidth',log10(1.05));
+%         histogram(single_cone_response(valid & ~lessthanvalid,i),'BinWidth',log10(1.05));        
     else
         histogram(single_cone_response(valid,i),'BinWidth',0.2);
     end
@@ -124,7 +157,7 @@ for i=1:length(single_cone_mat_files)
         saveas(gcf, [single_cone_mat_files{i} '_allresps_histogramsplot.png']);
     end
 end
-% legend(single_cone_mat_files);
+legend(single_cone_mat_files);
 
 xlabel('Aggregate Response');
 ylabel('Number of Cones');
@@ -134,9 +167,9 @@ ylabel('Number of Cones');
 
 %% Vs plots
 
-for i=1:length(single_cone_mat_files)
+for i=1:length(single_cone_mat_files)-1
     figure; hold on;
-    plot(single_cone_control_response(:,i),single_cone_response(:,i),'.');
+    plot(single_cone_response(:,i),single_cone_response(:,i+1),'.');
     if logmode
         plot([-0.5 1.5],[-0.5 1.5],'k');
         axis equal;axis([-0.5 1 -0.5 1]); 

@@ -33,7 +33,7 @@ clear;
 
 
 CUTOFF = 5;
-NUMTRIALS= 5;
+NUMTRIALS= 15;
 CRITICAL_REGION = 72:90; % 72:90;
 window_size = 5;
 half_window = floor(window_size/2);
@@ -258,6 +258,7 @@ stim_posnegratio = nan(numstimcoords,max_index);
 stim_prestim_means = nan(numstimcoords,length(profileSDataNames));
 
 i=1;
+allstimsignals=cell(numstimcoords,1);
 
 fitops = fitoptions('Method','SmoothingSpline','SmoothingParam',0.999,'Normalize','on');
 for i=1:numstimcoords
@@ -270,7 +271,7 @@ for i=1:numstimcoords
     if ~isempty(CELL_OF_INTEREST)
         nonorm_ref = nan(length(profileSDataNames), max_index);
     end
-    allsignals=[];
+    
     allnormsignals=[];
     allstims=[];
     
@@ -292,16 +293,17 @@ for i=1:numstimcoords
             
 %             f = fit(stim_time_indexes{j}{i}',stim_cell_reflectance{j}{i}','SmoothingSpline',fitops);            
 %             all_smooth_times_ref(j, : ) = f(1:max_index);
-            allsignals = [allsignals [stim_time_indexes{j}{i}+(166*(j-1));
-                                      stim_cell_reflectance_nonorm{j}{i}(~isnan(stim_cell_reflectance_nonorm{j}{i}))]];
-            allnormsignals = [allnormsignals [stim_time_indexes{j}{i}+(166*(j-1));
-                                      stim_cell_reflectance{j}{i}]];
-            allstims = [allstims [(72:108)+(166*(j-1));
-                                      ones(1,37)*10]];
+%             allsignals = [allsignals [stim_time_indexes{j}{i}+(166*(j-1));
+%                                       stim_cell_reflectance_nonorm{j}{i}(~isnan(stim_cell_reflectance_nonorm{j}{i}))]];
+%             allnormsignals = [allnormsignals [stim_time_indexes{j}{i}+(166*(j-1));
+%                                       stim_cell_reflectance{j}{i}]];
+%             allstims = [allstims [(72:108)+(166*(j-1));
+%                                       ones(1,37)*10]];
         end
         
 
     end
+    allstimsignals{i} = all_times_ref;
     stim_trial_count(i) = numtrials;
     
     critical_region_ref =all_times_ref(:, CRITICAL_REGION);
@@ -494,7 +496,7 @@ close(THEwaitbar);
 save([ outFname '.mat'],'AmpResp','MedianResp','TTPResp',...
      'ControlAmpResp','ControlMedianResp','ControlPrestimVal',...
      'valid','allcoords','ref_image','control_cell_median',...
-     'control_cell_var','stim_cell_median','stim_cell_var','stim_prestim_means','stim_resp_range');
+     'control_cell_var','stim_cell_median','stim_cell_var','stim_prestim_means','stim_resp_range','allstimsignals');
 
  
 

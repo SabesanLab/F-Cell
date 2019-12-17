@@ -193,15 +193,15 @@ end
 outFname = [id '_' stimwave '_' stim_intensity '_' stim_time  '_' stim_loc '_aggregate_' num2str(length(profileSDataNames)) '_signals_twosource'];
 
 figure(8);  title('All control signals'); xlabel('Frame #'); ylabel('Standard deviations'); %axis([0 249 -20 75]);
-saveas(gcf, fullfile(pwd, [outFname '_allcontrol.png']), 'png' );
+% saveas(gcf, fullfile(pwd, [outFname '_allcontrol.png']), 'png' );
 figure(9);  title('All stimulus signals'); xlabel('Frame #'); ylabel('Standard deviations'); %axis([0 249 -20 75]);
-saveas(gcf, fullfile(pwd, [outFname '_allstim.png']), 'png' );
+% saveas(gcf, fullfile(pwd, [outFname '_allstim.png']), 'png' );
 
 hz=17.75;
 stim_start = 72;
 timeBase = ((1:allmax)/hz)';
 
-dlmwrite(fullfile(pwd, [outFname '.csv']), [timeBase sqrt(pooled_variance_stim) sqrt(pooled_variance_control)], ',' );
+% dlmwrite(fullfile(pwd, [outFname '.csv']), [timeBase sqrt(pooled_variance_stim) sqrt(pooled_variance_control)], ',' );
 
 
 figure(10); 
@@ -222,7 +222,7 @@ plot(trainlocs, max(pooled_std_stim)*ones(size(trainlocs)),'r*'); hold off;
 
 % plot(stim_locs, max([ref_variance_stim; ref_variance_control])*ones(size(stim_locs)),'r*'); hold off;
 ylabel('Pooled Standard deviation'); xlabel('Time (s)'); title( [stim_intensity ' ' stim_time 'pooled standard deviation of ' num2str(length(profileSDataNames)) ' signals.'] );
-axis([0 16 -1 5])
+axis([0 16 -1 10])
 hold off;
 saveas(gcf, fullfile(pwd, [outFname '.png']), 'png' );
 % saveas(gcf, fullfile(pwd, [outFname '.svg']), 'svg' );
