@@ -38,7 +38,7 @@ CRITICAL_REGION = 72:90; % 72:90;
 window_size = 5;
 half_window = floor(window_size/2);
 
-pipeline_type = 'moving_rms'; % Legacy mode is 'stddev'
+pipeline_type = 'stddev'; % Legacy mode is 'stddev', moving_rms is new
 
 CELL_OF_INTEREST = [];
 
@@ -491,7 +491,7 @@ end
 %%
 close(THEwaitbar);
 
-save([ outFname '.mat'],'AmpResp','MedianResp','TTPResp',...
+save([ outFname '.mat'],'pipeline_type', 'AmpResp','MedianResp','TTPResp',...
      'ControlAmpResp','ControlMedianResp','ControlPrestimVal',...
      'valid','allcoords','ref_image','control_cell_median',...
      'control_cell_var','stim_cell_median','stim_cell_var','stim_prestim_means','stim_resp_range');

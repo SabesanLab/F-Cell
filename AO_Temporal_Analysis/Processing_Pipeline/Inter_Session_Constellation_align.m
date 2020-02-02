@@ -1,4 +1,4 @@
-% addpath(genpath('C:\Users\dontm\Dropbox (Personal)\Research\Projects\AOAutomontaging\AOAutomontaging\SupportFunctions'))
+addpath(genpath(fullfile(fileparts(which('Inter_Session_Constellation_align')), 'SupportFunctions')));
 
 if ~exist('vl_sift')
     error('Didn''t detect vl_sift on the path. Make sure to add SupportFunctions to the path!');

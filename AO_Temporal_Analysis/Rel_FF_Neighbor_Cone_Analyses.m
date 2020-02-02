@@ -35,10 +35,10 @@ clear;
 
 % load('lowest_responders.mat');
 
-CUTOFF = 26;
+CUTOFF = 10;
 NUM_NEIGHBORS = 3;
 NUMTRIALS=20 * (NUM_NEIGHBORS + 1);
-CRITICAL_REGION = 66:100;
+CRITICAL_REGION = 72:90;
 
 
 CELL_OF_INTEREST = [];
@@ -68,7 +68,7 @@ profileCDataNames = read_folder_contents(controlRootDir,'mat');
 [remain stimwave] = getparent(remain); % wavelength
 % [remain sessiondate] = getparent(remain); % date
 [~, id] = getparent(remain); % id
-outFname = [id '_' stimwave '_' stim_intensity '_' stim_time  '_' stim_loc '_' num2str(length(profileSDataNames)) '_single_cone_signals'];
+outFname = [id '_' stimwave '_' stim_intensity '_' stim_time  '_' stim_loc '_' num2str(length(profileSDataNames)) '_' num2str(NUM_NEIGHBORS) '_neighbor_cone_signals'];
 
 
 
@@ -199,7 +199,7 @@ for i=1:numstimcoords
     for j=1:length(profileSDataNames)
         
         if ~isempty(stim_cell_reflectance{j}{i}) && ...
-           sum(stim_time_indexes{j}{i} >= 67 & stim_time_indexes{j}{i} <=99) >= CUTOFF
+           sum(stim_time_indexes{j}{i} >= CRITICAL_REGION(1) & stim_time_indexes{j}{i} <=CRITICAL_REGION(end)) >= CUTOFF
 
             stim_prestim_means = [stim_prestim_means; stim_cell_prestim_mean{j}(i)];
 
@@ -218,7 +218,7 @@ for i=1:numstimcoords
         for j=1:length(profileSDataNames)
 
             if ~isempty(stim_cell_reflectance{j}{theind}) && ...
-               sum(stim_time_indexes{j}{theind} >= 67 & stim_time_indexes{j}{theind} <=99) >= CUTOFF
+               sum(stim_time_indexes{j}{theind} >= CRITICAL_REGION(1) & stim_time_indexes{j}{theind} <=CRITICAL_REGION(end)) >= CUTOFF
 
                 stim_prestim_means = [stim_prestim_means; stim_cell_prestim_mean{j}(theind)];
 
@@ -292,7 +292,7 @@ for i=1:numcontrolcoords
     for j=1:length(profileCDataNames)
                         
         if ~isempty(control_cell_reflectance{j}{i}) && ...
-           sum(control_time_indexes{j}{i} >= 67 & control_time_indexes{j}{i} <=99) >=  CUTOFF
+           sum(control_time_indexes{j}{i} >= CRITICAL_REGION(1) & control_time_indexes{j}{i} <= CRITICAL_REGION(end)) >=  CUTOFF
        
             cont_prestim_means = [cont_prestim_means; control_cell_prestim_mean{j}(i)];
             numtrials = numtrials+1;
@@ -310,7 +310,7 @@ for i=1:numcontrolcoords
         for j=1:length(profileCDataNames)
 
             if ~isempty(control_cell_reflectance{j}{theind}) && ...
-               sum(control_time_indexes{j}{theind} >= 67 & control_time_indexes{j}{theind} <=99) >=  CUTOFF
+               sum(control_time_indexes{j}{theind} >= CRITICAL_REGION(1) & control_time_indexes{j}{theind} <= CRITICAL_REGION(end)) >=  CUTOFF
 
                 cont_prestim_means = [cont_prestim_means; control_cell_prestim_mean{j}(theind)];
                 numtrials = numtrials+1;
@@ -383,8 +383,7 @@ if ~isempty(CELL_OF_INTEREST )
     saveas(gcf, ['Cell_' num2str(CELL_OF_INTEREST) '_subs.svg']);
 end
 
-%% Analyze the signals
-fitops = fitoptions('Method','SmoothingSpline','SmoothingParam',0.99,'Normalize','on');
+
 AmpResp = nan(size(std_dev_sub,1),1);
 MedianResp = nan(size(std_dev_sub,1),1);
 TTPResp = nan(size(std_dev_sub,1),1);
@@ -408,9 +407,7 @@ for i=1:size(std_dev_sub,1)
         interpinds = firstind(1):lastind;
         goodinds = allinds(nanners);
         std_dev_sig = interp1(goodinds, std_dev_sig(nanners), interpinds, 'linear');
-        f = fit(interpinds', std_dev_sig','SmoothingSpline',fitops);     
-%         filt_stddev_sig = wavelet_denoise( std_dev_sig );
-        filt_stddev_sig = f(interpinds);
+        filt_stddev_sig = std_dev_sig;
 
         median_sig = median_sub(i,2:end);
         nanners = ~isnan(median_sig);
@@ -419,13 +416,12 @@ for i=1:size(std_dev_sub,1)
         interpinds = firstind(1):lastind;
         goodinds = allinds(nanners);
         median_sig = interp1(goodinds, median_sig(nanners), interpinds, 'linear');
-        f = fit(interpinds', median_sig','SmoothingSpline',fitops);     
-%         filt_median_sig = wavelet_denoise( median_sig );
-        filt_median_sig = f(interpinds);
+        filt_median_sig = median_sig;
+
         critical_filt = filt_stddev_sig( CRITICAL_REGION );
         
         [~, TTPResp(i)] = max( abs(critical_filt) );    
-        AmpResp(i) = critical_filt(TTPResp(i))-mean(filt_stddev_sig(1:CRITICAL_REGION(1)));        
+        AmpResp(i) = quantile(critical_filt,0.95);
         MedianResp(i) = max(abs(filt_median_sig(CRITICAL_REGION))-mean(filt_median_sig(1:CRITICAL_REGION(1))) );        
         PrestimVal(i) = mean( stim_prestim_means(i,:),2, 'omitnan');
         
@@ -446,7 +442,7 @@ for i=1:size(std_dev_sub,1)
            title(['FitAmp: ' num2str(densitometry_fit_amplitude(i))]);axis([0 2 0 1.5]);
            drawnow; 
            
-           saveas(gcf, ['Cell_' num2str(i) '_stimulus.png']);
+%            saveas(gcf, ['Cell_' num2str(i) '_stimulus.png']);
         end
         
         % Control only
@@ -457,9 +453,8 @@ for i=1:size(std_dev_sub,1)
         interpinds = firstind(1):lastind;
         goodinds = allinds(nanners);
         std_dev_sig = interp1(goodinds, std_dev_sig(nanners), interpinds, 'linear');
-        f = fit(interpinds', std_dev_sig','SmoothingSpline',fitops);
-        filt_stddev_sig = f(interpinds);
-%         filt_stddev_sig = wavelet_denoise( std_dev_sig );
+        filt_stddev_sig = std_dev_sig;
+
         
         median_sig = control_median_sub(i,2:end);        
         nanners = ~isnan(median_sig);        
@@ -468,22 +463,22 @@ for i=1:size(std_dev_sub,1)
         interpinds = firstind(1):lastind;
         goodinds = allinds(nanners);        
         median_sig = interp1(goodinds, median_sig(nanners), interpinds, 'linear');
-        f = fit(interpinds', median_sig','SmoothingSpline',fitops);
-        filt_median_sig = f(interpinds);
-%         filt_median_sig = wavelet_denoise( median_sig );
+        filt_median_sig = median_sig;
+
 
         critical_filt = filt_stddev_sig( CRITICAL_REGION );
         
-        ControlAmpResp(i) = critical_filt(TTPResp(i))-mean(filt_stddev_sig(1:CRITICAL_REGION(1)));
+        ControlAmpResp(i) = quantile(critical_filt,0.95);
         ControlMedianResp(i) = max(abs(filt_median_sig(CRITICAL_REGION))-mean(filt_median_sig(1:CRITICAL_REGION(1))) );        
         ControlPrestimVal(i) = mean( cont_prestim_means(i,:),2, 'omitnan');
 %         histogram(filt_stddev_sig(CRITICAL_REGION),20)
 
     end
 end
+%%
 close(THEwaitbar);
 %%
-save([ outFname '.mat'],'AmpResp','MedianResp','TTPResp',...
+save([ outFname '.mat'], 'AmpResp','MedianResp','TTPResp',...
      'ControlAmpResp','ControlMedianResp','ControlPrestimVal',...
      'valid','allcoords','ref_image','control_cell_median',...
      'control_cell_var','stim_cell_median','stim_cell_var','stim_prestim_means');

@@ -9,7 +9,7 @@ clear;
 close all;
 
 saveplots = false;
-logmode = true;
+logmode = false;
 DENSTOMETRY_THRESHOLD = 0.1;
 RESPONSE_THRESHOLD = 0.3;
 
@@ -69,7 +69,7 @@ generate_spatial_map(single_cone_control_response, allcoords, valid, single_cone
 %% Amplitude vs Median response
 figure; hold on;
 for i=1:length(single_cone_mat_files)
-    plot(stimAmp(valid, i) ,abs(stimMedian(valid, i)),'.');
+    plot([25 50 140], [single_cone_response(:,2) single_cone_response(:,3) single_cone_response(:,1)] ,'.');
 end
 xlabel('Std dev reponse');
 ylabel('Absolute Mean reponse');
@@ -136,15 +136,15 @@ ylabel('Number of Cones');
 
 for i=1:length(single_cone_mat_files)
     figure; hold on;
-    plot(single_cone_control_response(:,i),single_cone_response(:,i),'.');
+    plot(single_cone_control_response(:,i),single_cone_response(:,i),'k.');
     if logmode
         plot([-0.5 1.5],[-0.5 1.5],'k');
         axis equal;axis([-0.5 1 -0.5 1]); 
     else
         plot([-10 10],[-10 10],'k');
-        axis equal; axis([-0.5 2 -0.5 15]); 
+        axis equal; axis([-0.5 2 -0.5 10]); 
     end
-    
+    xlabel('Control Response'); ylabel('Stmulus Response')
     if saveplots
         saveas(gcf, [single_cone_mat_files{i}(1:end-4) '_VS_plot.png']);
     end
@@ -279,11 +279,12 @@ lessthanvalid = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid & va
 lownotdens = find((lessthanvalid < (valid & valid_densitometry) ) & ...
              (single_cone_response(:,1)<0.45 & single_cone_response(:,2)<0.45));
 
+
 figure; hold on;
 plot(single_cone_response(:,1),single_cone_response(:,2),'k.');
 plot([-10 10],[-10 10],'k');
 axis equal; axis([-0.5 2 -0.5 15]);
-axis([-0.5 2 -0.5 2]);
+axis([-0.5 10 -0.5 10]);
 xlabel('Timepoint 1'); ylabel('Timepoint 2');
 title('Responses between both time points.')
 % plot(single_cone_response(lownotdens,1),single_cone_response(lownotdens,2),'b.');
@@ -293,11 +294,11 @@ if saveplots
     saveas(gcf, [single_cone_mat_files{1}(1:end-4) '_Repeat_plot_thresh_' num2str(DENSTOMETRY_THRESHOLD) '.png']);
 end
 
-figure; hold on;
-% plot(mean(single_cone_response(lownotdens,:),2), densitometry_fit_amplitude(lownotdens),'b*')
-plot(mean(single_cone_response(lessthanvalid,:),2), densitometry_fit_amplitude(lessthanvalid),'r*')
-xlabel('Mean cone response (std dev + median)');
-ylabel('Densitometry fit amplitude');
+% figure; hold on;
+% % plot(mean(single_cone_response(lownotdens,:),2), densitometry_fit_amplitude(lownotdens),'b*')
+% plot(mean(single_cone_response(lessthanvalid,:),2), densitometry_fit_amplitude(lessthanvalid),'r*')
+% xlabel('Mean cone response (std dev + median)');
+% ylabel('Densitometry fit amplitude');
 
 if saveplots
     saveas(gcf, [single_cone_mat_files{1}(1:end-4) '_dens_vs_mag_plot_thresh_' num2str(DENSTOMETRY_THRESHOLD) '.png']);
