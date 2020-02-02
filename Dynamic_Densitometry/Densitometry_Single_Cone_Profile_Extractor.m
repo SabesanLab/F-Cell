@@ -6,7 +6,7 @@ clear;
 close all;
 
 
-NUMTRIALS=8;
+NUMTRIALS=4;
 CRITICAL_TIME = 0:69;
 START_IND=5;
 
@@ -154,29 +154,29 @@ for i=1:numstimcoords
         densitometry_init_val(i) = mean(initvals(:),'omitnan');
 
         
-        if any(i==CELL_OF_INTEREST) || (densitometry_fit_amplitude(i) <=0.1)
-            %%
-            figure(1); clf; hold on;
-            
-            datapresent={};
-            for j=1:length(profileSDataNames)                
-                if any(~isnan(all_times_ref(j,:)))
-                     plot(all_times(j,:)-START_TIME, all_times_ref(j,:),'.');
-                    datapresent = [datapresent; {num2str(j)}];
-                end
-            end
-            legend(datapresent);
-%             plot(vect_times,vect_ref,'r*')
-            plot(CRITICAL_TIME/hz, criticalfit(i,:));
-            xlabel('Time index'); ylabel('Standardized Response');
-            title(['Cell #:' num2str(i) ', Amplitude: ' num2str(densitometry_fit_amplitude(i))]);
-            axis([0 CRITICAL_TIME(end)/hz 0 1.5]);
-            hold off;
-            drawnow;
-            fitresult
-%             saveas(gcf, [outFname '_cell_' num2str(i) '.png']);
-            pause;
-        end
+%         if any(i==CELL_OF_INTEREST) || (densitometry_fit_amplitude(i) <=0.1)
+%             %%
+%             figure(1); clf; hold on;
+%             
+%             datapresent={};
+%             for j=1:length(profileSDataNames)                
+%                 if any(~isnan(all_times_ref(j,:)))
+%                      plot(all_times(j,:)-START_TIME, all_times_ref(j,:),'.');
+%                     datapresent = [datapresent; {num2str(j)}];
+%                 end
+%             end
+%             legend(datapresent);
+% %             plot(vect_times,vect_ref,'r*')
+%             plot(CRITICAL_TIME/hz, criticalfit(i,:));
+%             xlabel('Time index'); ylabel('Standardized Response');
+%             title(['Cell #:' num2str(i) ', Amplitude: ' num2str(densitometry_fit_amplitude(i))]);
+%             axis([0 CRITICAL_TIME(end)/hz 0 1.5]);
+%             hold off;
+%             drawnow;
+%             fitresult
+% %             saveas(gcf, [outFname '_cell_' num2str(i) '.png']);
+% %             pause;
+%         end
         
     end
 

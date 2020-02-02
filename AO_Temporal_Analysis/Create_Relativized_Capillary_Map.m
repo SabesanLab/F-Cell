@@ -13,12 +13,12 @@ end
 mov_path = uigetdir(pwd,'Select the directory of piped avis to create a capillary map from.');
 
 
-fNames = read_folder_contents(mov_path,'avi');
+fNames = read_folder_contents_rec(mov_path,'avi');
 
 for f=1:length(fNames)
     if strcmp('_piped.avi', fNames{f}(end-length('_piped.avi')+1:end)) && ...
-       (contains(fNames{f}, 'confocal') || contains(fNames{f}, 'visible'))
-        temporal_stack_reader = VideoReader( fullfile(mov_path,fNames{f}) );
+       contains(fNames{f}, 'confocal')
+        temporal_stack_reader = VideoReader( fNames{f} );
         varImages = nan(temporal_stack_reader.Height, temporal_stack_reader.Width, length(fNames));
         break;
     end
@@ -29,9 +29,9 @@ end
 parfor f=1:length(fNames)
 
     if strcmp('_piped.avi', fNames{f}(end-length('_piped.avi')+1:end)) && ...
-       (contains(fNames{f}, 'confocal') || contains(fNames{f}, 'visible'))
+       contains(fNames{f}, 'confocal')
         fNames{f}
-        temporal_stack_reader = VideoReader( fullfile(mov_path,fNames{f}) );
+        temporal_stack_reader = VideoReader( fNames{f} );
 
         temporal_stack=zeros(temporal_stack_reader.Height, temporal_stack_reader.Width,... 
                              round(temporal_stack_reader.Duration*temporal_stack_reader.FrameRate));
@@ -101,7 +101,7 @@ sdImagestretched = sdImageminsub./max(sdImageminsub(:));
 
 figure(1); imagesc( sdImagestretched ); colormap gray; axis image;
 
-capillary_mask = imbinarize(sdImagestretched,adaptthresh(sdImagestretched,0.55));
+capillary_mask = imbinarize(sdImagestretched,adaptthresh(sdImagestretched,0.5));
 capillary_mask = imclose(capillary_mask, strel('disk',7));
 
 

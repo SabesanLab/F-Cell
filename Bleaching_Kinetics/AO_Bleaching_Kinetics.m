@@ -5,12 +5,12 @@
 % experiments.
 
 clear;
-close all force;
+% close all force;
 % tbDeployToolboxes('registered',{'isetbio', 'BrainardLabToolbox','Psychtoolbox-3','SilentSubstitutionToolbox'})
 
 units = 'trolands';
 stim_lambda = 545; % in nm
-stim_irradiance = 1.8; % in uW
+stim_irradiance =  0.150; % in uW
 
 num_acquisitions = 13;
 single_trial_train = [0 1  0;
@@ -84,5 +84,5 @@ plot(time, bleach_curve*100); hold on;
 plot([time(1) time(end)],[mean(highpks) mean(highpks)]*100, 'k');
 plot([time(1) time(end)],[1-mean(lowpks) 1-mean(lowpks)]*100, 'k');
 xlabel('Time (s)'); ylabel('Percent Pigment Remaining');
-title(['Mean bleach differential: ' num2str(round(mean_differential*100)) '% over time with a ' num2str(log10(I)) 'log Td stimulus.']);
+title(['Mean bleach differential: ' num2str(round(mean_differential*100,3)) '% over time with a ' num2str(log10(I)) 'log Td stimulus.']);
 axis([0 time(end) -5 105])

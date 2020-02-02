@@ -45,7 +45,7 @@ for j=1:size(single_cone_response,2)
     %             plot(coords(i,1), coords(i,2),'.','Color', thismap(thiscolorind,:), 'MarkerSize', 15 );
                     patch(V(C{i},1),V(C{i},2),ones(size(V(C{i},1))),'FaceColor', thismap(thiscolorind,:), 'EdgeColor','none');
                 else
-                    patch(V(C{i},1),V(C{i},2),ones(size(V(C{i},1))),'FaceColor', thismap(thiscolorind,:));
+                    patch(V(C{i},1),V(C{i},2),ones(size(V(C{i},1))),'FaceColor', thismap(thiscolorind,:), 'EdgeColor','red');
                 end
             end
         end
