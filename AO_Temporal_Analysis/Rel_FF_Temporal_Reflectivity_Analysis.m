@@ -138,9 +138,10 @@ mask_image = mask_image.*capillary_mask;
 temporal_stack = temporal_stack.*capillary_masks;
 
 %% Isolate individual profiles
-[V, C]=voronoin(ref_coords);
-[X, Y ] = meshgrid(1:size(ref_image,2), 1:size(ref_image,1));
-
+if strcmp(profile_method, 'voronoi')
+    [V, C]=voronoin(ref_coords);
+    [X, Y ] = meshgrid(1:size(ref_image,2), 1:size(ref_image,1));
+end
 ref_coords = round(ref_coords);
 
 cellseg = cell(size(ref_coords,1),1);
@@ -174,14 +175,14 @@ for i=1:size(ref_coords,1)
         if (all(C{i}~=1)  && all(vertices(:,1)<size(ref_image,2)) && all(vertices(:,2)<size(ref_image,1)) ... % [xmin xmax ymin ymax] 
                          && all(vertices(:,1)>=1) && all(vertices(:,2)>=1)) 
 
-            in = inpolygon(X(:), Y(:), vertices(:,1), vertices(:,2));
+            [in, on] = inpolygon(X(:), Y(:), vertices(:,1), vertices(:,2));
        
             cellseg_inds{i} = sub2ind( size(mask_image), Y(in), X(in) );
 
             cellseg_inds{i} = cellseg_inds{i}(:);
 
             mask_image(cellseg_inds{i})= -1;
-            imagesc(mask_image); colormap gray;
+            
         end
     end
 end
@@ -229,7 +230,7 @@ vid_size = size(temporal_stack(:,:,1));
 
 
 for i=1:length(cellseg_inds)
-    waitbar(i/length(cellseg_inds),wbh, ['Creating reflectance profile for cell: ' num2str(i)]);
+%     waitbar(i/length(cellseg_inds),wbh, ['Creating reflectance profile for cell: ' num2str(i)]);
 
     cell_times{i} = stimd_images;
     cell_reflectance{i} = zeros(1, size(temporal_stack,3));
@@ -242,14 +243,40 @@ for i=1:length(cellseg_inds)
         [m,n] = ind2sub(vid_size, cellseg_inds{i});
         
         thisstack = temporal_stack(min(m):max(m), min(n):max(n),:);        
+        
+%         cellseg{i} = temporal_stack((min(m)-5):(max(m)+5), (min(n)-5):(max(n)+5),:); % Remove before production code.
+        
         thisstack(thisstack == 0) = NaN;
         
         thisstack = sum(thisstack,1);
         thisstack = squeeze(sum(thisstack,2));
         thisstack = thisstack./ (length(cellseg_inds{i})*ones(size(thisstack)));
         
+        
         cell_reflectance{i} = thisstack';
 
+    elseif strcmp(profile_method, 'voronoi')    
+        
+        % Remove the below BEFORE production code!
+        [m,n] = ind2sub(vid_size, cellseg_inds{i});
+        cellseg{i} = nan( max(m)-min(m)+1, max(n)-min(n)+1, size(temporal_stack,3));
+        
+        for t=1:size(temporal_stack,3)
+ 
+            masked_timepoint = temporal_stack(:,:,t); 
+            
+            % Remove the below BEFORE production code!
+            for ind=1:length(m)
+                cellseg{i}(m(ind)-min(m)+1, n(ind)-min(n)+1,t) = masked_timepoint(m(ind), n(ind)); 
+            end
+            
+            if all( masked_timepoint(cellseg_inds{i}) ~= 0 )
+                cell_reflectance{i}(t) = mean( masked_timepoint(cellseg_inds{i}));
+            else            
+                cell_reflectance{i}(t) =  NaN;
+            end
+        end         
+        
     else
 
          for t=1:size(temporal_stack,3)
@@ -290,6 +317,8 @@ end
 % saveas(gcf, fullfile(mov_path, 'Frame_Stddev_Plots' , [ref_image_fname(1:end - length('_STD_DEV.tif') ) '_' profile_method '_cutoff_' norm_type '_' vid_type '_mean_plot.png' ] ) );
 
 
+
+
 %% Normalization to the mean
 norm_cell_reflectance = cell( size(cell_reflectance) );
 cell_prestim_mean = nan(size(cell_reflectance));
@@ -316,6 +345,19 @@ for i=1:length( cell_reflectance )
     cell_times{i}       = cell_times{i}(no_ref);
        
 end
+
+
+% Why not consider summed normalized reflectance to be the total number of photons hitting
+% detector? Seems like it'd be less sensitive to outliers AND moving
+% profiles.
+% coi = 4;
+% temporalhist = zeros(length(0:.1:3.5)-1,size(temporal_stack,3));
+% for i=1:size(temporal_stack,3)
+%     [temporalhist(:,i), edges, bins]= histcounts(cellseg{coi}(:,:,i)./ref_mean(i), 0:.1:3.5);
+%    figure(1); imagesc( cellseg{coi}(:,:,i) ); colormap gray; axis image; title(['Timepoint ' num2str(i) ' maxval: ' num2str(sum(sum(cellseg{1}(:,:,i)./ref_mean(i),'omitnan'),'omitnan'))]);
+%    pause();
+% 
+% end
 
 
 %% Standardization
@@ -434,13 +476,13 @@ norm_cell_reflectance = norm_cell_reflectance( ~cellfun(@isempty,norm_cell_refle
 cell_times            = cell_times( ~cellfun(@isempty,cell_times) );
 
 
-figure(11);
-if ~isempty(ref_stddev)
-    for i=1:length(norm_cell_reflectance)
-        plot(cell_times{i}, norm_cell_reflectance{i},'k' ); hold on;
-    end
-end
-hold off;
+% figure(11);
+% if ~isempty(ref_stddev)
+%     for i=1:length(norm_cell_reflectance)
+%         plot(cell_times{i}, norm_cell_reflectance{i},'k' ); hold on;
+%     end
+% end
+% hold off;
 
 
 %% Save the plots

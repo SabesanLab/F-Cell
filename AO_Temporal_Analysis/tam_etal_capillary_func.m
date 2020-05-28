@@ -41,7 +41,7 @@ for i=1:numFrames-1
 
 %     imagesc( divVideo(:,:,i) ); axis image; colormap gray; title(num2str(i));
 %     drawnow;
-%     pause(1);
+%     pause;
 end
 clear pceptVideo;
 

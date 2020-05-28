@@ -76,7 +76,7 @@ for i=1:size(varImages,3)
     sum_map = sum_map+nonzmask;
     gausfiltImages(:,:,i) = nonzmask.*imgaussfilt(varImages(:,:,i),15,'FilterSize',71);
     
-%     figure(1); imagesc(gausfiltImages(:,:,i)); colormap gray;
+%     figure(1); imagesc(varImages(:,:,i)); colormap gray;
 %     pause;
 end
 
@@ -101,8 +101,8 @@ sdImagestretched = sdImageminsub./max(sdImageminsub(:));
 
 figure(1); imagesc( sdImagestretched ); colormap gray; axis image;
 
-capillary_mask = imbinarize(sdImagestretched,adaptthresh(sdImagestretched,0.5));
-capillary_mask = imclose(capillary_mask, strel('disk',7));
+capillary_mask = imbinarize(sdImagestretched,adaptthresh(sdImagestretched,0.45));
+capillary_mask = imclose(capillary_mask, strel('disk',5));
 
 
 figure(2); imagesc( capillary_mask ); colormap gray; axis image;

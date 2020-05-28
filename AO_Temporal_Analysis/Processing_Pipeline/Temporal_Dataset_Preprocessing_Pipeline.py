@@ -203,7 +203,8 @@ for thisfile in os.listdir(dmp_folder_path):
                          anchorfile = mat_engi.Eye_Motion_Distortion_Repair_Pipl(image_folder_path, image, pick['strip_cropping_ROI_2'][-1],
                                                           shift_array.tolist(), static_distortion, cropregion, nargout=3)                                             
 
-                np.savetxt(os.path.join(writtenfile[1], thisfile[0:-4] + "_repaired_acceptable_frames.csv"),
+                print(writtenfile)
+                np.savetxt(os.path.join(writtenfile[1], writtenfile[0][0:-4] + "_acceptable_frames.csv"),
                            pick['acceptable_frames'],
                            delimiter=',', fmt='%f')
                 

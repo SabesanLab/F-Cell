@@ -1,4 +1,4 @@
-function [] = generate_spatial_map(single_cone_response, coords, valid_cells, names, suffix, saveplots, tohighlight)
+function [] = generate_spatial_map(single_cone_response, coords, valid_cells, threshold, names, suffix, saveplots, tohighlight)
 %generate_spatial_map(single_cone_response, coords, valid_cells, names)
 %
 % 2018-08-29 Robert F Cooper
@@ -10,10 +10,18 @@ if ~exist('tohighlight','var')
     tohighlight = zeros(size(valid_cells));
 end
 
+
+    
+
 for j=1:size(single_cone_response,2)
     
-    upper_thresh = quantile(single_cone_response(:,j),0.95); 
-    lower_thresh = quantile(single_cone_response(:,j),0.05);
+    if isempty(threshold)
+        upper_thresh = quantile(single_cone_response(:,j),0.95); 
+        lower_thresh = quantile(single_cone_response(:,j),0.05);
+    else
+        upper_thresh = threshold(2);
+        lower_thresh = threshold(1);
+    end
 
     thismap = parula( ((upper_thresh-lower_thresh)*100)+2); 
 
@@ -43,9 +51,9 @@ for j=1:size(single_cone_response,2)
                                     && all(vertices(:,1)>0) && all(vertices(:,2)>0)
                 if tohighlight(i)
     %             plot(coords(i,1), coords(i,2),'.','Color', thismap(thiscolorind,:), 'MarkerSize', 15 );
-                    patch(V(C{i},1),V(C{i},2),ones(size(V(C{i},1))),'FaceColor', thismap(thiscolorind,:), 'EdgeColor','none');
-                else
                     patch(V(C{i},1),V(C{i},2),ones(size(V(C{i},1))),'FaceColor', thismap(thiscolorind,:), 'EdgeColor','red');
+                else
+                    patch(V(C{i},1),V(C{i},2),ones(size(V(C{i},1))),'FaceColor', thismap(thiscolorind,:), 'EdgeColor','none');
                 end
             end
         end
