@@ -10,7 +10,7 @@ NUMTRIALS=4;
 CRITICAL_TIME = 0:69;
 START_IND=5;
 
-CELL_OF_INTEREST = [];
+CELL_OF_INTEREST = [211 404 476 783 991 1045 1398]; % High intrinsic, low densitometry.
 
 if isempty(CELL_OF_INTEREST)
     close all force;
@@ -110,7 +110,7 @@ i=1;
 ft = fittype( 'c-a*exp(-x/b)', 'independent', 'x', 'dependent', 'y' );
 opts = fitoptions( 'Method', 'NonlinearLeastSquares');
 opts.Display = 'Off';
-opts.Lower = [-0.5 0 0];
+opts.Lower = [-0.2 0 0];
 opts.Upper = [2 1 2];
 
 
@@ -154,10 +154,10 @@ for i=1:numstimcoords
         densitometry_init_val(i) = mean(initvals(:),'omitnan');
 
         
-%         if any(i==CELL_OF_INTEREST) || (densitometry_fit_amplitude(i) <=0.1)
-%             %%
-%             figure(1); clf; hold on;
-%             
+        if any(i==CELL_OF_INTEREST) || (densitometry_fit_amplitude(i) <=-0.1)
+            %%
+            figure(1); clf; hold on;
+            
 %             datapresent={};
 %             for j=1:length(profileSDataNames)                
 %                 if any(~isnan(all_times_ref(j,:)))
@@ -166,17 +166,18 @@ for i=1:numstimcoords
 %                 end
 %             end
 %             legend(datapresent);
-% %             plot(vect_times,vect_ref,'r*')
-%             plot(CRITICAL_TIME/hz, criticalfit(i,:));
-%             xlabel('Time index'); ylabel('Standardized Response');
-%             title(['Cell #:' num2str(i) ', Amplitude: ' num2str(densitometry_fit_amplitude(i))]);
-%             axis([0 CRITICAL_TIME(end)/hz 0 1.5]);
-%             hold off;
-%             drawnow;
+%             plot(vect_times,vect_ref,'r*')
+plot(densitometry_vect_times{i}, densitometry_vect_ref{i},'.');
+            plot(CRITICAL_TIME/hz, criticalfit(i,:));
+            xlabel('Time index'); ylabel('Standardized Response');
+            title(['Cell #:' num2str(i) ', Amplitude: ' num2str(densitometry_fit_amplitude(i))]);
+            axis([0 3 0 1.5]);
+            hold off;
+            drawnow;
 %             fitresult
-% %             saveas(gcf, [outFname '_cell_' num2str(i) '.png']);
-% %             pause;
-%         end
+%             saveas(gcf, [outFname '_cell_' num2str(i) '.png']);
+%             pause;
+        end
         
     end
 
@@ -205,7 +206,41 @@ counts = histcounts(densitometry_fit_amplitude,-0.1:0.02:1);
 
 %%
 figure; clf;
-lessthanvalid = (densitometry_fit_amplitude<=0) & valid_densitometry;
+reghist = histogram(densitometry_fit_amplitude,'BinWidth',.015);
+
+
+mainpeakind = mode(discretize(densitometry_fit_amplitude, reghist.BinEdges));
+mainpeakval = reghist.Values(mainpeakind);
+mainpeak = reghist.BinEdges(mainpeakind);
+
+% Fit a gaussian mixture model to determine which is which.
+sigmar = std(densitometry_fit_amplitude,'omitnan')
+sigmar =repmat(sigmar,[1 1 2]);
+startstruct = struct('mu',[min(reghist.BinEdges); mainpeak],'Sigma', sigmar,'ComponentProportion',[.15; .85]);
+
+gausfits=fitgmdist(densitometry_fit_amplitude,2,'Start', startstruct)
+
+range = min(densitometry_fit_amplitude):.001:max(densitometry_fit_amplitude);
+leftmix=pdf('Normal',range',gausfits.mu(1),sqrt(gausfits.Sigma(1)));
+rightmix=pdf('Normal',range',gausfits.mu(2),sqrt(gausfits.Sigma(2)));
+mewomix=pdf(gausfits,range');
+
+normleftmix = mainpeakval.*gausfits.ComponentProportion(1).*leftmix./max(leftmix);
+normrightmix = mainpeakval.*gausfits.ComponentProportion(2).*rightmix./max(rightmix);
+normmewomix = mainpeakval.*mewomix./max(mewomix);
+
+
+hold on;
+plot(range,normleftmix); 
+plot(range,normrightmix);
+plot(range,normmewomix);
+
+
+DENSTOMETRY_THRESHOLD = max(range(normleftmix>normrightmix));
+
+
+figure; clf;
+lessthanvalid = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid_densitometry;
 [V,C] = voronoin(allcoords,{'QJ'});
 numlowresp=0;
 for i=1:size(allcoords,1)

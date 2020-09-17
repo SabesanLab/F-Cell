@@ -66,7 +66,7 @@ for j=1:size(single_cone_response,2)
     hold off; drawnow;
     if saveplots
         set(gcf, 'Renderer', 'painters');
-        saveas(gcf, [names{j}(1:end-4) suffix '_spatial_map.png']);
+        saveas(gcf, [names{j}(1:end-4) suffix '_spatial_map.svg']);
     end
 end
 

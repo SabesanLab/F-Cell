@@ -357,7 +357,7 @@ for k=1:length(video_fname)
         maxcropregion(3) = size(sum_map,2);
     end    
     
-    average_frm_mask = sum_map > ceil(mean(sum_map(:)));
+    average_frm_mask = sum_map >= ceil(mean(sum_map(:)));
     % Find the largest incribed rectangle in this mask.
     [C, h, w, largest_rect] =FindLargestRectangles(average_frm_mask,[1 1 0], [300 150]);
 

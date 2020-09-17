@@ -63,7 +63,7 @@ for i=1:length(stack_fnames)
         acceptable_frames_fname = temporal_stack_fname; %strrep(stack_fnames{i},'visible','confocal') % Analyze the visible channel!
         acceptable_frames_fname = [acceptable_frames_fname(1:end-4) '_acceptable_frames.csv'];
         
-        if ~exist(acceptable_frames_fname,'file')
+        if ~exist(fullfile(mov_path, acceptable_frames_fname),'file')
             acceptable_frames_fname = strrep(temporal_stack_fname,'visible','confocal'); % Analyze the visible channel!
             acceptable_frames_fname = [acceptable_frames_fname(1:end-4) '_acceptable_frames.csv'];
         end
