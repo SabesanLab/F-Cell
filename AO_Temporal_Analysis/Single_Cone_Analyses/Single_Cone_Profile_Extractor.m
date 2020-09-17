@@ -33,14 +33,16 @@ clear;
 
 
 CUTOFF = 10;
-NUMTRIALS= 15;
-CRITICAL_REGION = 72:108; % 72:90;
-window_size = 3;
+NUMTRIALS= 25;
+CRITICAL_REGION = 72:92; 
+window_size = 5;
 half_window = floor(window_size/2);
 
 pipeline_type = 'moving_rms'; % Legacy mode is 'stddev', moving_rms is new
 
-CELL_OF_INTEREST = [];
+CELL_OF_INTEREST = [];%[31 83 198 599 746 790 794 824 842 1083 1255 1277];
+% CELL_OF_INTEREST = [7 26 44 54 62 82 96 132 162 169 195 236 261 168 324 370 377 404 412 438 439 449 507 565 572 594 609 660 784 786 809 830 858 873 902];
+% CELL_OF_INTEREST = [26,36,96,132,195,211,236,261,268,313,317,377,404,409,412,428,438,439,534,578,783,784,809,818,858,913,937,949,991,1014,1052,1158,1253,1338,1398,1432,1448];
 
 if isempty(CELL_OF_INTEREST)
     close all force;
@@ -53,6 +55,7 @@ end
 
 profileSDataNames = read_folder_contents(stimRootDir,'mat');
 profileCDataNames = read_folder_contents(controlRootDir,'mat');
+
 
 
 % For structure:
@@ -123,6 +126,7 @@ control_cell_prestim_mean = cell(length(profileCDataNames),1);
 load(fullfile(controlRootDir, profileCDataNames{1}));
 control_coords = ref_coords;
 
+
 for j=1:length(profileCDataNames)
 
     waitbar(j/length(profileCDataNames),THEwaitbar,'Loading control profiles...');
@@ -174,6 +178,8 @@ control_trial_count = zeros(size(control_coords,1),1);
 control_posnegratio = nan(size(control_coords,1),max_index);
 cont_prestim_means=[];
 
+allcontrolsignals=cell(numcontrolcoords,1);
+
 
 for i=1:numcontrolcoords
     waitbar(i/size(control_coords,1),THEwaitbar,'Processing control signals...');
@@ -198,6 +204,7 @@ for i=1:numcontrolcoords
         end
     end
     control_trial_count(i) = numtrials;
+    allcontrolsignals{i} = all_times_ref;
     
     if strcmp(pipeline_type,'stddev')
         % Standard form
@@ -308,8 +315,8 @@ for i=1:numstimcoords
     stim_trial_count(i) = numtrials;
     
     critical_region_ref =all_times_ref(:, CRITICAL_REGION);
-    quantrng = quantile(critical_region_ref(:), [0.05 0.95]);
-    stim_resp_range(i) = quantrng(2)-quantrng(1);
+%     quantrng = quantile(critical_region_ref(:), [0.05 0.95]);
+    stim_resp_range(i) = rms( critical_region_ref(~isnan(critical_region_ref(:))) );
     
     if strcmp(pipeline_type,'stddev')
         % Standard form
@@ -338,7 +345,7 @@ for i=1:numstimcoords
         end
     end
     
-    if any(i==CELL_OF_INTEREST) && stim_trial_count(i)>=CUTOFF %&& (densitometry_fit_amplitude(i) < 0.1) && valid_densitometry(i)
+    if any(i==CELL_OF_INTEREST) %&& stim_trial_count(i)>=CUTOFF && (densitometry_fit_amplitude(i) < 0.1) && valid_densitometry(i)
         figure(1); clf;
         [~, firstinds] = max(~isnan(nonorm_ref),[],2); % Find all of the first non-Nan indexes in our rows.
         subplot(3,1,1); plot( bsxfun(@minus,nonorm_ref, nonorm_ref(sub2ind(size(nonorm_ref),(1:size(nonorm_ref,1))',firstinds)))');%axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -150 150]); xlabel('Time index'); ylabel('Raw Response');        
@@ -349,10 +356,10 @@ for i=1:numstimcoords
 %         end
 %         hold off;
         plot(all_times_ref');
-        axis([0 180 -10 10]); xlabel('Time index'); ylabel('Standardized Response');
+        axis([0 180 -15 15]); xlabel('Time index'); ylabel('Standardized Response');
         
-        subplot(3,1,3); plot(stim_cell_median(i,:)); hold on;
-                        plot(stim_cell_var(i,:));hold off;
+        subplot(3,1,3); %plot(stim_cell_median(i,:)); hold on;
+                        plot((stim_cell_var(i,:))- (mean(control_cell_var,'omitnan')) ); hold off; %
 %                         plot(stim_cell_stddev);  %axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -2 10]); xlabel('Time index'); ylabel('Response');
 %         subplot(4,1,4); plot(stim_prestim_means(i,:),'*'); xlabel('Trial #'); ylabel('Prestimulus mean (A.U.)'); axis([0 50 0 255]);
         title(['Cell #:' num2str(i) ' Resp Range: ', num2str(stim_resp_range(i))]);
@@ -361,8 +368,8 @@ for i=1:numstimcoords
         
 %         THEstimref = all_times_ref;
         
-%         figure(5); imagesc(ref_image); colormap gray; axis image;hold on; 
-%         plot(ref_coords(i,1),ref_coords(i,2),'r*'); hold off;
+        figure(5); imagesc(ref_image); colormap gray; axis image;hold on; 
+        plot(ref_coords(i,1),ref_coords(i,2),'r*'); hold off;
 %         saveas(gcf, ['Cell_' num2str(i) '_location.png']);
 %         drawnow;
 
@@ -389,7 +396,8 @@ end
 %%
 
 
-valid = (stim_trial_count >= NUMTRIALS) & (control_trial_count >= NUMTRIALS);
+valid = (stim_trial_count >= NUMTRIALS);
+% valid = (stim_trial_count >= NUMTRIALS) & (control_trial_count >= NUMTRIALS);
 
 % Calculate the pooled std deviation
 if strcmp(pipeline_type,'stddev')
@@ -406,6 +414,7 @@ control_median_sub = control_cell_median-mean(control_cell_median,'omitnan');
 %% Analyze the signals
 
 AmpResp = nan(size(std_dev_sub,1),1);
+AUCResp = nan(size(std_dev_sub,1),1);
 MedianResp = nan(size(std_dev_sub,1),1);
 TTPResp = nan(size(std_dev_sub,1),1);
 PrestimVal = nan(size(std_dev_sub,1),1);
@@ -416,7 +425,9 @@ ControlPrestimVal = nan(size(std_dev_sub,1),1);
 hz=17.85;
 allinds = 1:length(std_dev_sub);
 for i=1:size(std_dev_sub,1)
- waitbar(i/size(std_dev_sub,1),THEwaitbar,'Analyzing subtracted signals...');
+    if ishandle(THEwaitbar)
+        waitbar(i/size(std_dev_sub,1),THEwaitbar,'Analyzing subtracted signals...');
+    end
 
     if ~all( isnan(std_dev_sub(i,2:end)) ) && valid(i)
         
@@ -445,57 +456,60 @@ for i=1:size(std_dev_sub,1)
         AmpResp(i) = quantile(critical_filt,0.95);
         MedianResp(i) = max(abs(filt_median_sig(CRITICAL_REGION))-mean(filt_median_sig(1:CRITICAL_REGION(1))) );        
         PrestimVal(i) = mean( stim_prestim_means(i,:),2, 'omitnan');
+        AUCResp(i) = sum(critical_filt);
         
-        if any(i==CELL_OF_INTEREST) && (AmpResp(i)<1  && AmpResp(i)>=.5)
+         if any(i==CELL_OF_INTEREST) %(log10(AmpResp(i)+1) > 0.3) && (log10(AmpResp(i)+1) <.45)
            figure(1); clf;
-           subplot(2,1,1);
+           subplot(3,1,1);
            plot( interpinds/hz, filt_stddev_sig ); hold on; %plot(interpinds/hz,std_dev_sig);
            plot( interpinds/hz,filt_median_sig ); %plot(interpinds/hz, median_sig);
-%            plot(sqrt(control_cell_var(i,2:end))-1);
+           plot( interpinds/hz, repmat(quantile(critical_filt,0.95),[1 length(interpinds)]), 'r' );
             
 %            plot(mean(sqrt(control_cell_var),'omitnan'));
-           title(['#: ' num2str(i) ' A: ' num2str(AmpResp(i)) ', M: ' num2str(MedianResp(i)) ', LogResp: ' num2str(log10(AmpResp(i)+MedianResp(i)+1)) ]);
+           title(['#: ' num2str(i) ' A: ' num2str(AmpResp(i)) ', M: ' num2str(MedianResp(i)) ', LogResp: ' num2str(log10(AmpResp(i)+1)) ]);
            axis([0 9 -5 10]); hold off;
            
-           subplot(2,1,2); 
+           subplot(3,1,2); 
            plot( allstimsignals{i}','k');hold on;
            plot(stim_cell_var(i,:),'r','LineWidth',3); 
+           axis([1 163 -10 25])
            
-%            plot((0:69)/hz, criticalfit(i,:));hold on;
-%            plot(densitometry_vect_times{i},densitometry_vect_ref{i},'.'); hold off;           
-%            title(['FitAmp: ' num2str(densitometry_fit_amplitude(i))]);axis([0 2 0 1.5]);
+           subplot(3,1,3);
+           plot(allcontrolsignals{i}','k');
+            axis([1 163 -10 25])
+
            drawnow; 
            pause;
 %            saveas(gcf, ['Cell_' num2str(i) '_stimulus.png']);
-        end
+         end
         
-        % Control only
-        std_dev_sig = control_std_dev_sub(i,2:end);
-        nanners = ~isnan(std_dev_sig);
-        firstind=find(cumsum(nanners)>0);
-        [~, lastind] = max(cumsum(nanners)-sum(nanners));
-        interpinds = firstind(1):lastind;
-        goodinds = allinds(nanners);
-        std_dev_sig = interp1(goodinds, std_dev_sig(nanners), interpinds, 'makima');
-        filt_stddev_sig = std_dev_sig;
+        % Control only - REMOVED as control responses are not of interest.
+%         std_dev_sig = control_std_dev_sub(i,2:end);
+%         nanners = ~isnan(std_dev_sig);
+%         firstind=find(cumsum(nanners)>0);
+%         [~, lastind] = max(cumsum(nanners)-sum(nanners));
+%         interpinds = firstind(1):lastind;
+%         goodinds = allinds(nanners);
+%         std_dev_sig = interp1(goodinds, std_dev_sig(nanners), interpinds, 'makima');
+%         filt_stddev_sig = std_dev_sig;
+% 
+%         
+%         median_sig = control_median_sub(i,2:end);        
+%         nanners = ~isnan(median_sig);        
+%         firstind=find(cumsum(nanners)>0);
+%         [~, lastind] = max(cumsum(nanners)-sum(nanners));
+%         interpinds = firstind(1):lastind;
+%         goodinds = allinds(nanners);        
+%         median_sig = interp1(goodinds, median_sig(nanners), interpinds, 'makima');
+%         filt_median_sig = median_sig;
+% 
+% 
+%         critical_filt = filt_stddev_sig( CRITICAL_REGION );
+% %         
+%         ControlAmpResp(i) = quantile(critical_filt,0.95);
+%         ControlMedianResp(i) = max(abs(filt_median_sig(CRITICAL_REGION))-mean(filt_median_sig(1:CRITICAL_REGION(1))) );        
+%         ControlPrestimVal(i) = mean( cont_prestim_means(i,:),2, 'omitnan');
 
-        
-        median_sig = control_median_sub(i,2:end);        
-        nanners = ~isnan(median_sig);        
-        firstind=find(cumsum(nanners)>0);
-        [~, lastind] = max(cumsum(nanners)-sum(nanners));
-        interpinds = firstind(1):lastind;
-        goodinds = allinds(nanners);        
-        median_sig = interp1(goodinds, median_sig(nanners), interpinds, 'makima');
-        filt_median_sig = median_sig;
-
-
-        critical_filt = filt_stddev_sig( CRITICAL_REGION );
-        
-        ControlAmpResp(i) = quantile(critical_filt,0.95);
-        ControlMedianResp(i) = max(abs(filt_median_sig(CRITICAL_REGION))-mean(filt_median_sig(1:CRITICAL_REGION(1))) );        
-        ControlPrestimVal(i) = mean( cont_prestim_means(i,:),2, 'omitnan');
-%         histogram(filt_stddev_sig(CRITICAL_REGION),20)
 
     end
 end
@@ -503,32 +517,22 @@ end
 close(THEwaitbar);
 
 save([ outFname '.mat'],'pipeline_type', 'AmpResp','MedianResp','TTPResp',...
-     'ControlAmpResp','ControlMedianResp','ControlPrestimVal',...
-     'valid','allcoords','ref_image','control_cell_median',...
+    'valid','allcoords','ref_image','control_cell_median',...
      'control_cell_var','stim_cell_median','stim_cell_var','stim_prestim_means','stim_resp_range','allstimsignals');
+%      'ControlAmpResp','ControlMedianResp','ControlPrestimVal',...
+     
 
  
 
 %% Plot the pos/neg ratio of the mean vs the amplitude
-posnegratio=nan(size(control_coords,1),1);
 
 
-% figure(101); clf; hold on;
-% for i=1:size(control_coords,1)
-%     if ~isnan(AmpResp(i))
-%         % Find out what percentage of time the signal spends negative
-%         % or positive after stimulus delivery (66th frame)
-%         numposneg = sign(mean_sub(i,:));
-%         pos = sum(numposneg == 1);
-% 
-%         posnegratio(i) = 100*pos/length(numposneg);
-% 
-%         if mean(stim_prestim_means(i,:),'omitnan') > 150 && mean(stim_prestim_means(i,:),'omitnan') < 152
-%             disp(num2str(i));
-%         end
-%         plot( mean(stim_prestim_means(i,:),'omitnan'),AmpResp(i)+abs(MedianResp(i)),'k.');        
-%     end
-% end
+figure(101); clf; hold on;
+for i=1:size(control_coords,1)
+    if ~isnan(AmpResp(i))
+        plot(log10( (AUCResp(i)./21)+1), log10(AmpResp(i)+1),'k.');
+    end
+end
 % ylabel('Median response amplitude');
 % xlabel('Reflectance response amplitude');
 % title('Median reflectance vs reflectance response amplitude')
