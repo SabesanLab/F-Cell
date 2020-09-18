@@ -87,7 +87,7 @@ end
 %% Load the dataset(s)
 
 ref_image  = double(imread(  fullfile(mov_path, ref_image_fname) ));
-mask_image  = double(imread(  fullfile(mov_path, this_image_fname) ));
+
 stimd_images = dlmread( fullfile(mov_path,acceptable_frames_fname) );
 stimd_images = sort(stimd_images)' +1; % For some dumb reason it doesn't store them in the order they're put in the avi.
 
@@ -110,23 +110,6 @@ stim_inds = find(stimd_images>=stimulus_frames(1) & stimd_images<=stimulus_frame
 % Make them relative to their actual temporal locations.
 stim_times = stimd_images(stim_inds);
 
-
-%% Create the capillary mask, if we can't find the all trial based one.
-if ~exist('capillary_mask','var')
-    capillary_mask = double(~tam_etal_capillary_func( temporal_stack ));
-
-    if ~exist( fullfile(mov_path, 'Capillary_Maps'), 'dir' )
-        mkdir(fullfile(mov_path, 'Capillary_Maps'))
-    end
-   
-    imwrite(uint8(capillary_mask*255), fullfile(mov_path, 'Capillary_Maps' ,[this_image_fname(1:end - length('_AVG.tif') ) '_cap_map.png' ] ) );
-end
-% Mask the images to exclude zones with capillaries on top of them.
-capillary_masks = repmat(capillary_mask,[1 1 size(temporal_stack,3)]);
-
-
-mask_image = mask_image.*capillary_mask;
-temporal_stack = temporal_stack.*capillary_masks;
 
 %% Isolate individual profiles
 ref_coords = round(ref_coords);
@@ -242,8 +225,6 @@ for i=1:length( cell_reflectance )
     
     if contains(  norm_type, 'global_norm' )
         norm_cell_reflectance(i,:) = cell_reflectance{i} ./ ref_mean;
-    elseif contains(  norm_type, 'regional_norm' )
-        norm_cell_reflectance(i,:) = cell_reflectance{i} ./ ref_mean;
     elseif contains(  norm_type, 'no_norm' )
         norm_cell_reflectance(i,:) = cell_reflectance{i};
         warn('No normalization selected!')
@@ -330,8 +311,49 @@ tic;
 toc;
 
 all_ref(notnans,:) = SCORE*COEFF';
+all_ref_low = zeros(size(norm_cell_reflectance,1),156);
+all_ref_low(notnans,:) = SCORE(:,1)*COEFF(:,1)';
+% save('Piecewise_PCA_run.mat', '-v7.3');
+
+%% Conversion of cells to complete matrix.
+norm_cell_reflectance_mat = nan(length(norm_cell_reflectance),162);
 
 
+
+for c=1:length(norm_cell_reflectance)
+    for t=1:length(cell_times{c})
+    
+       norm_cell_reflectance_mat(c, cell_times{c}) = norm_cell_reflectance{c};
+    
+    end
+end
+norm_cell_reflectance_mat(:,1) =[];
+all_ref_low = zeros(size(norm_cell_reflectance_mat,1),161);
+notnans = ~all(isnan(norm_cell_reflectance_mat),2);
+
+tic;
+[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(norm_cell_reflectance_mat(notnans, :),'Algorithm','als');
+toc;
+
+
+
+%% output this stuff to a video...
+vidObj = VideoWriter('norm_video_pca_proj.avi');
+open(vidObj);
+
+
+minall = min(all_ref_low(:));
+maxall = max(all_ref_low(:)-minall);
+for i=1:size(all_ref_low,2)
+
+    scaled_norm_chg_im = reshape(all_ref_low(:,i)-min(all_ref_low(:)), 607,614);
+    scaled_norm_chg_im = scaled_norm_chg_im ./maxall;
+    
+    writeVideo(vidObj, scaled_norm_chg_im);
+end
+
+close(vidObj);
+return;
 %% Standard deviation of all cells before first stimulus
 
 thatmax = max( cellfun(@max, cell_times( ~cellfun(@isempty,cell_times)) ) );   

@@ -135,7 +135,7 @@ capillary_masks = repmat(capillary_mask,[1 1 size(temporal_stack,3)]);
 var_ref_image = stdfilt(mask_image,ones(3));
 
 mask_image = mask_image.*capillary_mask;
-temporal_stack = temporal_stack.*capillary_masks;
+% temporal_stack = temporal_stack.*capillary_masks;
 
 %% Isolate individual profiles
 if strcmp(profile_method, 'voronoi')

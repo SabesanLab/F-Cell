@@ -205,16 +205,16 @@ for i=1:numcontrolcoords
 end
 
 all_times_ref = all_times_ref(:,2:end);
-all_control_ref = all_times_ref;
-notnans= ~all(isnan(all_times_ref),2);
+pca_all_control_ref = all_times_ref;
+cont_notnans= ~all(isnan(pca_all_control_ref),2);
 
 % Remove the all nan rows, drop the first never used index.
 % Explains 95% of variance, selecting the first 5 components
-[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(all_times_ref(notnans, :),'Algorithm','als');
+[control_COEFF, control_SCORE, LATENT, TSQUARED, EXPLAINED, control_MU] = pca(pca_all_control_ref(cont_notnans, :),'Algorithm','als');
 
 
-all_control_ref(notnans,:) = SCORE*COEFF';
-return;
+% all_control_ref(notnans,:) = SCORE*COEFF';
+
 %% Stimulus trial aggregation
 percentparula = parula(101);
 
@@ -264,15 +264,18 @@ for i=1:numstimcoords
 
 end
 all_times_ref = all_times_ref(:,2:end);
-all_stim_ref = all_times_ref;
+pca_all_stim_ref = all_times_ref;
 notnans= ~all(isnan(all_times_ref),2);
 
 % Remove the all nan rows, drop the first never used index.
 % Explains 95% of variance, selecting the first 5 components
-[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(all_times_ref(notnans, :),'Algorithm','als');
+[stim_COEFF, stim_SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(all_times_ref(notnans, :),'Algorithm','als');
 
 
-all_stim_ref(notnans,:) = SCORE*COEFF';
+pca_all_stim_ref(notnans,:) = SCORE*stim_COEFF(:,1:2)';
+
+stim_proj_control_SCORE = (pca_all_control_ref(cont_notnans,:)-control_MU)*stim_COEFF;
+
 
 return;
 
