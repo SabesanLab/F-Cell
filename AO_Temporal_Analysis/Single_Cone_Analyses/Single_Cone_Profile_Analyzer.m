@@ -142,7 +142,7 @@ normleftmix = gausfits.ComponentProportion(1).*leftmix;
 normrightmix = gausfits.ComponentProportion(2).*rightmix;
 normmewomix = normleftmix+normrightmix;
 
-
+sum(min( [normleftmix normrightmix] ,[], 2 )) *.001
 RESPONSE_THRESHOLD = max(range(normleftmix>normrightmix))
 
 hold on;
@@ -538,18 +538,19 @@ end
 %% Display results vs densitometry
 % load('/local_data/Dropbox/General_Postdoc_Work/Dynamic_Densitometry/11049/Dynamic_Densitometry_combined_4_sec_545b25nm_3uW_20_single_cone_signals.mat')
 close all;
-lessdensitometry_threshold = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid;
+% lessdensitometry_threshold = (densitometry_fit_amplitude<=DENSTOMETRY_THRESHOLD) & valid;
 
-% lessdensitometry_threshold = (single_cone_response(:,4)<RESPONSE_THRESHOLD) 
+lessdensitometry_threshold = (single_cone_response(:,4)<RESPONSE_THRESHOLD) 
 % lessdensitometry_threshold = all(lessdensitometry_threshold,2);
+lessdensitometry_threshold = regressions<RESPONSE_THRESHOLD;
 
 
-for i=3:length(single_cone_mat_files)
+for i=4:length(single_cone_mat_files)
     
-    figure; hold on;
-    plot(single_cone_control_response(valid,i),single_cone_response(valid,i),'k.');
-    plot(single_cone_control_response(lessdensitometry_threshold,i),single_cone_response(lessdensitometry_threshold,i),'r.');
-    plot([-10 10],[-10 10],'k');
+%     figure; hold on;
+%     plot(single_cone_control_response(valid,i),single_cone_response(valid,i),'k.');
+%     plot(single_cone_control_response(lessdensitometry_threshold,i),single_cone_response(lessdensitometry_threshold,i),'r.');
+%     plot([-10 10],[-10 10],'k');
          
     thelessthan{i} = find(lessdensitometry_threshold==1);
     if logmode
@@ -693,7 +694,7 @@ DENSTOMETRY_THRESHOLD = max(range(normleftmix>normrightmix))
 close all;
 figure;
 
-response_of_interest = single_cone_response(valid,4);
+response_of_interest = single_cone_response(valid,2);
 % response_of_interest(response_of_interest<.34 &
 % response_of_interest>.328)=[]; % Screwing around with getting it to converge.
 % response_of_interest(response_of_interest<.3884 & response_of_interest>.3735)=[];
@@ -710,10 +711,12 @@ mainpeak = reghist.BinEdges(mainpeakind);
 % Fit a gaussian mixture model to determine which is which.
 sigmar = std(response_of_interest,'omitnan')
 sigmar =repmat(sigmar,[1 1 2]);
-sigmar(1,1,1) = 0.005;
-startstruct = struct('mu',[min(reghist.BinEdges); mainpeak],'Sigma', sigmar,'ComponentProportion',[.05; .95],'Display','iter');
+sigmar(1,1,1) = 0.001;
+startstruct = struct('mu',[min(reghist.BinEdges); mainpeak],'Sigma', sigmar,'ComponentProportion',[.05; .95]);
 
-gausfits=fitgmdist(response_of_interest,2,'Start', startstruct)
+opts = statset('MaxIter', 50, 'Display','iter', 'TolFun', 0.001); % necessary to bound the fitting procedure...
+gausfits=fitgmdist(response_of_interest,2,'Start', startstruct, 'Options', opts)
+% gausfits=fitgmdist(response_of_interest,2,'Start', startstruct)
 
 range = min(response_of_interest):.001:max(response_of_interest);
 leftmix=pdf('Normal',range',gausfits.mu(1),sqrt(gausfits.Sigma(1)));
@@ -725,7 +728,7 @@ normrightmix = gausfits.ComponentProportion(2).*rightmix;
 % normleftmix = mainpeakval.*gausfits.ComponentProportion(1).*leftmix./max(leftmix);
 % normrightmix = mainpeakval.*gausfits.ComponentProportion(2).*rightmix./max(rightmix);
 % normmewomix = mainpeakval.*mewomix./max(mewomix);
-
+sum(min( [normleftmix normrightmix] ,[], 2 )) *.001
 
 hold on;
 plot(range,normleftmix); 
@@ -739,7 +742,6 @@ end
 
 RESPONSE_THRESHOLD = max(range(normleftmix>normrightmix))
 
-RESPONSE_THRESHOLD=0.32
 
 dens_s_cone = lessdensitometry_threshold;
 intrinsic_s_cone = (response_of_interest<=RESPONSE_THRESHOLD);

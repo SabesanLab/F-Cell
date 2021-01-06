@@ -181,7 +181,11 @@ if ~ishandle(wbh)
 end
 
 vid_size = size(temporal_stack(:,:,1));
-
+if isempty(gcp)
+    myPool=parpool;
+else
+    myPool=gcp('nocreate');
+end
 
 parfor i=1:length(cellseg_inds)
 %     waitbar(i/length(cellseg_inds),wbh, ['Creating reflectance profile for cell: ' num2str(i)]);
@@ -264,6 +268,8 @@ prestim_mean=nan(1,length( norm_cell_reflectance ));
 
 maxtime =stim_times(1);
 
+
+
 parfor i=1:length( norm_cell_reflectance )
 
     if notnans(i)
@@ -301,17 +307,22 @@ parfor i=1:length( norm_cell_reflectance )
     end
 end
 
+delete(myPool)
+
 clear cell_reflectance;
 
+norm_cell_reflectance(isinf(norm_cell_reflectance)) = NaN;
+
+return;
 
 %% Remove the all nan rows, drop the first never used index.
 % Explains 95% of variance, selecting the first 5 components
 tic;
-[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(norm_cell_reflectance(notnans, :),'Algorithm','als');
+[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(norm_cell_reflectance(notnans, :),'Algorithm','als', 'NumComponents',10);
 toc;
 
 all_ref(notnans,:) = SCORE*COEFF';
-all_ref_low = zeros(size(norm_cell_reflectance,1),156);
+all_ref_low = zeros(size(norm_cell_reflectance,1),151);
 all_ref_low(notnans,:) = SCORE(:,1)*COEFF(:,1)';
 % save('Piecewise_PCA_run.mat', '-v7.3');
 
@@ -323,7 +334,7 @@ norm_cell_reflectance_mat = nan(length(norm_cell_reflectance),162);
 for c=1:length(norm_cell_reflectance)
     for t=1:length(cell_times{c})
     
-       norm_cell_reflectance_mat(c, cell_times{c}) = norm_cell_reflectance{c};
+       norm_cell_reflectance_mat(c, cell_times{c}-1) = norm_cell_reflectance(c,:);
     
     end
 end
@@ -335,18 +346,21 @@ tic;
 [COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(norm_cell_reflectance_mat(notnans, :),'Algorithm','als');
 toc;
 
-
+all_ref_low(notnans,:) = SCORE(:,1)*COEFF(:,1)';
 
 %% output this stuff to a video...
-vidObj = VideoWriter('norm_video_pca_proj.avi');
+vidObj = VideoWriter('norm_video_proj_control.avi');
 open(vidObj);
+
+
+all_ref_low =norm_cell_reflectance;
 
 
 minall = min(all_ref_low(:));
 maxall = max(all_ref_low(:)-minall);
 for i=1:size(all_ref_low,2)
 
-    scaled_norm_chg_im = reshape(all_ref_low(:,i)-min(all_ref_low(:)), 607,614);
+    scaled_norm_chg_im = reshape(all_ref_low(:,i)-min(all_ref_low(:)), size(ref_image,1),size(ref_image,2));
     scaled_norm_chg_im = scaled_norm_chg_im ./maxall;
     
     writeVideo(vidObj, scaled_norm_chg_im);
