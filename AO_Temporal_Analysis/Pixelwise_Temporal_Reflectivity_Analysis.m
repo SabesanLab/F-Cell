@@ -28,7 +28,7 @@
 %
 % 
 %
-
+clear
 % if ~exist('contains','builtin')
 %     contains = @(t,p)~isempty(strfind(t,p));
 % end
@@ -63,26 +63,6 @@ for i=1:length(stack_fnames)
     end
 end
 
-% If we can't find a coordinate file, look for the Relativize Trials
-% output.
-if ~exist(fullfile(mov_path,ref_coords_fname),'file')
-    tifnames = read_folder_contents( mov_path,'tif' );
-    
-    for i=1:length(tifnames)
-        if ~isempty( strfind( tifnames{i}, 'ALL_TRIALS.tif')) %%&& ...
-%             exist( [tifnames{i}(1:end-4) '_coords.csv'],'file')
-            ref_image_fname = tifnames{i};
-            ref_coords_fname = [tifnames{i}(1:end-4) '_coords.csv'];
-            
-            if exist(fullfile(mov_path, [tifnames{i}(1:end-4) '_cap_map.mat']), 'file')
-                load( fullfile(mov_path, [tifnames{i}(1:end-4) '_cap_map.mat']) );
-                capillary_mask = ~capillary_mask;
-            end
-            break;
-        end
-    end
-    
-end
 
 %% Load the dataset(s)
 
@@ -117,7 +97,7 @@ ref_coords = round(ref_coords);
 cellseg = cell(size(ref_coords,1),1);
 cellseg_inds = cell(size(ref_coords,1),1);
 
-roiradius = 1;
+roiradius = 2;
     
 im_size=size(ref_image);
 wbh = waitbar(0,'Segmenting coordinates...');
@@ -181,11 +161,11 @@ if ~ishandle(wbh)
 end
 
 vid_size = size(temporal_stack(:,:,1));
-if isempty(gcp)
-    myPool=parpool;
-else
-    myPool=gcp('nocreate');
-end
+% if isempty(gcp)
+%     myPool=parpool;
+% else
+%     myPool=gcp('nocreate');
+% end
 
 parfor i=1:length(cellseg_inds)
 %     waitbar(i/length(cellseg_inds),wbh, ['Creating reflectance profile for cell: ' num2str(i)]);
@@ -302,17 +282,41 @@ parfor i=1:length( norm_cell_reflectance )
 
         prestim_std(i) = std( sig( 1:maxtime ), 'omitnan' );
 
-        norm_cell_reflectance(i,:) = norm_cell_reflectance(i,:)/( prestim_std(i) ); % /sqrt(length(norm_control_cell_reflectance{i})) );
+%         norm_cell_reflectance(i,:) = norm_cell_reflectance(i,:)/prestim_std(i); % /sqrt(length(norm_control_cell_reflectance{i})) );
 
     end
 end
 
-delete(myPool)
+norm_cell_reflectance = norm_cell_reflectance ./ median(prestim_std,'omitnan');
+
+% delete(myPool)
 
 clear cell_reflectance;
 
 norm_cell_reflectance(isinf(norm_cell_reflectance)) = NaN;
 
+maxresp = max(abs(norm_cell_reflectance(notnans,:)),[],2);
+
+
+%% output this stuff to a video...
+vidObj = VideoWriter([this_image_fname(1:end-4) '_resp_video.avi']);
+open(vidObj);
+
+
+all_ref_low =abs(norm_cell_reflectance);
+
+
+minall = min(all_ref_low(:));
+maxall = max(all_ref_low(:)-minall);
+for i=1:size(all_ref_low,2)
+
+    scaled_norm_chg_im = reshape(all_ref_low(:,i)-min(all_ref_low(:)), size(ref_image,1),size(ref_image,2));
+    scaled_norm_chg_im = scaled_norm_chg_im ./maxall;
+    
+    writeVideo(vidObj, scaled_norm_chg_im);
+end
+
+close(vidObj);
 return;
 
 %% Remove the all nan rows, drop the first never used index.
@@ -327,7 +331,7 @@ all_ref_low(notnans,:) = SCORE(:,1)*COEFF(:,1)';
 % save('Piecewise_PCA_run.mat', '-v7.3');
 
 %% Conversion of cells to complete matrix.
-norm_cell_reflectance_mat = nan(length(norm_cell_reflectance),162);
+norm_cell_reflectance_mat = nan(length(norm_cell_reflectance),161);
 
 
 
@@ -343,31 +347,12 @@ all_ref_low = zeros(size(norm_cell_reflectance_mat,1),161);
 notnans = ~all(isnan(norm_cell_reflectance_mat),2);
 
 tic;
-[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(norm_cell_reflectance_mat(notnans, :),'Algorithm','als');
+[COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(norm_cell_reflectance_mat(notnans, :),'Algorithm','als', 'NumComponents',2);
 toc;
 
-all_ref_low(notnans,:) = SCORE(:,1)*COEFF(:,1)';
-
-%% output this stuff to a video...
-vidObj = VideoWriter('norm_video_proj_control.avi');
-open(vidObj);
+all_ref_low(notnans,:) = SCORE(:,1:2)*COEFF(:,1:2)';
 
 
-all_ref_low =norm_cell_reflectance;
-
-
-minall = min(all_ref_low(:));
-maxall = max(all_ref_low(:)-minall);
-for i=1:size(all_ref_low,2)
-
-    scaled_norm_chg_im = reshape(all_ref_low(:,i)-min(all_ref_low(:)), size(ref_image,1),size(ref_image,2));
-    scaled_norm_chg_im = scaled_norm_chg_im ./maxall;
-    
-    writeVideo(vidObj, scaled_norm_chg_im);
-end
-
-close(vidObj);
-return;
 %% Standard deviation of all cells before first stimulus
 
 thatmax = max( cellfun(@max, cell_times( ~cellfun(@isempty,cell_times)) ) );   

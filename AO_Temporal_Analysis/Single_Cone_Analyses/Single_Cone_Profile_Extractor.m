@@ -40,7 +40,7 @@ half_window = floor(window_size/2);
 
 pipeline_type = 'moving_rms'; % Legacy mode is 'stddev', moving_rms is new
 
-CELL_OF_INTEREST = [];%[31 83 198 599 746 790 794 824 842 1083 1255 1277];
+CELL_OF_INTEREST = [5];%[31 83 198 599 746 790 794 824 842 1083 1255 1277];
 % CELL_OF_INTEREST = [7 26 44 54 62 82 96 132 162 169 195 236 261 168 324 370 377 404 412 438 439 449 507 565 572 594 609 660 784 786 809 830 858 873 902];
 % CELL_OF_INTEREST = [26,36,96,132,195,211,236,261,268,313,317,377,404,409,412,428,438,439,534,578,783,784,809,818,858,913,937,949,991,1014,1052,1158,1253,1338,1398,1432,1448];
 
@@ -269,7 +269,7 @@ i=1;
 allstimsignals=cell(numstimcoords,1);
 
 fitops = fitoptions('Method','SmoothingSpline','SmoothingParam',0.999,'Normalize','on');
-for i=1:numstimcoords
+for i=28:numstimcoords
     waitbar(i/size(stim_coords,1),THEwaitbar,'Processing stimulus signals...');
 
     
@@ -350,10 +350,11 @@ for i=1:numstimcoords
         [~, firstinds] = max(~isnan(nonorm_ref),[],2); % Find all of the first non-Nan indexes in our rows.
         subplot(3,1,1); plot( bsxfun(@minus,nonorm_ref, nonorm_ref(sub2ind(size(nonorm_ref),(1:size(nonorm_ref,1))',firstinds)))');%axis([CRITICAL_REGION(1) CRITICAL_REGION(end) -150 150]); xlabel('Time index'); ylabel('Raw Response');        
         subplot(3,1,2); %hold on;
-%         for m=1:size(all_times_ref,1)
+        for m=1:size(all_times_ref,1)
+            profileSDataNames{m}
 %             goodinds = find(~isnan(all_times_ref(m,:)));
-%             plot(goodinds-2, all_times_ref(m,goodinds));
-%         end
+            plot(all_times_ref(m,:));
+        end
 %         hold off;
         plot(all_times_ref');
         axis([0 180 -15 15]); xlabel('Time index'); ylabel('Standardized Response');
@@ -371,7 +372,7 @@ for i=1:numstimcoords
         figure(5); imagesc(ref_image); colormap gray; axis image;hold on; 
         plot(ref_coords(i,1),ref_coords(i,2),'r*'); hold off;
 %         saveas(gcf, ['Cell_' num2str(i) '_location.png']);
-%         drawnow;
+        drawnow;
 
 
 %         if (densitometry_fit_amplitude(i) < 0.1) && valid_densitometry(i)
@@ -387,7 +388,7 @@ for i=1:numstimcoords
 %         end
 %         saveas(gcf, ['Cell_' num2str(i) '_stimulus_densitometry.png']);
         
-        pause;
+%         pause;
     end
 
 end

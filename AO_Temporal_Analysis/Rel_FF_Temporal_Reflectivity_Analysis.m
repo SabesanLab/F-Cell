@@ -81,10 +81,12 @@ if ~exist(fullfile(mov_path,ref_coords_fname),'file')
             ref_image_fname = tifnames{i};
             ref_coords_fname = [tifnames{i}(1:end-4) '_coords.csv'];
             
-            if exist(fullfile(mov_path, [tifnames{i}(1:end-4) '_cap_map.mat']), 'file')
-                load( fullfile(mov_path, [tifnames{i}(1:end-4) '_cap_map.mat']) );
-                capillary_mask = ~capillary_mask;
-            end
+            %% THIS SECTION HAS BEEN REMOVED FOLLOWING COMPARISONS BETWEEN CAPILLARY 
+            % AND NON CAPILLARY AREAS (there is no difference)
+%             if exist(fullfile(mov_path, [tifnames{i}(1:end-4) '_cap_map.mat']), 'file')
+%                 load( fullfile(mov_path, [tifnames{i}(1:end-4) '_cap_map.mat']) );
+%                 capillary_mask = ~capillary_mask;
+%             end
             break;
         end
     end
@@ -119,22 +121,25 @@ stim_inds = find(stimd_images>=stimulus_frames(1) & stimd_images<=stimulus_frame
 stim_times = stimd_images(stim_inds);
 
 
-%% Create the capillary mask, if we can't find the all trial based one.
-if ~exist('capillary_mask','var')
-    capillary_mask = double(~tam_etal_capillary_func( temporal_stack ));
+%% THIS SECTION HAS BEEN REMOVED FOLLOWING COMPARISONS BETWEEN CAPILLARY 
+% AND NON CAPILLARY AREAS (there is no difference)
 
-    if ~exist( fullfile(mov_path, 'Capillary_Maps'), 'dir' )
-        mkdir(fullfile(mov_path, 'Capillary_Maps'))
-    end
-   
-    imwrite(uint8(capillary_mask*255), fullfile(mov_path, 'Capillary_Maps' ,[this_image_fname(1:end - length('_AVG.tif') ) '_cap_map.png' ] ) );
-end
-% Mask the images to exclude zones with capillaries on top of them.
-capillary_masks = repmat(capillary_mask,[1 1 size(temporal_stack,3)]);
-
-var_ref_image = stdfilt(mask_image,ones(3));
-
-mask_image = mask_image.*capillary_mask;
+% Create the capillary mask, if we can't find the all trial based one.
+% if ~exist('capillary_mask','var')
+%     capillary_mask = double(~tam_etal_capillary_func( temporal_stack ));
+% 
+%     if ~exist( fullfile(mov_path, 'Capillary_Maps'), 'dir' )
+%         mkdir(fullfile(mov_path, 'Capillary_Maps'))
+%     end
+%    
+%     imwrite(uint8(capillary_mask*255), fullfile(mov_path, 'Capillary_Maps' ,[this_image_fname(1:end - length('_AVG.tif') ) '_cap_map.png' ] ) );
+% end
+% % Mask the images to exclude zones with capillaries on top of them.
+% capillary_masks = repmat(capillary_mask,[1 1 size(temporal_stack,3)]);
+% 
+% var_ref_image = stdfilt(mask_image,ones(3));
+% 
+% mask_image = mask_image.*capillary_mask;
 % temporal_stack = temporal_stack.*capillary_masks;
 
 %% Isolate individual profiles
@@ -229,55 +234,63 @@ end
 vid_size = size(temporal_stack(:,:,1));
 
 
-for i=1:length(cellseg_inds)
 %     waitbar(i/length(cellseg_inds),wbh, ['Creating reflectance profile for cell: ' num2str(i)]);
 
-    cell_times{i} = stimd_images;
-    cell_reflectance{i} = zeros(1, size(temporal_stack,3));
     
-    if any( capillary_mask(cellseg_inds{i}) ~= 1 )
-        
-        cell_reflectance{i} = nan(1,size(temporal_stack,3));
-    elseif strcmp(profile_method, 'box') % Shorthand, but way faster than the naive implementation, for box extraction only. (>2x speedup)
+    
+%     if any( capillary_mask(cellseg_inds{i}) ~= 1 )
+%         
+%         cell_reflectance{i} = nan(1,size(temporal_stack,3));
+%     else
+
+ if strcmp(profile_method, 'box') % Shorthand, but way faster than the naive implementation, for box extraction only. (>2x speedup)
+
+    for i=1:length(cellseg_inds) 
+        cell_times{i} = stimd_images;
+        cell_reflectance{i} = zeros(1, size(temporal_stack,3));
 
         [m,n] = ind2sub(vid_size, cellseg_inds{i});
-        
+
         thisstack = temporal_stack(min(m):max(m), min(n):max(n),:);        
-        
-%         cellseg{i} = temporal_stack((min(m)-5):(max(m)+5), (min(n)-5):(max(n)+5),:); % Remove before production code.
-        
+
         thisstack(thisstack == 0) = NaN;
-        
+
         thisstack = sum(thisstack,1);
         thisstack = squeeze(sum(thisstack,2));
         thisstack = thisstack./ (length(cellseg_inds{i})*ones(size(thisstack)));
-        
-        
-        cell_reflectance{i} = thisstack';
 
-    elseif strcmp(profile_method, 'voronoi')    
-        
+
+        cell_reflectance{i} = thisstack';
+    end
+elseif strcmp(profile_method, 'voronoi')    
+    for i=1:length(cellseg_inds) 
+        cell_times{i} = stimd_images;
+        cell_reflectance{i} = zeros(1, size(temporal_stack,3));
+
         % Remove the below BEFORE production code!
-        [m,n] = ind2sub(vid_size, cellseg_inds{i});
-        cellseg{i} = nan( max(m)-min(m)+1, max(n)-min(n)+1, size(temporal_stack,3));
-        
+%             [m,n] = ind2sub(vid_size, cellseg_inds{i});
+%             cellseg{i} = nan( max(m)-min(m)+1, max(n)-min(n)+1, size(temporal_stack,3));
+
         for t=1:size(temporal_stack,3)
- 
+
             masked_timepoint = temporal_stack(:,:,t); 
-            
+
             % Remove the below BEFORE production code!
-            for ind=1:length(m)
-                cellseg{i}(m(ind)-min(m)+1, n(ind)-min(n)+1,t) = masked_timepoint(m(ind), n(ind)); 
-            end
-            
+%                 for ind=1:length(m)
+%                     cellseg{i}(m(ind)-min(m)+1, n(ind)-min(n)+1,t) = masked_timepoint(m(ind), n(ind)); 
+%                 end
+
             if all( masked_timepoint(cellseg_inds{i}) ~= 0 )
                 cell_reflectance{i}(t) = mean( masked_timepoint(cellseg_inds{i}));
             else            
                 cell_reflectance{i}(t) =  NaN;
             end
         end         
-        
-    else
+    end
+else
+    for i=1:length(cellseg_inds) 
+        cell_times{i} = stimd_images;
+        cell_reflectance{i} = zeros(1, size(temporal_stack,3));
 
          for t=1:size(temporal_stack,3)
              masked_timepoint = temporal_stack(:,:,t); 
@@ -287,9 +300,9 @@ for i=1:length(cellseg_inds)
                  cell_reflectance{i}(t) =  NaN;
              end
          end
-
     end
 end
+
 close(wbh);
 
 %% Find the means / std devs
@@ -455,7 +468,7 @@ if strcmp(vid_type,'stimulus')
 end
 hold off;
 ylabel('Standard deviation'); xlabel('Time (s)'); title( strrep( [this_image_fname(1:end - length('_AVG.tif') ) '_' profile_method '_stddev_ref_plot' ], '_',' ' ) );
-axis([0 15 -1 4])
+% axis([0 10 0 ])
 
 % ref_image_fname = strrep(ref_image_fname,'confocal','split_det');
 if ~exist( fullfile(mov_path, 'Std_Dev_Plots'), 'dir' )
