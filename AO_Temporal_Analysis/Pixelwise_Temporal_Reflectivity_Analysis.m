@@ -47,7 +47,7 @@ norm_type = 'global_norm_linear_prestim_stdiz';
 if ~exist('mov_path','var') || ~exist('this_image_fname','var')
     close all force;
     [this_image_fname, mov_path]  = uigetfile(fullfile(pwd,'*.tif'));
-    stimulus_frames=[72 90];
+    stimulus_frames=[36 90];
     
 end
 ref_image_fname = this_image_fname;
@@ -69,7 +69,7 @@ end
 ref_image  = double(imread(  fullfile(mov_path, ref_image_fname) ));
 
 stimd_images = dlmread( fullfile(mov_path,acceptable_frames_fname) );
-stimd_images = sort(stimd_images)' +1; % For some dumb reason it doesn't store them in the order they're put in the avi.
+stimd_images = sort(stimd_images)'; % For some dumb reason it doesn't store them in the order they're put in the avi.
 
 [X_grid, Y_grid]= meshgrid(1:size(ref_image,2), 1:size(ref_image,1));
 
@@ -97,7 +97,7 @@ ref_coords = round(ref_coords);
 cellseg = cell(size(ref_coords,1),1);
 cellseg_inds = cell(size(ref_coords,1),1);
 
-roiradius = 2;
+roiradius = 0;
     
 im_size=size(ref_image);
 wbh = waitbar(0,'Segmenting coordinates...');
@@ -223,6 +223,11 @@ for i=1:length( cell_reflectance )
        
 end
 
+for t=1:size(cell_ref,2)
+     ref_mean(t) = mean(norm_cell_reflectance( : ,t), 'omitnan');  
+    ref_std(t) = var(norm_cell_reflectance( : ,t), 'omitnan');
+end
+
 notnans= ~all(isnan(norm_cell_reflectance),2);
 
 
@@ -287,7 +292,9 @@ parfor i=1:length( norm_cell_reflectance )
     end
 end
 
-norm_cell_reflectance = norm_cell_reflectance ./ median(prestim_std,'omitnan');
+norm_cell_reflectance = norm_cell_reflectance ./ 0.66; %median(prestim_std,'omitnan');
+
+imagesc(reshape(prestim_std, size(ref_image,1),size(ref_image,2)));
 
 % delete(myPool)
 
@@ -302,17 +309,25 @@ maxresp = max(abs(norm_cell_reflectance(notnans,:)),[],2);
 vidObj = VideoWriter([this_image_fname(1:end-4) '_resp_video.avi']);
 open(vidObj);
 
-
+MAX_FRAMES = 162;
 all_ref_low =abs(norm_cell_reflectance);
 
+minall = 0;%quantile(all_ref_low(:),0.01)
+maxall = 3.3; %quantile(all_ref_low(:)-minall,0.99)
+for i=1:MAX_FRAMES
 
-minall = min(all_ref_low(:));
-maxall = max(all_ref_low(:)-minall);
-for i=1:size(all_ref_low,2)
-
-    scaled_norm_chg_im = reshape(all_ref_low(:,i)-min(all_ref_low(:)), size(ref_image,1),size(ref_image,2));
-    scaled_norm_chg_im = scaled_norm_chg_im ./maxall;
+    frmind = find(i==stimd_images);
     
+    if ~isempty(frmind)
+        scaled_norm_chg_im = reshape(all_ref_low(:,frmind)-minall, size(ref_image,1),size(ref_image,2));
+        scaled_norm_chg_im = scaled_norm_chg_im ./maxall;
+    
+        % Clamp the values over the 95th percentile.
+        scaled_norm_chg_im(scaled_norm_chg_im>1) = 1;
+        scaled_norm_chg_im(scaled_norm_chg_im<0) = 0;
+    else
+        scaled_norm_chg_im = zeros( size(ref_image,1),size(ref_image,2));
+    end
     writeVideo(vidObj, scaled_norm_chg_im);
 end
 
