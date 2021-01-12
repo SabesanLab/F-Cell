@@ -199,7 +199,7 @@ for t=1:size(cell_ref,2)
     ref_std(t) = std(cell_ref( ~isnan(cell_ref(:,t)) ,t));
 end
 
-
+plot(ref_std./ref_mean); hold on;
 
 %% Normalization to the mean
 norm_cell_reflectance = nan( [length(cell_reflectance), length(cell_reflectance{1})] );
@@ -225,12 +225,12 @@ end
 
 for t=1:size(cell_ref,2)
      ref_mean(t) = mean(norm_cell_reflectance( : ,t), 'omitnan');  
-    ref_std(t) = var(norm_cell_reflectance( : ,t), 'omitnan');
+    ref_std(t) = std(norm_cell_reflectance( : ,t), 'omitnan');
 end
 
 notnans= ~all(isnan(norm_cell_reflectance),2);
 
-
+plot(ref_std./ref_mean); hold off;
 
 % Why not consider summed normalized reflectance to be the total number of photons hitting
 % detector? Seems like it'd be less sensitive to outliers AND moving
