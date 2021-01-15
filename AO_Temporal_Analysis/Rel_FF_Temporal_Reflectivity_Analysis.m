@@ -157,7 +157,7 @@ for i=1:size(ref_coords,1)
 
     waitbar(i/size(ref_coords,1),wbh, ['Segmenting coordinate ' num2str(i)]);
         
-    roiradius = 1;
+    roiradius = 2;
 
     if strcmp(profile_method, 'box')
     
@@ -182,7 +182,7 @@ for i=1:size(ref_coords,1)
 
             [in, on] = inpolygon(X(:), Y(:), vertices(:,1), vertices(:,2));
        
-            cellseg_inds{i} = sub2ind( size(mask_image), Y(in), X(in) );
+            cellseg_inds{i} = sub2ind( size(mask_image), Y(in|on), X(in|on) );
 
             cellseg_inds{i} = cellseg_inds{i}(:);
 
@@ -354,6 +354,7 @@ for i=1:length( cell_reflectance )
     
     no_ref = ~isnan(norm_cell_reflectance{i});
        
+    cell_reflectance{i} = cell_reflectance{i}(no_ref);
     norm_cell_reflectance{i} = norm_cell_reflectance{i}(no_ref);
     cell_times{i}       = cell_times{i}(no_ref);
        
@@ -486,16 +487,23 @@ save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.t
   
 %% Remove the empty cells
 norm_cell_reflectance = norm_cell_reflectance( ~cellfun(@isempty,norm_cell_reflectance)  );
+cell_reflectance            = cell_reflectance( ~cellfun(@isempty,cell_reflectance) );
 cell_times            = cell_times( ~cellfun(@isempty,cell_times) );
 
 
-% figure(11);
-% if ~isempty(ref_stddev)
-%     for i=1:length(norm_cell_reflectance)
-%         plot(cell_times{i}, norm_cell_reflectance{i},'k' ); hold on;
-%     end
-% end
-% hold off;
+figure(11); clf; %hold on;
+if ~isempty(ref_stddev)
+    lowrespy=[];
+    for i=1:length(norm_cell_reflectance)
+        if quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.95)< 5 && quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.05)>-4.5
+            plot(cell_times{i}, cell_reflectance{i},'k' ); axis([0 140 0 255]);
+            pause;
+            
+            lowrespy=[lowrespy;i];
+        end
+    end
+end
+hold off;
 
 
 %% Save the plots
