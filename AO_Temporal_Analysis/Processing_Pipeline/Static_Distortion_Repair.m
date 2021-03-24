@@ -12,11 +12,13 @@ function [ static_grid_distortion ] = Static_Distortion_Repair( fringes_fullpath
 
 load(fringes_fullpath,'horizontal_fringes_indices_minima');
 
-if ~exist('fitstartind','var')
-     fitstartind=10; % The point at which we'll start fitting (as we know the beginning is distorted)
-end
+
 
 horizontal_fringes_indices_minima=horizontal_fringes_indices_minima';
+
+if ~exist('fitstartind','var')
+     fitstartind=min(horizontal_fringes_indices_minima); % The point at which we'll start fitting (as we know the beginning is distorted)
+end
 
 xvals = (1:length(horizontal_fringes_indices_minima))';
 % Determine the linreg fit coefficients (X\y)

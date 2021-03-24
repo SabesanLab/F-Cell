@@ -491,19 +491,19 @@ cell_reflectance            = cell_reflectance( ~cellfun(@isempty,cell_reflectan
 cell_times            = cell_times( ~cellfun(@isempty,cell_times) );
 
 
-figure(11); clf; %hold on;
-if ~isempty(ref_stddev)
-    lowrespy=[];
+% figure(11); clf; %hold on;
+% if ~isempty(ref_stddev)
+%     lowrespy=[];
     for i=1:length(norm_cell_reflectance)
-        if quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.95)< 5 && quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.05)>-4.5
-            plot(cell_times{i}, cell_reflectance{i},'k' ); axis([0 140 0 255]);
-            pause;
+%         if quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.95)< 5 && quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.05)>-4.5
+            plot(cell_times{i}, cell_reflectance{i},'k' ); %axis([0 140 0 255]);
+%             pause;
             
-            lowrespy=[lowrespy;i];
-        end
+%             lowrespy=[lowrespy;i];
+%         end
     end
-end
-hold off;
+% end
+% hold off;
 
 
 %% Save the plots

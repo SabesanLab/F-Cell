@@ -21,7 +21,7 @@ for i=1:size(fPaths,1)
     end
 
     try
-        f(i) = parfeval(@Rel_FF_Temporal_Reflectivity_Analysis, 0, mov_path, ref_image_fname,[72 90],vid_type);
+        f(i) = parfeval(@Rel_FF_Temporal_Reflectivity_Analysis, 0, mov_path, ref_image_fname,[68 102],vid_type);
     catch ex
        disp([ref_image_fname ' failed to process:']);
        disp([ex.message ': line ' num2str(ex.stack(1).line)] );
