@@ -485,25 +485,37 @@ save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.t
      'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance' );
 
   
+% return;
 %% Remove the empty cells
 norm_cell_reflectance = norm_cell_reflectance( ~cellfun(@isempty,norm_cell_reflectance)  );
 cell_reflectance            = cell_reflectance( ~cellfun(@isempty,cell_reflectance) );
 cell_times            = cell_times( ~cellfun(@isempty,cell_times) );
 
-
+allinds = 1:162;
 % figure(11); clf; %hold on;
 % if ~isempty(ref_stddev)
 %     lowrespy=[];
-    for i=1:length(norm_cell_reflectance)
-%         if quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.95)< 5 && quantile( norm_cell_reflectance{i}(cell_times{i}>72), 0.05)>-4.5
-            plot(cell_times{i}, cell_reflectance{i},'k' ); %axis([0 140 0 255]);
-%             pause;
-            
-%             lowrespy=[lowrespy;i];
-%         end
-    end
+for i=1:length(norm_cell_reflectance)
+
+    interpinds = cell_times{i}(1):cell_times{i}(end);
+    
+    fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'makima');
+
+    filtsig = movmean(fullsig,7);
+    
+    plot(fullsig); %axis([0 140 0 255]); 
+    hold on;
+    plot(filtsig);
+    plot(stimulus_frames(1):(stimulus_frames(2)-1), cumsum(abs(diff(filtsig(stimulus_frames(1):stimulus_frames(2))))));
+    hold off;
+% pause;
+end
 % end
 % hold off;
+
+
+
+
 
 
 %% Save the plots

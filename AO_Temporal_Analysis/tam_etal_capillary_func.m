@@ -10,6 +10,17 @@ function [ sdImageMasked, varImage  ] = tam_etal_capillary_func( pceptVideo )
 % A 3D stack containing the video frames from which the motion contrast will
 % be generated
 
+if ~exist('pceptVideo','var')
+    [this_mov, mov_path]  = uigetfile(fullfile(pwd,'*.avi'));
+    i=1;
+    temporal_stack_reader = VideoReader( fullfile(mov_path,this_mov) );
+    this_mov
+    while(hasFrame(temporal_stack_reader))
+        pceptVideo(:,:,i) = double(readFrame(temporal_stack_reader));
+        i = i+1;
+    end
+end
+
 numFrames = size(pceptVideo,3);
 ignoremask = zeros(size(pceptVideo));
 
@@ -120,7 +131,7 @@ meaningfulregion = sdImage~=1;
 % to play with and b) don't care about the background noise
 sdImage = imgaussfilt(sdImage,10,'FilterSize',51);
 
-% figure(1); imagesc(varImage); colormap gray;
+figure(1); imagesc(varImage); colormap gray;
 
 % centerVarImage = varImage(edgemask+1:end-edgemask+1,edgemask+1:end-edgemask+1);
 
@@ -129,7 +140,7 @@ sdImagemin = min(sdImage(meaningfulregion));
 sdImageminsub = sdImage-sdImagemin;
 sdImagestretched = 255*sdImageminsub./max(sdImageminsub(:));
 
-% imagesc( sdImagestretched ); colormap gray; axis image; title('SD Image');
+figure(2);imagesc( sdImagestretched ); colormap gray; axis image; title('SD Image');
 
 
 threshold = mean(sdImage(:))  + std(sdImage(:));
