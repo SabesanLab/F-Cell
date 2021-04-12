@@ -694,7 +694,7 @@ DENSTOMETRY_THRESHOLD = max(range(normleftmix>normrightmix))
 close all;
 figure;
 
-response_of_interest = single_cone_response(valid,2);
+response_of_interest = single_cone_response(valid,4);
 % response_of_interest(response_of_interest<.34 &
 % response_of_interest>.328)=[]; % Screwing around with getting it to converge.
 % response_of_interest(response_of_interest<.3884 & response_of_interest>.3735)=[];

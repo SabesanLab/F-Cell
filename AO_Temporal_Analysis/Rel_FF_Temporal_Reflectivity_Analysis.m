@@ -1,4 +1,4 @@
-function []=Rel_FF_Temporal_Reflectivity_Analysis(mov_path, this_image_fname, stimulus_frames, vid_type)
+% function []=Rel_FF_Temporal_Reflectivity_Analysis(mov_path, this_image_fname, stimulus_frames, vid_type)
 % []=Rel_FF_Temporal_Reflectivity_Analysis(mov_path, ref_image_fname)
 % Robert F Cooper 06-20-2017
 %
@@ -41,7 +41,7 @@ profile_method = 'box';
 
 % For release, this version only contains the normalizations used in the
 % paper. However, the code is structured such that you can add more if desired.
-norm_type = 'global_norm_linear_prestim_stdiz'; 
+norm_type = 'global_norm';%_all_cell_linear_prestim_stdiz';
 
 % mov_path=pwd;
 if ~exist('mov_path','var') || ~exist('this_image_fname','var')
@@ -375,7 +375,36 @@ end
 
 
 %% Standardization
-if contains( norm_type, 'linear_prestim_stdiz')
+if contains( norm_type, 'all_cell_linear_prestim_stdiz')
+    % Then normalize to the average intensity of each cone BEFORE stimulus.
+    prestim_std=nan(1,length( norm_cell_reflectance ));
+    prestim_mean=nan(1,length( norm_cell_reflectance ));
+    
+    for i=1:length( norm_cell_reflectance )
+
+        prestim_sig = norm_cell_reflectance{i}( cell_times{i}<stim_times(1) & ~isnan( norm_cell_reflectance{i} ) );
+        prestim_time = cell_times{i}(cell_times{i}<stim_times(1))/17.85;
+        
+        linreg = [prestim_time; ones(size(prestim_time))]'\prestim_sig';
+        
+        prestim_sig = prestim_sig-(linreg(2)+prestim_time.*linreg(1));
+        
+        prestim_mean(i) = mean( norm_cell_reflectance{i}( cell_times{i}<stim_times(1) & ~isnan( norm_cell_reflectance{i} ) ) );
+
+        prestim_std(i) = std( prestim_sig,'omitnan' );
+
+    end
+    
+    
+    
+    for i=1:length( norm_cell_reflectance )
+
+        norm_cell_reflectance{i} = norm_cell_reflectance{i}-prestim_mean(i);
+        
+        norm_cell_reflectance{i} = norm_cell_reflectance{i}/ median(prestim_std,'omitnan') ;
+    end
+    
+elseif contains( norm_type, 'linear_prestim_stdiz')
     % Then normalize to the average intensity of each cone BEFORE stimulus.
     prestim_std=nan(1,length( norm_cell_reflectance ));
     prestim_mean=nan(1,length( norm_cell_reflectance ));
@@ -397,6 +426,8 @@ if contains( norm_type, 'linear_prestim_stdiz')
         
         norm_cell_reflectance{i} = norm_cell_reflectance{i}/( prestim_std(i) ); % /sqrt(length(norm_control_cell_reflectance{i})) );
     end
+    
+  
 elseif contains( norm_type, 'prestim_stdiz')
     % Then normalize to the average intensity of each cone BEFORE stimulus.
     prestim_std=nan(1,length( norm_cell_reflectance ));
@@ -409,6 +440,7 @@ elseif contains( norm_type, 'prestim_stdiz')
         norm_cell_reflectance{i} = norm_cell_reflectance{i}-prestim_mean(i);
         
         prestim_std(i) = std( norm_cell_reflectance{i}( cell_times{i}<stim_times(1) & ~isnan( norm_cell_reflectance{i} ) ) );
+        
         
         norm_cell_reflectance{i} = norm_cell_reflectance{i}/( prestim_std(i) ); % /sqrt(length(norm_control_cell_reflectance{i})) );
     end
@@ -481,34 +513,112 @@ if ~exist( fullfile(mov_path, 'Profile_Data'), 'dir' )
     mkdir(fullfile(mov_path, 'Profile_Data'))
 end
 % Dump all the analyzed data to disk
-save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.tif') ) '_' profile_method '_' norm_type '_' vid_type '_profiledata.mat']), ...
-     'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance' );
+% save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.tif') ) '_' profile_method '_' norm_type '_' vid_type '_profiledata.mat']), ...
+%      'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance' );
 
   
 % return;
-%% Remove the empty cells
-norm_cell_reflectance = norm_cell_reflectance( ~cellfun(@isempty,norm_cell_reflectance)  );
-cell_reflectance            = cell_reflectance( ~cellfun(@isempty,cell_reflectance) );
-cell_times            = cell_times( ~cellfun(@isempty,cell_times) );
 
+% What follows is for assessing single-cone responses.
+%% Remove the invalid cells, as determined by our single cone analysis from 2020.
+
+
+norm_cell_reflectance = norm_cell_reflectance( valid  );
+cell_reflectance            = cell_reflectance( valid );
+cell_times            = cell_times( valid );
+
+%%
 allinds = 1:162;
+Fs=17.85;
+alltimes = allinds/Fs;
+freqlimits = [0.4 1];
+
+
 % figure(11); clf; %hold on;
 % if ~isempty(ref_stddev)
 %     lowrespy=[];
 for i=1:length(norm_cell_reflectance)
 
-    interpinds = cell_times{i}(1):cell_times{i}(end);
-    
-    fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'makima');
+    if ~isempty(cell_times{i})
+        interpinds = cell_times{i}(1):cell_times{i}(end);
 
-    filtsig = movmean(fullsig,7);
-    
-    plot(fullsig); %axis([0 140 0 255]); 
-    hold on;
-    plot(filtsig);
-    plot(stimulus_frames(1):(stimulus_frames(2)-1), cumsum(abs(diff(filtsig(stimulus_frames(1):stimulus_frames(2))))));
-    hold off;
-% pause;
+        fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'linear');
+
+%         filtsig = lowpass(fullsig,0.025);
+%         filtsig = bandpass(fullsig,[.25 1.5],17.85);
+
+        before=filtsig( stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)+1):(stimulus_frames(1)-1))';
+        during=filtsig(stimulus_frames(1):stimulus_frames(2))';
+
+        figure(10); clf;hold on;
+        plot(fullsig); %axis([0 140 0 255]); 
+        
+%         plot(filtsig);
+%         plot(stimulus_frames(1):(stimulus_frames(2)-1), zeros(length(stimulus_frames(1):(stimulus_frames(2)-1)),1),'r' );
+%         plot(stimulus_frames(1):(stimulus_frames(2)-1), cumsum(abs(diff(during))));
+%         plot(stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)-1):(stimulus_frames(1)), cumsum(abs(diff(before))));
+        hold off;
+
+
+
+%         meandur(i) = mean(((during)));
+%         meanbef(i) = mean((( before )));
+%         
+%         meandiffdur(i) = mean(abs(diff(during)));
+%         meandiffbef(i) = mean(abs(diff( before )));
+%         rat(i)=meandiffdur(i)/meandiffbef(i);
+        
+%         title([num2str(meandiffdur(i)/meandiffbef(i)) ' or ' num2str(meandiffdur(i))])
+    %     drawnow;
+        
+        % Using single cone output from 2020 paper...
+         
+
+            figure(20); 
+            cwt(fullsig,Fs,'FrequencyLimits',freqlimits);hold on;
+            
+            [wt, f, coi]=cwt(fullsig,Fs,'FrequencyLimits',freqlimits);
+            abswt = abs(wt);
+            
+            coi(coi<freqlimits(1))=freqlimits(1);
+            flippedcoi = (min(coi)-coi);
+            flippedcoi = flippedcoi-min(flippedcoi);
+            flippedscaledcoi = ceil(size(wt,1)*flippedcoi./max(flippedcoi));
+            coimask = poly2mask(allinds, flippedscaledcoi, size(wt,1), size(wt,2));
+            
+            % Find the regional maximal blobs, multiplied by our COI (valid
+            % result) window
+            maxes = imregionalmax(abswt).*coimask;
+            
+            
+            [freqind, timeind] = find(maxes);
+            
+            if ~isempty(freqind)
+                figure(21); imagesc(maxes);
+                figure(20);
+                
+                plot(alltimes(timeind), f(freqind),'r*');
+
+                for p=1:length(freqind)
+                    amps(p)=abswt(freqind(p),timeind(p));
+                end
+
+                maxamp(i) = max(amps);
+            else
+                figure(21); imagesc(abswt.*coimask);
+            figure(20);
+                maxamp(i)=max(max(abswt.*coimask));
+            end
+            title(["Peak amplitude: " num2str(maxamp(i))])
+            hold off;
+            
+         if dens_s_cone(i)
+             pause;
+         elseif maxamp(i)< 0.1
+             disp(['NOT a s cone!' num2str(maxamp(i))]);
+             pause;
+         end
+    end
 end
 % end
 % hold off;
