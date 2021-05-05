@@ -47,7 +47,7 @@ norm_type = 'global_norm';%_all_cell_linear_prestim_stdiz';
 if ~exist('mov_path','var') || ~exist('this_image_fname','var')
     close all force;
     [this_image_fname, mov_path]  = uigetfile(fullfile(pwd,'*.tif'));
-    stimulus_frames=[72 108];
+    stimulus_frames=[72 90];
     
     rply = input('Stimulus (s) or Control (c)? [s]: ','s');
     if isempty(rply) || strcmpi(rply,'s')
@@ -531,29 +531,29 @@ cell_times            = cell_times( valid );
 allinds = 1:162;
 Fs=17.85;
 alltimes = allinds/Fs;
-freqlimits = [0.4 1];
+freqlimits = [0 2];
 
-
+maxamp = nan(length(norm_cell_reflectance),1);
 % figure(11); clf; %hold on;
 % if ~isempty(ref_stddev)
 %     lowrespy=[];
-for i=1:length(norm_cell_reflectance)
+for i=112:length(norm_cell_reflectance)
 
     if ~isempty(cell_times{i})
         interpinds = cell_times{i}(1):cell_times{i}(end);
-
+        
         fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'linear');
 
-%         filtsig = lowpass(fullsig,0.025);
-%         filtsig = bandpass(fullsig,[.25 1.5],17.85);
+%         filtsig = highpass(fullsig,.25,Fs);
+%         filtsig = bandpass(fullsig,[.25 2],17.85);
 
-        before=filtsig( stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)+1):(stimulus_frames(1)-1))';
-        during=filtsig(stimulus_frames(1):stimulus_frames(2))';
+%         before=filtsig( stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)+1):(stimulus_frames(1)-1))';
+%         during=filtsig(stimulus_frames(1):stimulus_frames(2))';
 
         figure(10); clf;hold on;
-        plot(fullsig); %axis([0 140 0 255]); 
+        plot(allinds/Fs,fullsig-1); %axis([0 140 0 255]); 
         
-%         plot(filtsig);
+%         plot(allinds/Fs, filtsig);
 %         plot(stimulus_frames(1):(stimulus_frames(2)-1), zeros(length(stimulus_frames(1):(stimulus_frames(2)-1)),1),'r' );
 %         plot(stimulus_frames(1):(stimulus_frames(2)-1), cumsum(abs(diff(during))));
 %         plot(stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)-1):(stimulus_frames(1)), cumsum(abs(diff(before))));
@@ -574,11 +574,16 @@ for i=1:length(norm_cell_reflectance)
         % Using single cone output from 2020 paper...
          
 
+            filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(fullsig),'SamplingFrequency',Fs,'WaveletParameters',[3 20]);
+        
             figure(20); 
-            cwt(fullsig,Fs,'FrequencyLimits',freqlimits);hold on;
+            cwt(fullsig,'Filterbank',filtbank);hold on;
             
-            [wt, f, coi]=cwt(fullsig,Fs,'FrequencyLimits',freqlimits);
-            abswt = abs(wt);
+            [wt, f, coi]=cwt(fullsig,'Filterbank',filtbank);
+            
+            
+            abswt = abs(wt).^2;
+            
             
             coi(coi<freqlimits(1))=freqlimits(1);
             flippedcoi = (min(coi)-coi);
@@ -586,38 +591,53 @@ for i=1:length(norm_cell_reflectance)
             flippedscaledcoi = ceil(size(wt,1)*flippedcoi./max(flippedcoi));
             coimask = poly2mask(allinds, flippedscaledcoi, size(wt,1), size(wt,2));
             
+            abswt=abswt.*coimask;
+%             abswt(abswt==0) = NaN;
+            figure(1); bar(sum(abswt,'omitnan'));
             % Find the regional maximal blobs, multiplied by our COI (valid
             % result) window
-            maxes = imregionalmax(abswt).*coimask;
-            
-            
-            [freqind, timeind] = find(maxes);
-            
-            if ~isempty(freqind)
-                figure(21); imagesc(maxes);
-                figure(20);
-                
-                plot(alltimes(timeind), f(freqind),'r*');
-
-                for p=1:length(freqind)
-                    amps(p)=abswt(freqind(p),timeind(p));
-                end
-
-                maxamp(i) = max(amps);
-            else
-                figure(21); imagesc(abswt.*coimask);
-            figure(20);
-                maxamp(i)=max(max(abswt.*coimask));
-            end
-            title(["Peak amplitude: " num2str(maxamp(i))])
-            hold off;
-            
+%             maxes = imregionalmax(abswt).*coimask;
+%             
+%             
+%             [freqind, timeind] = find(maxes);
+%             
+%             if ~isempty(freqind)
+%                 figure(21); imagesc(maxes);
+%                 figure(20);
+%                 
+%                 plot(alltimes(timeind), f(freqind),'r*');
+%                 amps=[];
+%                 for p=1:length(freqind)
+%                     amps(p)=abswt(freqind(p),timeind(p));
+%                 end
+% 
+%                 maxamp(i) = max(amps);
+%             else
+%                 figure(21); imagesc(abswt.*coimask);
+%             figure(20);
+%                 maxamp(i)=max(max(abswt.*coimask));
+%             end
+%             if maxamp(i) == 0
+%                 
+%                 pause;
+%             end
+%             
+            title(["Amplitude: " num2str(maxamp(i))])
+%             hold off;
+         
+            % Really sum of energy in our stimulus range.
+             maxamp(i)=mean2(abswt(:,stimulus_frames(1):stimulus_frames(2)));
+            title(["Amplitude: " num2str(maxamp(i))])
          if dens_s_cone(i)
-             pause;
-         elseif maxamp(i)< 0.1
-             disp(['NOT a s cone!' num2str(maxamp(i))]);
+             disp(['Allegedly a s cone!' num2str(maxamp(i))]);
+            
              pause;
          end
+             if maxamp(i)< 1.5
+%              disp(['NOT a s cone!' num2str(maxamp(i))]);
+%              pause;
+         end
+%          pause;
     end
 end
 % end
