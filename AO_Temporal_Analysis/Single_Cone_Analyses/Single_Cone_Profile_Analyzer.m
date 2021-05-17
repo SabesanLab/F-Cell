@@ -708,6 +708,7 @@ mainpeakind = mode(discretize(response_of_interest, reghist.BinEdges));
 mainpeakval = reghist.Values(mainpeakind);
 mainpeak = reghist.BinEdges(mainpeakind);
 
+
 % Fit a gaussian mixture model to determine which is which.
 sigmar = std(response_of_interest,'omitnan')
 sigmar =repmat(sigmar,[1 1 2]);

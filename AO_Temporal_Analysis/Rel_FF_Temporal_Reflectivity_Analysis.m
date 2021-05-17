@@ -1,4 +1,4 @@
-% function []=Rel_FF_Temporal_Reflectivity_Analysis(mov_path, this_image_fname, stimulus_frames, vid_type)
+function []=Rel_FF_Temporal_Reflectivity_Analysis(mov_path, this_image_fname, stimulus_frames, vid_type)
 % []=Rel_FF_Temporal_Reflectivity_Analysis(mov_path, ref_image_fname)
 % Robert F Cooper 06-20-2017
 %
@@ -47,7 +47,7 @@ norm_type = 'global_norm';%_all_cell_linear_prestim_stdiz';
 if ~exist('mov_path','var') || ~exist('this_image_fname','var')
     close all force;
     [this_image_fname, mov_path]  = uigetfile(fullfile(pwd,'*.tif'));
-    stimulus_frames=[72 90];
+    stimulus_frames=[72 108];
     
     rply = input('Stimulus (s) or Control (c)? [s]: ','s');
     if isempty(rply) || strcmpi(rply,'s')
@@ -461,8 +461,19 @@ elseif contains( norm_type, 'poststim_stdiz')
         norm_cell_reflectance{i} = norm_cell_reflectance{i}/( poststim_std(i) ); % /sqrt(length(norm_control_cell_reflectance{i})) );
     end
 else
-    % NOP - leave stub in case of change.
+    % NOP - Calc the prestim mean and std, but do nothing else.
 
+    prestim_std=nan(1,length( norm_cell_reflectance ));
+    prestim_mean=nan(1,length( norm_cell_reflectance ));
+    
+    for i=1:length( norm_cell_reflectance )
+
+        prestim_mean(i) = mean( norm_cell_reflectance{i}( cell_times{i}<stim_times(1) & ~isnan( norm_cell_reflectance{i} ) ) );
+        
+        prestim_std(i) = std( norm_cell_reflectance{i}( cell_times{i}<stim_times(1) & ~isnan( norm_cell_reflectance{i} ) ) );
+
+    end
+    
 end
 
 %% Standard deviation of all cells before first stimulus
@@ -512,9 +523,6 @@ saveas(gcf, fullfile(mov_path, 'Std_Dev_Plots' , [this_image_fname(1:end - lengt
 if ~exist( fullfile(mov_path, 'Profile_Data'), 'dir' )
     mkdir(fullfile(mov_path, 'Profile_Data'))
 end
-% Dump all the analyzed data to disk
-% save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.tif') ) '_' profile_method '_' norm_type '_' vid_type '_profiledata.mat']), ...
-%      'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance' );
 
   
 % return;
@@ -522,43 +530,54 @@ end
 % What follows is for assessing single-cone responses.
 %% Remove the invalid cells, as determined by our single cone analysis from 2020.
 
-
-norm_cell_reflectance = norm_cell_reflectance( valid  );
-cell_reflectance            = cell_reflectance( valid );
-cell_times            = cell_times( valid );
-
+if exist('valid','var')
+    norm_cell_reflectance = norm_cell_reflectance( valid  );
+    cell_reflectance            = cell_reflectance( valid );
+    cell_times            = cell_times( valid );
+end
 %%
 allinds = 1:162;
 Fs=17.85;
 alltimes = allinds/Fs;
-freqlimits = [0 2];
+freqlimits = [0.25 1];
 
 maxamp = nan(length(norm_cell_reflectance),1);
 % figure(11); clf; %hold on;
+
 % if ~isempty(ref_stddev)
 %     lowrespy=[];
-for i=112:length(norm_cell_reflectance)
+
+
+        
+
+display=false;
+
+for i=1:length(norm_cell_reflectance)
 
     if ~isempty(cell_times{i})
         interpinds = cell_times{i}(1):cell_times{i}(end);
         
         fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'linear');
 
-%         filtsig = highpass(fullsig,.25,Fs);
+        filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 9.3], 'FrequencyLimits',freqlimits);
+filtnolimit=cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 9.3]);
+        
+        filtsig = lowpass(fullsig,.05,Fs);
+        
 %         filtsig = bandpass(fullsig,[.25 2],17.85);
 
 %         before=filtsig( stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)+1):(stimulus_frames(1)-1))';
 %         during=filtsig(stimulus_frames(1):stimulus_frames(2))';
 
-        figure(10); clf;hold on;
-        plot(allinds/Fs,fullsig-1); %axis([0 140 0 255]); 
-        
-%         plot(allinds/Fs, filtsig);
-%         plot(stimulus_frames(1):(stimulus_frames(2)-1), zeros(length(stimulus_frames(1):(stimulus_frames(2)-1)),1),'r' );
-%         plot(stimulus_frames(1):(stimulus_frames(2)-1), cumsum(abs(diff(during))));
-%         plot(stimulus_frames(1)-(stimulus_frames(2)-stimulus_frames(1)-1):(stimulus_frames(1)), cumsum(abs(diff(before))));
-        hold off;
+        if display
+            figure(10); clf;hold on;
+            plot(interpinds/Fs,fullsig-1); axis([0 9 -1.5 2]); 
 
+            plot(interpinds/Fs, filtsig);
+            plot(interpinds/Fs, fullsig-filtsig);            
+            hold off;
+        end
+        subsig=fullsig-filtsig;
 
 
 %         meandur(i) = mean(((during)));
@@ -574,66 +593,96 @@ for i=112:length(norm_cell_reflectance)
         % Using single cone output from 2020 paper...
          
 
-            filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(fullsig),'SamplingFrequency',Fs,'WaveletParameters',[3 20]);
-        
-            figure(20); 
-            cwt(fullsig,'Filterbank',filtbank);hold on;
             
-            [wt, f, coi]=cwt(fullsig,'Filterbank',filtbank);
+            if display
+                figure(21); 
+                cwt(fullsig,'Filterbank',filtbank);
+            end
+%             scaleSpectrum(filtbank,fullsig,'Normalization','none'); axis([0 9 0 1e-3])
+%             [scalespt scaleidx]=scaleSpectrum(filtbank,fullsig,'Normalization','none'); 
+            
+            [wt, f, coi,fb,scalingfs]=cwt(fullsig,'Filterbank',filtbank);
+            
+            s=scales(fb);
+            srep=repmat(s',[1 162]);
+            % Normalized power spectrum
+%             var(subsig(20:stimulus_frames(1)))
+            wtpwrspect =(abs(wt));
+            normwtpwrspect = (abs(wt).^2) ./(var(subsig(18:stimulus_frames(1) )));
+            
+            % Chi-square distribution we'll use to determine which regions
+            % are significant- per Page 70 of Torrence and Compo, 1998
+            whitenoise_thresh = (chi2inv([.8 .9 0.95 .99],2))/2;
             
             
-            abswt = abs(wt).^2;
-            
+%             figure(2);
+%             plot(f,sigthresh_per_row)
             
             coi(coi<freqlimits(1))=freqlimits(1);
             flippedcoi = (min(coi)-coi);
             flippedcoi = flippedcoi-min(flippedcoi);
             flippedscaledcoi = ceil(size(wt,1)*flippedcoi./max(flippedcoi));
-            coimask = poly2mask(allinds, flippedscaledcoi, size(wt,1), size(wt,2));
+            coimask = poly2mask(allinds(1:length(interpinds)), flippedscaledcoi, size(wt,1), size(wt,2));
             
-            abswt=abswt.*coimask;
-%             abswt(abswt==0) = NaN;
-            figure(1); bar(sum(abswt,'omitnan'));
+            if display
+                figure(20); clf;
+                imagesc(normwtpwrspect); caxis([0 6]); colorbar;hold on;
+                contour(normwtpwrspect,[whitenoise_thresh],'r');
+            end
+            
+            normwtpwrspect=normwtpwrspect.*coimask;
+%             if display
+%                 figure(22); plot(allinds/Fs,sum(normwtpwrspect)); hold on;
+%                 plot([stimulus_frames(1) stimulus_frames(1)]/Fs, [0 4],'r') 
+%                 plot([stimulus_frames(2) stimulus_frames(2)]/Fs, [0 4],'r'); hold off;
+%             end
+
             % Find the regional maximal blobs, multiplied by our COI (valid
-            % result) window
-%             maxes = imregionalmax(abswt).*coimask;
+            % result) window            
+%             maxes = imregionalmax(wtpwrspect).*coimask;
+%             maxinds = find(maxes)';
 %             
+%             maxes = zeros(size(maxes));
 %             
-%             [freqind, timeind] = find(maxes);
-%             
-%             if ~isempty(freqind)
-%                 figure(21); imagesc(maxes);
-%                 figure(20);
-%                 
-%                 plot(alltimes(timeind), f(freqind),'r*');
-%                 amps=[];
-%                 for p=1:length(freqind)
-%                     amps(p)=abswt(freqind(p),timeind(p));
-%                 end
-% 
-%                 maxamp(i) = max(amps);
-%             else
-%                 figure(21); imagesc(abswt.*coimask);
-%             figure(20);
-%                 maxamp(i)=max(max(abswt.*coimask));
-%             end
-%             if maxamp(i) == 0
-%                 
-%                 pause;
+%             for ind=maxinds
+%                 [r, c] = ind2sub(size(wtpwrspect), ind);
+%                 maxes = maxes | grayconnected(wtpwrspect, r, c, wtpwrspect(ind)*0.05);
+%                 figure(22); imagesc( maxes);
 %             end
 %             
-            title(["Amplitude: " num2str(maxamp(i))])
-%             hold off;
+%             figure(22); imagesc( maxes);
+%             stats=regionprops(logical(maxes),'PixelIdxList','Area','BoundingBox');
+%             
+%             % Check overlap with the stimulus area- if it's empty, then it
+%             % doesn't overlap at all.
+%             overlaps = rectint(reshape([stats.BoundingBox]',[4 length(stats)])', [stimulus_frames(1) 1 stimulus_frames(2)-stimulus_frames(1) size(wtpwrspect,1) ]);
+%             
+%             stats = stats(overlaps~=0);
+%             % If there's multiple regions in there, pick the biggest one.
+%             [~, maxar]=max([stats.Area]);
+%             if length([stats.Area]) > 1                
+%                 [stats.Area]
+%             end
+%             roiinds = stats(maxar).PixelIdxList;
+                        
          
             % Really sum of energy in our stimulus range.
-             maxamp(i)=mean2(abswt(:,stimulus_frames(1):stimulus_frames(2)));
-            title(["Amplitude: " num2str(maxamp(i))])
-         if dens_s_cone(i)
-             disp(['Allegedly a s cone!' num2str(maxamp(i))]);
+             maxampnorm(i)= max(max(normwtpwrspect(:,stimulus_frames(1):stimulus_frames(2)))); %mean(normwtpwrspect(roiinds)); %max(mean(normwtpwrspect(:,stimulus_frames(1):stimulus_frames(2))));
+             maxamp(i)= max(max(wtpwrspect(:,stimulus_frames(1):stimulus_frames(2)))); %mean(wtpwrspect(roiinds));%max(mean(wtpwrspect(:,stimulus_frames(1):stimulus_frames(2))));
+             if display
+                
+%                 blanky=zeros(size(wtpwrspect));
+%                 blanky(roiinds) = wtpwrspect(roiinds);
+%                 figure(22); imagesc( blanky);
+                title(["Amplitude: " num2str(maxampnorm(i)) ' or ' num2str(maxamp(i))])
+             end
             
-             pause;
-         end
-             if maxamp(i)< 1.5
+%          if dens_s_cone(i)
+%              disp(['Allegedly a s cone!' num2str(maxamp(i))]);
+            
+%              pause;
+%     else
+        if maxamp(i) <.1
 %              disp(['NOT a s cone!' num2str(maxamp(i))]);
 %              pause;
          end
@@ -643,10 +692,35 @@ end
 % end
 % hold off;
 
+figure(100); subplot(2,1,1); histogram((maxampnorm),200);
+subplot(2,1,2); histogram((maxamp),200);
+%%
+
+% Dump all the analyzed data to disk
+save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.tif') ) '_' profile_method '_' norm_type '_wavelet_profiledata.mat']), ...
+     'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance','maxamp' );
 
 
+return 
+%%
+cellind = 1:length(norm_cell_reflectance);
+for i= cellind(maxamp<0.00078)
 
+    if ~isempty(cell_times{i})
+    interpinds = cell_times{i}(1):cell_times{i}(end);
 
+    fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'linear');
+    filtsig = lowpass(fullsig,.05,Fs);
+
+    figure(10); clf;hold on;
+    plot(allinds/Fs,fullsig-1); axis([0 9 -1.5 2]); 
+
+    plot(allinds/Fs, filtsig);
+    plot(allinds/Fs, fullsig-filtsig);
+    title(num2str(maxamp(i)))
+    pause;
+    end
+end
 
 %% Save the plots
 % if ~exist( fullfile(mov_path, 'Raw_Plots'), 'dir' )
