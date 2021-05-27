@@ -607,7 +607,7 @@ filtnolimit=cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'Sa
             srep=repmat(s',[1 162]);
             % Normalized power spectrum
 %             var(subsig(20:stimulus_frames(1)))
-            wtpwrspect =(abs(wt));
+            wtpwrspect =(abs(wt)).^2;
             normwtpwrspect = (abs(wt).^2) ./(var(subsig(18:stimulus_frames(1) )));
             
             % Chi-square distribution we'll use to determine which regions
@@ -698,7 +698,8 @@ subplot(2,1,2); histogram((maxamp),200);
 
 % Dump all the analyzed data to disk
 save(fullfile(mov_path, 'Profile_Data' ,[this_image_fname(1:end - length('_AVG.tif') ) '_' profile_method '_' norm_type '_wavelet_profiledata.mat']), ...
-     'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance','maxamp' );
+     'this_image_fname', 'cell_times', 'norm_cell_reflectance','ref_coords','ref_image','ref_mean','ref_stddev','vid_type','cell_prestim_mean','cell_reflectance',...
+ 'maxamp','maxampnorm' );
 
 
 return 
