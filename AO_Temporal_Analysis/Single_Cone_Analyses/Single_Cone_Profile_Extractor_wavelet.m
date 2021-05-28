@@ -89,12 +89,54 @@ for j=1:length(profileSDataNames)
     end
     
     
+        
     allamps(:,j) = maxamp;
     allampsnorm(:,j) = maxampnorm;
     
 end
 
 allcoords = ref_coords;
+
+%%
+DENSTOMETRY_THRESHOLD = 0.1681;
+stimulus_frames = [72 108];
+
+for c=1:size(allcoords,1)
+
+    if densitometry_fit_amplitude(c) < DENSTOMETRY_THRESHOLD
+%         figure(5); clf; hold on; 
+        for j=1:length(profileSDataNames)
+            figure(5); clf;
+            
+            load(fullfile(stimRootDir,profileSDataNames{j}));
+            if ~isempty(cell_times{c}) && log(allampsnorm(c,j))>0.5
+                
+                interpinds = cell_times{c}(1):cell_times{c}(end);
+        
+                fullsig = interp1(cell_times{c}, norm_cell_reflectance{c}, interpinds, 'linear');
+
+                filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',17.85,'WaveletParameters',[3 30], 'FrequencyLimits',[0.25 1]);
+                 figure(21); clf;
+                cwt(fullsig,'Filterbank',filtbank);
+                
+                [wt, f, coi,fb,scalingfs]=cwt(fullsig,'Filterbank',filtbank);
+                wtpwrspect =(abs(wt));
+                
+                [maxvalrows, maxrow]=max(wtpwrspect(:,stimulus_frames(1):stimulus_frames(2)),[], 1);
+                [maxvalcols, maxcol]=max(maxvalrows);
+                
+                
+                figure(5); clf;
+                plot(cell_times{c}/17.85, norm_cell_reflectance{c}-norm_cell_reflectance{c}(1));
+                title( [num2str( log(allampsnorm(c,j)) ) ' at ' num2str(f(maxrow(maxcol))) 'Hz']);
+                pause;
+            end
+        end
+%         hold off; title( num2str( log(median(allampsnorm(c,:),2,'omitnan')) ) );
+%         pause;
+    end
+    
+end
 
 %%
 figure; 

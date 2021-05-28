@@ -539,7 +539,7 @@ end
 allinds = 1:162;
 Fs=17.85;
 alltimes = allinds/Fs;
-freqlimits = [0.25 1];
+freqlimits = [0.3 1];
 
 maxamp = nan(length(norm_cell_reflectance),1);
 % figure(11); clf; %hold on;
@@ -559,8 +559,11 @@ for i=1:length(norm_cell_reflectance)
         
         fullsig = interp1(cell_times{i}, norm_cell_reflectance{i}, interpinds, 'linear');
 
-        filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 9.3], 'FrequencyLimits',freqlimits);
-filtnolimit=cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 9.3]);
+%         filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 9.3], 'FrequencyLimits',freqlimits);
+% filtnolimit=cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 9.3]);
+
+        filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(interpinds),'SamplingFrequency',Fs,'WaveletParameters',[3 30], 'FrequencyLimits',freqlimits);
+
         
         filtsig = lowpass(fullsig,.05,Fs);
         
@@ -692,8 +695,8 @@ end
 % end
 % hold off;
 
-figure(100); subplot(2,1,1); histogram((maxampnorm),200);
-subplot(2,1,2); histogram((maxamp),200);
+figure(100); subplot(2,1,1); histogram(log(maxampnorm),200);
+subplot(2,1,2); histogram(log(maxamp),200);
 %%
 
 % Dump all the analyzed data to disk
