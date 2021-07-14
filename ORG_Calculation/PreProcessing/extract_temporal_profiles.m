@@ -6,7 +6,8 @@ p = inputParser;
 dataset_size = size(temporal_data);
 
 if length(dataset_size) > 3
-   fourDeeData = true; 
+   fourDeeData = true;
+   warning('4D data is not yet supported.');
 end
 
 [X_grid, Y_grid]= meshgrid(1:dataset_size(1), 1:dataset_size(2));
@@ -25,11 +26,11 @@ checkExtMethods = @(x) any(validatestring(x,validextmethods));
 defaultradius = 2;
 
 addRequired(p,'temporal_data', @isnumeric)
-addOptional(p,'Coordinates', defaultcoords, checkcoords);
-addOptional(p,'SegmentationMethod', defaultmethod, checkMethods);
-addOptional(p,'SegmentationRadius', defaultradius, @isnumeric); %Unused for voronoi.
-addOptional(p,'ExtractionMethod', defaultextmethod, checkExtMethods);
-addOptional(p,'ProgBarHandle', [], @ishandle);
+addParameter(p,'Coordinates', defaultcoords, checkcoords);
+addParameter(p,'SegmentationMethod', defaultmethod, checkMethods);
+addParameter(p,'SegmentationRadius', defaultradius, @isnumeric); %Unused for voronoi.
+addParameter(p,'ExtractionMethod', defaultextmethod, checkExtMethods);
+addParameter(p,'ProgBarHandle', [], @ishandle);
 
 % Parse our inputs.
 parse(p,temporal_data,varargin{:})
@@ -96,7 +97,7 @@ switch segmentation_method
 end
 
 
-temporal_profiles = cell( length(cellseg_inds), 1);
+temporal_profiles = nan( length(cellseg_inds), dataset_size(end));
 
 
 waitbar(0,wbh, 'Generating reflectance profiles...');
@@ -114,8 +115,6 @@ switch segmentation_method
                     
                     if ~isempty(cellseg_inds{i})
 
-                        temporal_profiles{i} = zeros(1, dataset_size(end));
-
                         [m,n] = ind2sub(dataset_size(1:2), cellseg_inds{i});
 
                         thisstack = temporal_data(min(m):max(m), min(n):max(n),:);        
@@ -127,7 +126,7 @@ switch segmentation_method
                         thisstack = thisstack./ (length(cellseg_inds{i})*ones(size(thisstack)));
 
 
-                        temporal_profiles{i} = thisstack';
+                        temporal_profiles(i,:) = thisstack';
                     end
                 end
             case 'median'
@@ -137,21 +136,21 @@ switch segmentation_method
                     end
                     
                     if ~isempty(cellseg_inds{i})
-                    temporal_profiles{i} = zeros(1, dataset_size(end));
+                        
+                        for t=1:size(temporal_data,3)
 
-                    for t=1:size(temporal_data,3)
+                            masked_timepoint = temporal_data(:,:,t); 
 
-                        masked_timepoint = temporal_data(:,:,t); 
-
-                        if all( masked_timepoint(cellseg_inds{i}) ~= 0 )
-                            temporal_profiles{i}(t) = median( masked_timepoint(cellseg_inds{i}));
-                        else            
-                            temporal_profiles{i}(t) =  NaN;
+                            if all( masked_timepoint(cellseg_inds{i}) ~= 0 )
+                                temporal_profiles(i,t) = median( masked_timepoint(cellseg_inds{i}));
+                            else            
+                                temporal_profiles(i,t) =  NaN;
+                            end
                         end
                     end
-                    end
                 end
-            case 'glcm'
+            otherwise
+                warning([extraction_method ' is not yet supported.']);
                 
         end
     case 'voronoi'
@@ -159,16 +158,15 @@ switch segmentation_method
             case 'mean'
                 for i=1:length(cellseg_inds)
                     if ~isempty(cellseg_inds{i})
-                    temporal_profiles{i} = zeros(1, dataset_size(end));
 
                     for t=1:size(temporal_data,3)
 
                         masked_timepoint = temporal_data(:,:,t); 
 
                         if all( masked_timepoint(cellseg_inds{i}) ~= 0 )
-                            temporal_profiles{i}(t) = mean( masked_timepoint(cellseg_inds{i}));
+                            temporal_profiles(i,t) = mean( masked_timepoint(cellseg_inds{i}));
                         else            
-                            temporal_profiles{i}(t) =  NaN;
+                            temporal_profiles(i,t) =  NaN;
                         end
                     end
                     end
@@ -176,22 +174,21 @@ switch segmentation_method
             case 'median'
                 for i=1:length(cellseg_inds)
                     if ~isempty(cellseg_inds{i})
-                    temporal_profiles{i} = zeros(1, dataset_size(end));
 
                     for t=1:size(temporal_data,3)
 
                         masked_timepoint = temporal_data(:,:,t); 
 
                         if all( masked_timepoint(cellseg_inds{i}) ~= 0 )
-                            temporal_profiles{i}(t) = median( masked_timepoint(cellseg_inds{i}));
+                            temporal_profiles(i,t) = median( masked_timepoint(cellseg_inds{i}));
                         else            
-                            temporal_profiles{i}(t) =  NaN;
+                            temporal_profiles(i,t) =  NaN;
                         end
                     end
                     end
                 end
-            case 'glcm'
-                
+            otherwise
+                warning([extraction_method ' is not yet supported.']);
         end
 end
 

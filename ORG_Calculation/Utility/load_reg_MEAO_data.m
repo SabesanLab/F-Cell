@@ -3,10 +3,10 @@ function [temporal_data, framestamps, reference_coordinates, mask_data, referenc
 p = inputParser;
 
 addRequired(p,'filename', @ischar);
-addOptional(p,'ReferenceModality', 'Confocal', @ischar);
-addOptional(p,'LoadCoordinates', true, @islogical);
-addOptional(p,'LoadReferenceImage', true, @islogical);
-addOptional(p,'LoadMasks', true, @islogical);
+addParameter(p,'ReferenceModality', 'Confocal', @ischar);
+addParameter(p,'LoadCoordinates', true, @islogical);
+addParameter(p,'LoadReferenceImage', true, @islogical);
+addParameter(p,'LoadMasks', true, @islogical);
 
 % Parse our inputs.
 parse(p,temporal_data_filename,varargin{:})
@@ -45,6 +45,7 @@ if load_coords
 end
 
 framestamps = csvread(fullfile(parentpath, [filename(1:end-3) 'csv'] ), 1, 0);
+framestamps = framestamps(:,3)';
 
 temporal_data_reader = VideoReader( fullfile(parentpath, filename) );
 
@@ -80,10 +81,10 @@ if load_masks
         delete(mask_data_reader)
     else
         warning(['Mask video file: ' maskfile ' Not found.']);
-    end
-    
+    end    
 end
 
 [temporal_data] = Residual_Torsion_Removal_Pipl(temporal_data, mask_data);
+
 
 end
