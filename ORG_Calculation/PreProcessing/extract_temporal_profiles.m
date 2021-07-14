@@ -1,4 +1,4 @@
-function [temporal_profiles]=extract_temporal_profiles(temporal_data, varargin)
+function [temporal_profiles, coordinates]=extract_temporal_profiles(temporal_data, varargin)
 
 
 p = inputParser;
