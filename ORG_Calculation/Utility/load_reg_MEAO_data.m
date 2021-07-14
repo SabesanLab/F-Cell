@@ -1,4 +1,4 @@
-function [temporal_data, framestamps, reference_coordinates, mask_data, reference_image]=load_reg_MEAO_data(temporal_data_filename, varargin)
+function [temporal_data, framestamps, reference_coordinates, mask_data, reference_image]=load_reg_MEAO_data(temporal_data_path, varargin)
 
 p = inputParser;
 
@@ -9,7 +9,7 @@ addParameter(p,'LoadReferenceImage', true, @islogical);
 addParameter(p,'LoadMasks', true, @islogical);
 
 % Parse our inputs.
-parse(p,temporal_data_filename,varargin{:})
+parse(p,temporal_data_path,varargin{:})
 
 ref_modality = p.Results.ReferenceModality;
 load_coords = p.Results.LoadCoordinates;
@@ -18,7 +18,7 @@ load_masks = p.Results.LoadMasks;
 
 %Grab the base path provided; all other paths relevant to it can be derived
 %from it.
-[parentpath, filename] = getparent(temporal_data_filename);
+[parentpath, filename] = getparent(temporal_data_path);
 
 under_indices=regexp(filename,'_');
 
@@ -61,9 +61,9 @@ delete(temporal_data_reader)
 
 mask_data=[];
 if load_masks
-    maskfile = fullfile(parentpath,[temporal_data_filename(1:end-4) '_mask.avi']);
-    if exist(maskfile,'file')
-        mask_data_reader = VideoReader( fullfile(parentpath, maskfile) );
+    maskpath = fullfile(parentpath,[filename(1:end-4) '_mask.avi']);
+    if exist(maskpath,'file')
+        mask_data_reader = VideoReader( maskpath );
 
         num_mask_frames = round(mask_data_reader.Duration*mask_data_reader.FrameRate);
 
@@ -80,7 +80,7 @@ if load_masks
 
         delete(mask_data_reader)
     else
-        warning(['Mask video file: ' maskfile ' Not found.']);
+        warning(['Mask video file: ' maskpat ' Not found.']);
     end    
 end
 

@@ -23,7 +23,7 @@ defaultextmethod = 'mean';
 validextmethods = {'mean', 'median', 'glcm_ent', 'glcm_ent'};
 checkExtMethods = @(x) any(validatestring(x,validextmethods));
 
-defaultradius = 2;
+defaultradius = 1;
 
 addRequired(p,'temporal_data', @isnumeric)
 addParameter(p,'Coordinates', defaultcoords, checkcoords);
@@ -107,6 +107,8 @@ switch segmentation_method
     case 'box' 
         switch extraction_method
             case 'mean' % Shorthand, but way faster than the naive implementation, for box extraction only. (>2x speedup)
+                % Obtains the average value of the reflectance inside the
+                % box.
                 for i=1:length(cellseg_inds) 
 
                     if mod(i, length(cellseg_inds)/10) == 0
@@ -130,6 +132,8 @@ switch segmentation_method
                     end
                 end
             case 'median'
+                % Obtains the median value of the reflectance inside the
+                % box.
                 for i=1:length(cellseg_inds)
                     if mod(i, length(cellseg_inds)/10) == 0
                         waitbar(i/length(cellseg_inds),wbh, 'Generating reflectance profiles...');
@@ -156,6 +160,8 @@ switch segmentation_method
     case 'voronoi'
         switch extraction_method
             case 'mean'
+                % Obtains the average value of the reflectance inside each 
+                % voronoi cell.
                 for i=1:length(cellseg_inds)
                     if ~isempty(cellseg_inds{i})
 
@@ -172,6 +178,8 @@ switch segmentation_method
                     end
                 end
             case 'median'
+                % Obtains the median value of the reflectance inside each 
+                % voronoi cell.
                 for i=1:length(cellseg_inds)
                     if ~isempty(cellseg_inds{i})
 

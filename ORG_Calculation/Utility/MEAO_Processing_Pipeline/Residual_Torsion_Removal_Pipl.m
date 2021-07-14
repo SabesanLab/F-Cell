@@ -8,7 +8,7 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
     % optimizer.MaximumStepLength = 0.04;
     % optimizer.MaximumIterations = 100;
 
-    tic;
+%     tic;
     if ~isempty(mask_data)
         masked_temporal_data = (mask_data/255).*temporal_data;
     else
@@ -29,7 +29,7 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
         
         tforms(:,:,n) = forward_reg_tform{n}.T;
     end
-    toc;
+%     toc;
 
     mean_tforms = mean(tforms,3);
 
