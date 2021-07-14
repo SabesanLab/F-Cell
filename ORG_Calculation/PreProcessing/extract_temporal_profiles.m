@@ -39,10 +39,10 @@ extraction_method = p.Results.ExtractionMethod;
 roiradius = p.Results.SegmentationRadius;
 coordinates = p.Results.Coordinates;
 
-if ~isempty(p.UsingDefaults.ProgBarHandle)
+if ~isempty(p.Results.ProgBarHandle)
     wbh = p.Results.ProgBarHandle;
 else
-    wbh = waitbar(0,'Segmenting coordinate 0');
+    wbh = waitbar(0,'Segmenting coordinates...');
 end
 
 
@@ -55,47 +55,51 @@ coordinates = round(coordinates);
 
 cellseg_inds = cell(size(coordinates,1),1);
 
-for i=1:size(coordinates,1)
+switch segmentation_method
+    case 'box'
+        for i=1:size(coordinates,1)
+            
+            if mod(i, size(coordinates,1)/10) == 0
+                waitbar(i/size(coordinates,1),wbh, 'Segmenting coordinates...');
+            end
 
-    waitbar(i/size(coordinates,1),wbh, ['Segmenting coordinate ' num2str(i)]);
-
-    switch segmentation_method
-        case 'box'
-            if (coordinates(i,1) - roiradius) > 1 && (coordinates(i,1) + roiradius) < size(mask_image,2) &&...
-               (coordinates(i,2) - roiradius) > 1 && (coordinates(i,2) + roiradius) < size(mask_image,1)
+            if (coordinates(i,1) - roiradius) > 1 && (coordinates(i,1) + roiradius) < dataset_size(2) &&...
+               (coordinates(i,2) - roiradius) > 1 && (coordinates(i,2) + roiradius) < dataset_size(1)
 
                 [R, C ] = meshgrid((coordinates(i,2) - roiradius) : (coordinates(i,2) + roiradius), ...
                                    (coordinates(i,1) - roiradius) : (coordinates(i,1) + roiradius));
 
-                cellseg_inds{i} = sub2ind( size(mask_image), R, C );
+                cellseg_inds{i} = sub2ind( dataset_size(1:2), R, C );
 
                 cellseg_inds{i} = cellseg_inds{i}(:);
 
             end
-        case 'voronoi'
+        end
+    case 'voronoi'
+        for i=1:size(coordinates,1)
+
+            if mod(i, size(coordinates,1)/10) == 0
+                waitbar(i/size(coordinates,1),wbh, 'Segmenting coordinates...');
+            end
             vertices = V(C{i},:);
 
-            if (all(C{i}~=1)  && all(vertices(:,1)<size(ref_image,2)) && all(vertices(:,2)<size(ref_image,1)) ... % [xmin xmax ymin ymax] 
+            if (all(C{i}~=1)  && all(vertices(:,1)<dataset_size(2)) && all(vertices(:,2)<dataset_size(1)) ... % [xmin xmax ymin ymax] 
                              && all(vertices(:,1)>=1) && all(vertices(:,2)>=1)) 
 
                 [in, on] = inpolygon(X(:), Y(:), vertices(:,1), vertices(:,2));
 
-                cellseg_inds{i} = sub2ind( size(mask_image), Y(in|on), X(in|on) );
+                cellseg_inds{i} = sub2ind( dataset_size(1:2), Y(in|on), X(in|on) );
 
                 cellseg_inds{i} = cellseg_inds{i}(:);
-
-
             end
-    end
+        end
 end
+
 
 temporal_profiles = cell( length(cellseg_inds), 1);
 
-if ~isempty(p.UsingDefaults.ProgBarHandle)
-    waitbar(0,wbh, 'Creating reflectance profile for cell: 0');
-else
-    wbh = waitbar(0,'Creating reflectance profile for cell: 0');
-end
+
+waitbar(0,wbh, 'Generating reflectance profiles...');
 
 
 switch segmentation_method
@@ -104,11 +108,15 @@ switch segmentation_method
             case 'mean' % Shorthand, but way faster than the naive implementation, for box extraction only. (>2x speedup)
                 for i=1:length(cellseg_inds) 
 
+                    if mod(i, length(cellseg_inds)/10) == 0
+                        waitbar(i/length(cellseg_inds),wbh, 'Generating reflectance profiles...');
+                    end
+                    
                     if ~isempty(cellseg_inds{i})
 
                         temporal_profiles{i} = zeros(1, dataset_size(end));
 
-                        [m,n] = ind2sub(vid_size, cellseg_inds{i});
+                        [m,n] = ind2sub(dataset_size(1:2), cellseg_inds{i});
 
                         thisstack = temporal_data(min(m):max(m), min(n):max(n),:);        
 
@@ -124,6 +132,10 @@ switch segmentation_method
                 end
             case 'median'
                 for i=1:length(cellseg_inds)
+                    if mod(i, length(cellseg_inds)/10) == 0
+                        waitbar(i/length(cellseg_inds),wbh, 'Generating reflectance profiles...');
+                    end
+                    
                     if ~isempty(cellseg_inds{i})
                     temporal_profiles{i} = zeros(1, dataset_size(end));
 
@@ -185,7 +197,7 @@ end
 
 % If we didn't supply a progress bar, close it at the end to be a good
 % neighbor.
-if isempty(p.UsingDefaults.ProgBarHandle)
+if isempty(p.Results.ProgBarHandle)
    close(wbh) 
 end
 

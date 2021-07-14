@@ -10,7 +10,7 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
 
     tic;
     if ~isempty(mask_data)
-        masked_temporal_data = mask_data.*temporal_data;
+        masked_temporal_data = (mask_data/255).*temporal_data;
     else
         warning(['No mask data supplied. Registration may be inaccurate.']);
         masked_temporal_data = temporal_data;

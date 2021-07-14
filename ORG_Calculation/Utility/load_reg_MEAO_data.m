@@ -74,6 +74,7 @@ if load_masks
 
         for f=1:num_mask_frames
             mask_data(:,:,f) = rgb2gray(readFrame(mask_data_reader));
+            
         end
 
         delete(mask_data_reader)
