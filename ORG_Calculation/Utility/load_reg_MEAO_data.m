@@ -36,11 +36,14 @@ end
 
 reference_coordinates=[];
 if load_coords
-    coordfile = fullfile(parentpath,[common_prefix ref_modality '1_extract_reg_avg_coords.csv']);
-    if exist(coordfile,'file')
-        reference_coordinates = dlmread(coordfile);
+    coordfile_base = fullfile(parentpath,[common_prefix ref_modality '1_extract_reg_avg_coords.csv']);
+    coordfile_ref = fullfile(parentpath,[filename(1:under_indices(7)) 'extract_reg_avg_coords.csv']);
+    if exist(coordfile_base,'file')
+        reference_coordinates = dlmread(coordfile_base);
+    elseif exist(coordfile_ref,'file')
+        reference_coordinates = dlmread(coordfile_ref);
     else
-        warning(['Coordinate file: ' coordfile ' Not found.']);
+        warning(['Coordinate file: ' coordfile_base '(or ' coordfile_ref ' ) Not found.']);
     end
 end
 
