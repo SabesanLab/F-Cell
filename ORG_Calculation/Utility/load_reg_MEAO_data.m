@@ -38,7 +38,7 @@ reference_coordinates=[];
 if load_coords
     coordfile_base = fullfile(parentpath,[common_prefix ref_modality '1_extract_reg_avg_coords.csv']);
     coordfile_ref = fullfile(parentpath,[filename(1:under_indices(7)) 'extract_reg_avg_coords.csv']);
-    if exist(coordfile_base,'file')
+    if exist(coordfile_base,'file') % Could draw coordinates from EITHER the base modality, or some reference modality.
         reference_coordinates = dlmread(coordfile_base);
     elseif exist(coordfile_ref,'file')
         reference_coordinates = dlmread(coordfile_ref);

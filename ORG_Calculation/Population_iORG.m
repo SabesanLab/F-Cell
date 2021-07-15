@@ -1,4 +1,4 @@
-function []=Population_iORG(temporal_profiles, timestamps, varargin)
+function [pop_iORG]=Population_iORG(temporal_profiles, timestamps, varargin)
 
 window_size = 5;
 half_window = 2;

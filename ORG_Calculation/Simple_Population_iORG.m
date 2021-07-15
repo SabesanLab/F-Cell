@@ -1,4 +1,4 @@
-function []=Simple_Population_iORG(temporal_data, framestamps, reference_coordinates, prestimulus_range, fps, varargin)
+function [iORG]=Simple_Population_iORG(temporal_data, framestamps, reference_coordinates, prestimulus_range, fps, varargin)
 
 p = inputParser;
 
@@ -31,7 +31,7 @@ end
 
 [stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps, prestimulus_range, fps,'Method', 'linear_stddev', 'ProgBarHandle', wbh);
 
-Population_iORG(stdz_temporal_profiles, framestamps/fps)
+iORG=Population_iORG(stdz_temporal_profiles, framestamps/fps)
 
 close(wbh) 
 end
