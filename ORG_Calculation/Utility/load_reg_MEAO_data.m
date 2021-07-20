@@ -1,11 +1,51 @@
 function [temporal_data, framestamps, reference_coordinates, mask_data, reference_image]=load_reg_MEAO_data(temporal_data_path, varargin)
+% function [...]=LOAD_REG_MEAO_DATA(temporal_data_path, ...)
+%
+% 	This function is designed to load in a temporal dataset obtained from
+%   the MEAOSLO designed by Boston Micromachines Corporation.
+%
+% 	[temporal_data, framestamps]=LOAD_REG_MEAO_DATA(temporal_data_path) 
+%   loads in an MEAOSLO temporal dataset into an NxMxT array,
+%	along with the "frame stamps" which correspond to the indexes of the
+%   frames from the original video that were included in the registration
+%	step.
+%
+% 	[temporal_data, framestamps, reference_coordinates]=
+%                                   LOAD_REG_MEAO_DATA(temporal_data_path)
+%	in addition to the above, the functon also loads in any coordinates 
+%   that can be used in following steps (see EXTRACT_TEMPORAL_PROFILES).
+%		** IMPORTANT: The coordinate file is expected to share a common 
+%       path root with the registered tif from the 'Confocal' modality.
+%
+%		For example, if one obtains a registered temporal dataset named 
+%       "MEAO_dataset_760nm1_extract_reg_small.avi", then the function form 
+%		will assume you have included a coordinate file named 
+%       "MEAO_dataset_Confocal1_extract_reg_avg_coords.csv" generated 
+%       from the reference image "MEAO_dataset_Confocal1_extract_reg_avg.tif"
+%
+%		If this coordinate file cannot be found, an empty array will be
+%       returned instead.
+%
+% 	[temporal_data, framestamps, reference_coordinates, mask_data]=
+%                                    LOAD_REG_MEAO_DATA(temporal_data_path) 
+%	in addition to the above, the function returns any associated masking 
+%   data (in an NxMxT array) from the temporal dataset.
+%		** Similar to above, the mask video file is expected to share a 
+%       common path root with the registered video in 'temporal_data_path'.
+%
+%		For example, if one obtains a registered temporal dataset named 
+%       "MEAO_dataset_760nm1_extract_reg_small.avi", then the function form 
+%		will expect the existence of a 
+%       "MEAO_dataset_760nm1_extract_reg_small_mask.avi"
+%
+
 
 p = inputParser;
 
 addRequired(p,'filename', @ischar);
 addParameter(p,'ReferenceModality', 'Confocal', @ischar);
 addParameter(p,'LoadCoordinates', true, @islogical);
-addParameter(p,'LoadReferenceImage', true, @islogical);
+addParameter(p,'LoadReferenceImage', false, @islogical);
 addParameter(p,'LoadMasks', true, @islogical);
 
 % Parse our inputs.
