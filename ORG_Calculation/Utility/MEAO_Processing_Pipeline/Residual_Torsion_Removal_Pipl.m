@@ -1,4 +1,4 @@
-function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mask_data)
+function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mask_data, reference_frame)
 % Robert F Cooper 7-12-2021
 
 
@@ -23,7 +23,7 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
     parfor n=2:size(masked_temporal_data,3)
 
         % Register using the cropped frame
-        forward_reg_tform{n}=imregtform(masked_temporal_data(:,:,n), masked_temporal_data(:,:,1),'affine',...
+        forward_reg_tform{n}=imregtform(masked_temporal_data(:,:,n), masked_temporal_data(:,:,reference_frame),'affine',...
                                 optimizer, metric,'PyramidLevels',1, 'InitialTransformation', affine2d());%,'DisplayOptimization',true);
 
         

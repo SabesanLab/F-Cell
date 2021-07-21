@@ -14,14 +14,15 @@ function [temporal_data, framestamps, reference_coordinates, mask_data, referenc
 %                                   LOAD_REG_MEAO_DATA(temporal_data_path)
 %	in addition to the above, the functon also loads in any coordinates 
 %   that can be used in following steps (see EXTRACT_TEMPORAL_PROFILES).
+%
 %		** IMPORTANT: The coordinate file is expected to share a common 
 %       path root with the registered tif from the 'Confocal' modality.
 %
 %		For example, if one obtains a registered temporal dataset named 
-%       "MEAO_dataset_760nm1_extract_reg_small.avi", then the function form 
+%       "MEAO_dataset_760nm1_extract_reg_cropped_small.avi", then the function form 
 %		will assume you have included a coordinate file named 
 %       "MEAO_dataset_Confocal1_extract_reg_avg_coords.csv" generated 
-%       from the reference image "MEAO_dataset_Confocal1_extract_reg_avg.tif"
+%       from a reference image "MEAO_dataset_Confocal1_extract_reg_avg.tif"
 %
 %		If this coordinate file cannot be found, an empty array will be
 %       returned instead.
@@ -30,30 +31,65 @@ function [temporal_data, framestamps, reference_coordinates, mask_data, referenc
 %                                    LOAD_REG_MEAO_DATA(temporal_data_path) 
 %	in addition to the above, the function returns any associated masking 
 %   data (in an NxMxT array) from the temporal dataset.
+%
 %		** Similar to above, the mask video file is expected to share a 
 %       common path root with the registered video in 'temporal_data_path'.
 %
 %		For example, if one obtains a registered temporal dataset named 
-%       "MEAO_dataset_760nm1_extract_reg_small.avi", then the function form 
+%       "MEAO_dataset_760nm1_extract_reg_cropped_small.avi", then the function form 
 %		will expect the existence of a 
-%       "MEAO_dataset_760nm1_extract_reg_small_mask.avi"
+%       "MEAO_dataset_760nm1_extract_reg_cropped_small_mask.avi"
 %
-
+% 	[temporal_data, framestamps, reference_coordinates, mask_data, reference_image]=
+%                                    LOAD_REG_MEAO_DATA(temporal_data_path) 
+%	in addition to the above, the function returns the reference image 
+%   from the temporal dataset.
+%
+%		** Similar to above, the mask video file is expected to share a 
+%       common path root with the registered video in 'temporal_data_path'.
+%
+%		For example, if one obtains a registered temporal dataset named 
+%       "MEAO_dataset_760nm1_extract_reg_cropped_small.avi", then the function
+%       will load the reference image "MEAO_dataset_Confocal1_extract_reg_avg.tif"
+%
+%
+% 	[...]=LOAD_REG_MEAO_DATA(temporal_data_path, 'PARAM1', VALUE1, 'PARAM2', VALUE2,...) 
+%   loads in an MEAOSLO temporal dataset into an NxMxT array, using named
+%   parameters altered to specific values. Parameters and values may be:
+%
+%       LoadCoordinates - Specifies whether or not to load the coordinates.
+%       [{'true'} | 'false']
+%
+%       LoadMasks - Specifies whether or not to load (and use) the associated video mask.
+%       [{'true'} | 'false']
+%
+%       ReferenceModality - Defines the string embedded in the reference modality filename.
+%       [{'Confocal'} | character vector]
+%
+%       ReferenceImage - Specifies the method for obtaining a reference
+%       image. Generating a reference image (default) creates a reference
+%       from the input dataset. Otherwise, it is loaded from disk using the
+%       reference modality string.
+%       [{'generated'} | 'loaded']
 
 p = inputParser;
 
-addRequired(p,'filename', @ischar);
+refimage = 'generated';
+validrefimage = {'generated', 'loaded'};
+checkrefimage = @(x) any(validatestring(x,validrefimage));
+
+addRequired(p,'temporal_data_path', @ischar);
 addParameter(p,'ReferenceModality', 'Confocal', @ischar);
 addParameter(p,'LoadCoordinates', true, @islogical);
-addParameter(p,'LoadReferenceImage', false, @islogical);
 addParameter(p,'LoadMasks', true, @islogical);
+addParameter(p,'ReferenceImage', refimage, checkrefimage);
 
 % Parse our inputs.
 parse(p,temporal_data_path,varargin{:})
 
 ref_modality = p.Results.ReferenceModality;
 load_coords = p.Results.LoadCoordinates;
-load_ref_im = p.Results.LoadReferenceImage;
+ref_im = p.Results.ReferenceImage;
 load_masks = p.Results.LoadMasks;
 
 %Grab the base path provided; all other paths relevant to it can be derived
@@ -65,7 +101,7 @@ under_indices=regexp(filename,'_');
 common_prefix = filename(1:under_indices(6));
 
 reference_image=[];
-if load_ref_im
+if strcmp(ref_im, 'loaded')
     imfile = fullfile(parentpath,[common_prefix ref_modality '1_extract_reg_avg.tif']);
     if exist(imfile,'file')
         reference_image = imread(imfile);
@@ -83,13 +119,15 @@ if load_coords
     elseif exist(coordfile_ref,'file')
         reference_coordinates = dlmread(coordfile_ref);
     else
-        warning(['Coordinate file: ' coordfile_base '(or ' coordfile_ref ' ) Not found.']);
+        warning(['Coordinate file: ' coordfile_base ' (or ' coordfile_ref ' ) Not found.']);
     end
 end
 
-framestamps = csvread(fullfile(parentpath, [filename(1:end-3) 'csv'] ), 1, 0);
-framestamps = framestamps(:,3)';
-
+regdata = readtable(fullfile(parentpath, [filename(1:end-3) 'csv'] ));
+framestamps = regdata.OriginalFrameNumber; % The framestamps column.
+[~, minind] = min(1-regdata.NCC);
+referenceidx = framestamps(minind); % The reference frame should be perfectly correlated to itself; use this as the reference.
+% floor(regdata.Strip0_NCC)
 temporal_data_reader = VideoReader( fullfile(parentpath, filename) );
 
 num_frames = round(temporal_data_reader.Duration*temporal_data_reader.FrameRate);
@@ -127,7 +165,65 @@ if load_masks
     end    
 end
 
-[temporal_data] = Residual_Torsion_Removal_Pipl(temporal_data, mask_data);
+% Remove residual distortions and torsion.
+shiftheaders = regdata.Properties.VariableNames(4:end-2);
+shiftvalues = regdata.Variables;
 
+coarseX = shiftvalues(:,end-1);
+coarseY = shiftvalues(:,end);
+
+shiftvalues = shiftvalues(:,4:end-2);
+
+% Find our headers
+xshiftheaders = cellfun(@(head)contains(head,'XShift'), shiftheaders);
+yshiftheaders = cellfun(@(head)contains(head,'YShift'), shiftheaders);
+
+% Resort these to be in numerical instead of alphabetical order.
+striporder = cellfun(@(x)str2double(x(6:end)), cellfun(@(head)strtok(head,'_'), shiftheaders(xshiftheaders), 'UniformOutput', false));
+[~, sortind] = sort(striporder);
+
+
+xshifts = shiftvalues(:,xshiftheaders);
+xshifts = xshifts(:,sortind);
+xshift_medians = median(xshifts,1);
+
+roweval = linspace(1,length(xshift_medians), size(temporal_data,1));
+
+indivxshift = zeros([num_frames, size(temporal_data,2)]);
+%Use a poly8 as this is what BMC's imreg software uses.
+for f=1:num_frames
+    ind_xshiftfit = fit( (1:length(xshift_medians))',xshifts(f,:)','poly8','Normalize','on'); 
+    indivxshift(f,:) = feval(ind_xshiftfit, roweval);
+end
+
+xgriddistortion = repmat(mean(indivxshift,1)', [1 size(temporal_data,2)]);
+
+yshifts = shiftvalues(:,yshiftheaders);
+yshifts = yshifts(:,sortind);
+yshift_medians = median(yshifts,1);
+
+indivyshift = zeros([num_frames, size(temporal_data,2)]);
+%Use a poly8 as this is what BMC's imreg software uses. 
+for f=1:num_frames
+    ind_yshiftfit = fit( (1:length(yshift_medians))',yshifts(f,:)','poly8','Normalize','on'); 
+    indivyshift(f,:) = feval(ind_yshiftfit, roweval);
+end
+
+ygriddistortion = repmat(mean(indivyshift,1)', [1 size(temporal_data,2)]);
+
+disp_field = cat(3,xgriddistortion,ygriddistortion);
+
+for f=1:num_frames
+    temporal_data(:,:,f) = imwarp(temporal_data(:,:,f), disp_field,'FillValues',0);
+end
+
+[temporal_data] = Residual_Torsion_Removal_Pipl(temporal_data, mask_data, referenceidx);
+
+if strcmp(ref_im, 'generated')
+    reference_image = sum(temporal_data,3)./sum(mask_data/255,3);
+    reference_image(isinf(reference_image)) = 0;
+    reference_image(isnan(reference_image)) = 0;
+    imagesc(reference_image); axis image; colormap gray;
+end
 
 end
