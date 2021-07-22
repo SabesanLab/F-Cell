@@ -1,9 +1,9 @@
-function []=Relativize_Trials(trial_im, pathname)
+function [tforms, ref_im]=Relativize_Trials(ref_images, pName, fNames)
 
 
-for i=1:length(trial_im)
+for i=1:length(ref_images)
    
-    imsize(i,:) = size(trial_im{i});
+    imsize(i,:) = size(ref_images{i});
 end
 
 %%
@@ -18,7 +18,7 @@ monooptimizer.MaximumIterations = 250;
 monooptimizer.RelaxationFactor = 0.6;
 monooptimizer.GradientMagnitudeTolerance = 1e-5;
 
-tforms = cell(length(trial_im),length(trial_im));
+tforms = cell(length(ref_images),1);
 
 % Find the transform from each image to every other
 
@@ -28,51 +28,48 @@ thearea = prod(imsize,2);
 
 
 i=ref_im;
-for j=1:length(trial_im)
+for j=1:length(ref_images)
+    tforms{j} = affine2d();
     if i~=j
         %%
         tic;
 
-%             tforms{i,j} = imregtform(trial_im{j},trial_im{ref_im},... 
-%                                      'rigid',optimizer,metric, 'PyramidLevels',3);
         % First get close via ncc
-        [xcorr_map , ~] = normxcorr2_general(trial_im{j}, trial_im{ref_im}, prod(mean([imsize(j,:);imsize(ref_im,:)])/2) );
+        [xcorr_map , ~] = normxcorr2_general(ref_images{j}, ref_images{ref_im}, prod(mean([imsize(j,:);imsize(ref_im,:)])/2) );
 
         [~, ncc_ind] = max(xcorr_map(:));
         [roff, coff]= ind2sub(size(xcorr_map), ncc_ind );
-        roff = roff-size(trial_im{j},1);
-        coff = coff-size(trial_im{j},2);
+        roff = roff-size(ref_images{j},1);
+        coff = coff-size(ref_images{j},2);
 
-        tforms{i,j} = affine2d([1 0 0; 0 1 0; coff roff 1]);
+        tforms{j} = affine2d([1 0 0; 0 1 0; coff roff 1]);
 
-        trial_im{j}(isnan(trial_im{j})) = 0;
-        tforms{i,j} = imregtform( trial_im{j}, trial_im{ref_im},... % Then tweak for affine
-                                 'affine',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{i,j});
+        ref_images{j}(isnan(ref_images{j})) = 0;
+        tforms{j} = imregtform( ref_images{j}, ref_images{ref_im},... % Then tweak for affine
+                                 'affine',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{j});
 
 
         toc;
-
-
-%             reg = imwarp(trial_im{j}, imref2d(size(trial_im{j})), tforms{ref_im,j},'OutputView', imref2d(size(trial_im{ref_im})) );
-%             figure(1);imshowpair(trial_im{ref_im},reg);
 
     end
 end
 % end
 
-%% Confocal Relativized stack
-stk_name = 'Relativized_Trial_Stack.tif';
-reg_ims = repmat(trial_im{ref_im},[1 1 length(trial_im)]);
-imwrite(uint8(reg_ims(:,:,ref_im)), fullfile(pathname, stk_name) );
+%% Relativized stack
 
-for j=1:length(trial_im)
+under_indices = regexp(fNames{ref_im},'_');
+common_prefix = fNames{ref_im}(1:under_indices(7));
+
+stk_name = [common_prefix 'Relativized_Avg_Ims.tif'];
+reg_ims = repmat(ref_images{ref_im},[1 1 length(ref_images)]);
+imwrite(uint8(reg_ims(:,:,ref_im)), fullfile(pName, stk_name) );
+
+for j=1:length(ref_images)
     if j ~= ref_im
-        reg_ims(:,:,j) = imwarp(trial_im{j}, imref2d(size(trial_im{j})), tforms{ref_im,j}, 'OutputView', imref2d(size(trial_im{ref_im})) );
+        reg_ims(:,:,j) = imwarp(ref_images{j}, imref2d(size(ref_images{j})), tforms{j}, 'OutputView', imref2d(size(ref_images{ref_im})) );
         
-        imwrite(uint8(reg_ims(:,:,j)),fullfile(pathname, stk_name),'WriteMode','append','Description',num2str(j));                
-%         figure(1); imshowpair(trial_im{ref_im}, reg_ims(:,:,j)); pause(.5)
+        imwrite(uint8(reg_ims(:,:,j)),fullfile(pName, stk_name),'WriteMode','append','Description',num2str(j));                
 
-        
     end
 %     imwrite(reg_ims(:,:,j), fullfile(pathname,[confocal_fname{j}(1:end-8) '_piped_AVG.tif']) );
 %     delete(confocal_fname{j});
@@ -87,114 +84,6 @@ for f=1:size(reg_ims,3)
     sum_map = sum_map+frm_nonzeros;
 end
 
-% matchexp = '_\d*_ref_\d*_'; %String match that is expected to show up in the filename of each image. E.g. '_0018_ref_7_'
-% avgname = regexprep(confocal_fname{1},matchexp,'_ALL_TRIALS_');
-% matchexp = '_n\d*_';
-% avgname = regexprep(avgname,matchexp,'_');
 
-imwrite(uint8(sum(double(reg_ims),3)./sum_map), fullfile(pathname,['ALL_TRIALS.tif']));
-
-%% Transform all of the videos associated with each avg image
-for i=1:length(confocal_fname)
-    mov_name_in = fullfile(pathname,[confocal_fname{i}(1:end-8) '.avi']);
-    mov_name_out = fullfile(pathname,[confocal_fname{i}(1:end-8) '_piped.avi']);
-
-    if exist(mov_name_in,'file')
-        confocal_vidin = VideoReader( mov_name_in );
-        confocal_vidout = VideoWriter( mov_name_out, 'Grayscale AVI' );
-        confocal_vidout.FrameRate = 16.6;
-        open(confocal_vidout);    
-        while hasFrame(confocal_vidin)
-            frm_in = readFrame(confocal_vidin);
-
-            if ~isempty(tforms{ref_im,i})
-                writeVideo( confocal_vidout, imwarp(frm_in, imref2d(size(frm_in)), tforms{ref_im,i},...
-                                                    'OutputView', imref2d(size(trial_im{ref_im}))) );
-            else
-                writeVideo( confocal_vidout, frm_in );
-            end
-        end
-        close(confocal_vidout);
-
-        avg_name_in = [confocal_fname{i}(1:end-8) '.avi'];    
-        avg_name_in = fullfile(pathname, strrep(avg_name_in, 'confocal', 'avg'));
-
-        if exist(avg_name_in,'file')
-            avg_name_out = [confocal_fname{i}(1:end-8) '_piped.avi'];
-            avg_name_out = fullfile(pathname, strrep(avg_name_out, 'confocal', 'avg'));
-
-            avg_vidin = VideoReader( avg_name_in );
-            avg_vidout = VideoWriter( avg_name_out, 'Grayscale AVI' );
-            avg_vidout.FrameRate = 16.6;
-            open(avg_vidout);    
-            while hasFrame(avg_vidin)
-                frm_in = readFrame(avg_vidin);
-
-                if ~isempty(tforms{ref_im,i})
-                    writeVideo( avg_vidout, imwarp(frm_in, imref2d(size(frm_in)), tforms{ref_im,i},...
-                                                        'OutputView', imref2d(size(trial_im{ref_im}))) );
-                else
-                    writeVideo( avg_vidout, frm_in );
-                end
-            end
-            close(avg_vidout);
-
-        end
-
-        split_name_in = [confocal_fname{i}(1:end-8) '.avi'];    
-        split_name_in = fullfile(pathname, strrep(split_name_in, 'confocal', 'split_det'));
-
-        if exist(split_name_in,'file')
-            split_name_out = [confocal_fname{i}(1:end-8) '_piped.avi'];
-            split_name_out = fullfile(pathname, strrep(split_name_out, 'confocal', 'split_det'));
-
-            split_vidin = VideoReader( split_name_in );
-            split_vidout = VideoWriter( split_name_out, 'Grayscale AVI' );
-            split_vidout.FrameRate = 16.6;
-            open(split_vidout);    
-            while hasFrame(split_vidin)
-                frm_in = readFrame(split_vidin);
-
-                if ~isempty(tforms{ref_im,i})
-                    writeVideo( split_vidout, imwarp(frm_in, imref2d(size(frm_in)), tforms{ref_im,i},...
-                                                        'OutputView', imref2d(size(trial_im{ref_im}))) );
-                else
-                    writeVideo( split_vidout, frm_in );
-                end
-            end
-            close(split_vidout);
-
-        end
-
-        vis_name_in = [confocal_fname{i}(1:end-8) '.avi'];    
-        vis_name_in = fullfile(pathname, strrep(vis_name_in, 'confocal', 'visible'));
-
-        if exist(vis_name_in,'file')
-            vis_name_out = [confocal_fname{i}(1:end-8) '_piped.avi'];
-            vis_name_out = fullfile(pathname, strrep(vis_name_out, 'confocal', 'visible'));
-
-            vis_vidin = VideoReader( vis_name_in );
-            vis_vidout = VideoWriter( vis_name_out, 'Grayscale AVI' );
-            vis_vidout.FrameRate = 16.6;
-            open(vis_vidout);    
-            while hasFrame(vis_vidin)
-                frm_in = readFrame(vis_vidin);
-
-                if ~isempty(tforms{ref_im,i})
-                    writeVideo( vis_vidout, imwarp(frm_in, imref2d(size(frm_in)), tforms{ref_im,i},...
-                                                        'OutputView', imref2d(size(trial_im{ref_im}))) );
-                else
-                    writeVideo( vis_vidout, frm_in );
-                end
-            end
-            close(vis_vidout);
-
-        end
-    else
-        warning(['Unable to find matching confocal video: ' [confocal_fname{i}(1:end-8) '.avi']]);
-    end
-%     delete(mov_name_in);
-    
-end
-
+imwrite(uint8(sum(double(reg_ims),3)./sum_map), fullfile(pName,[common_prefix 'ALL_ACQ_AVG.tif']));
 
