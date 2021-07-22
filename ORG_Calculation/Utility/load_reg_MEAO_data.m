@@ -195,8 +195,9 @@ for f=1:num_frames
     ind_xshiftfit = fit( (1:length(xshift_medians))',xshifts(f,:)','poly8','Normalize','on'); 
     indivxshift(f,:) = feval(ind_xshiftfit, roweval);
 end
-
-xgriddistortion = repmat(mean(indivxshift,1)', [1 size(temporal_data,2)]);
+% Do the INVERSE of what is represented in the data, to counteract it.
+xgriddistortion = repmat(-median(indivxshift,1)', [1 size(temporal_data,2)]);
+% figure(1); plot(indivxshift'); hold on; plot(median(indivxshift,1),'r*')
 
 yshifts = shiftvalues(:,yshiftheaders);
 yshifts = yshifts(:,sortind);
@@ -208,8 +209,10 @@ for f=1:num_frames
     ind_yshiftfit = fit( (1:length(yshift_medians))',yshifts(f,:)','poly8','Normalize','on'); 
     indivyshift(f,:) = feval(ind_yshiftfit, roweval);
 end
+% Do the INVERSE of what is represented in the data, to counteract it.
+ygriddistortion = repmat(-median(indivyshift,1)', [1 size(temporal_data,2)]);
 
-ygriddistortion = repmat(mean(indivyshift,1)', [1 size(temporal_data,2)]);
+% figure(2); plot(indivyshift'); hold on; plot(median(indivyshift,1),'r*')
 
 disp_field = cat(3,xgriddistortion,ygriddistortion);
 
@@ -223,7 +226,7 @@ if strcmp(ref_im, 'generated')
     reference_image = sum(temporal_data,3)./sum(mask_data/255,3);
     reference_image(isinf(reference_image)) = 0;
     reference_image(isnan(reference_image)) = 0;
-    imagesc(reference_image); axis image; colormap gray;
+    figure(3);  imagesc(reference_image); axis image; colormap gray; title(filename);
 end
 
 end

@@ -31,7 +31,7 @@ for f=startind:length(fNames)
     end
 end
 
-fNames = fNames(~cellfun(@isempty, temporal_data));
+
 framestamps = framestamps(~cellfun(@isempty, temporal_data));
 mask_data = mask_data(~cellfun(@isempty, temporal_data));
 ref_images = ref_images(~cellfun(@isempty, temporal_data));
