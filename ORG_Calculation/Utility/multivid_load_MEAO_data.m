@@ -34,7 +34,7 @@ wb = waitbar(0, ['Loading ' strrep(fNames{1},'_','\_') ' (Location: ' unique_loc
 for loc=1:length(loc_list)
 
     startind = 1;
-    % Grab the filenames for this location.
+    %% Grab the filenames for this location.
     fNames = loc_list{loc};
     
     temporal_data = cell(length(fNames),1);
@@ -78,6 +78,8 @@ for loc=1:length(loc_list)
         close(confocal_vidout);
     end
 
+    % After pipeline, transfer stimulus info file.
+    
 end
 
 close(wb)
