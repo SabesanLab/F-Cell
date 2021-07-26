@@ -115,13 +115,13 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
 
             masked_temporal_data(:,:,f)= imwarp(masked_temporal_data(:,:,f), affine2d(tfo),'OutputView', imref2d(size(masked_temporal_data(:,:,f))) );
             
-            if f>=2
-                imshowpair(masked_temporal_data(:,:,f-1), masked_temporal_data(:,:,f) );
-%                 froby
-%                 tfo
-
-                pause(0.1);
-            end
+%             if f>=2
+%                 imshowpair(masked_temporal_data(:,:,f-1), masked_temporal_data(:,:,f) );
+% %                 froby
+% %                 tfo
+% 
+%                 pause(0.1);
+%             end
 %         imagesc(masked_temporal_data(:,:,f)); colormap gray; drawnow;pause(1/29.466)
     end
 

@@ -1,27 +1,30 @@
-
+% Robert Cooper 2021-07-26
+%
+% This script extracts and obtains profile data from a MEAO pipelined
+% dataset.
 clear;
 close all force;
 clc;
 
-rootDir = uigetdir(pwd);
+rootDir = uigetdir(pwd, 'Select the folder containing all videos of interest.');
 
-fPaths = read_folder_contents_rec(rootDir,'tif');
+fPaths = read_folder_contents_rec(rootDir, 'avi', '760nm');
 
-wbh = waitbar(0,['Processing trial 0 of ' num2str(length(fPaths)) '.']);
+[stimFile, stimPath] = uigetfile(fullfile(rootDir, '*.csv'), 'Select the stimulus train file that was used for this dataset.');
+
+stimTrain = dlmread(fullfile(stimPath, stimFile), ',');
+
+wbh = waitbar(0,['Processing dataset 0 of ' num2str(length(fPaths)) '.']);
 
 p = gcp();
 for i=1:size(fPaths,1)
     
     [mov_path, ref_image_fname] = getparent(fPaths{i});
 
-    waitbar(i/length(fPaths), wbh, ['Submitted trial (' num2str(i) ' of ' num2str(length(fPaths)) ').']); 
-    vid_type= 'stimulus';
-    if strcmpi(getparent(mov_path,2,'short'), 'control')
-        vid_type = 'control';
-    end
+    waitbar(i/length(fPaths), wbh, ['Submitted dataset (' num2str(i) ' of ' num2str(length(fPaths)) ').']); 
 
     try
-        f(i) = parfeval(@Rel_FF_Temporal_Reflectivity_Analysis, 0, mov_path, ref_image_fname,[72 108],vid_type);
+        f(i) = parfeval( );
     catch ex
        disp([ref_image_fname ' failed to process:']);
        disp([ex.message ': line ' num2str(ex.stack(1).line)] );

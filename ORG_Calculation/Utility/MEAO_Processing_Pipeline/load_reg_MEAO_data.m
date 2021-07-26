@@ -1,16 +1,19 @@
-function [temporal_data, framestamps, reference_coordinates, mask_data, reference_image]=load_reg_MEAO_data(temporal_data_path, varargin)
+function [temporal_data, framestamps, framerate, reference_coordinates, mask_data, reference_image]=load_reg_MEAO_data(temporal_data_path, varargin)
 % function [...]=LOAD_REG_MEAO_DATA(temporal_data_path, ...)
 %
 % 	This function is designed to load in a temporal dataset obtained from
-%   the MEAOSLO designed by Boston Micromachines Corporation.
+%   the MEAOSLO designed by Boston Micromachines Corporation. For videos to
+%   load, you MUST install LAVFilters codecs, found here: 
+%   https://github.com/Nevcairiel/LAVFilters, or any codec set that can load
+%   Y800 encoded datasets.
 %
-% 	[temporal_data, framestamps]=LOAD_REG_MEAO_DATA(temporal_data_path) 
+% 	[temporal_data, framestamps, framerate]=LOAD_REG_MEAO_DATA(temporal_data_path) 
 %   loads in an MEAOSLO temporal dataset into an NxMxT array,
-%	along with the "frame stamps" which correspond to the indexes of the
+%	alongside both the "frame stamps" which correspond to the indexes of the
 %   frames from the original video that were included in the registration
-%	step.
+%	step, and the detected framerate of the video.
 %
-% 	[temporal_data, framestamps, reference_coordinates]=
+% 	[temporal_data, framestamps, framerate, reference_coordinates]=
 %                                   LOAD_REG_MEAO_DATA(temporal_data_path)
 %	in addition to the above, the functon also loads in any coordinates 
 %   that can be used in following steps (see EXTRACT_TEMPORAL_PROFILES).
@@ -27,7 +30,7 @@ function [temporal_data, framestamps, reference_coordinates, mask_data, referenc
 %		If this coordinate file cannot be found, an empty array will be
 %       returned instead.
 %
-% 	[temporal_data, framestamps, reference_coordinates, mask_data]=
+% 	[temporal_data, framestamps, framerate, reference_coordinates, mask_data]=
 %                                    LOAD_REG_MEAO_DATA(temporal_data_path) 
 %	in addition to the above, the function returns any associated masking 
 %   data (in an NxMxT array) from the temporal dataset.
@@ -40,7 +43,7 @@ function [temporal_data, framestamps, reference_coordinates, mask_data, referenc
 %		will expect the existence of a 
 %       "MEAO_dataset_760nm1_extract_reg_cropped_small_mask.avi"
 %
-% 	[temporal_data, framestamps, reference_coordinates, mask_data, reference_image]=
+% 	[temporal_data, framestamps, framerate, reference_coordinates, mask_data, reference_image]=
 %                                    LOAD_REG_MEAO_DATA(temporal_data_path) 
 %	in addition to the above, the function returns the reference image 
 %   from the temporal dataset.
@@ -123,6 +126,7 @@ if load_coords
     end
 end
 
+
 regdata = readtable(fullfile(parentpath, [filename(1:end-3) 'csv'] ));
 framestamps = regdata.OriginalFrameNumber; % The framestamps column.
 [~, minind] = min(1-regdata.NCC);
@@ -130,8 +134,9 @@ referenceidx = framestamps(minind); % The reference frame should be perfectly co
 % floor(regdata.Strip0_NCC)
 temporal_data_reader = VideoReader( fullfile(parentpath, filename) );
 
+framerate = temporal_data_reader.FrameRate;
 num_frames = round(temporal_data_reader.Duration*temporal_data_reader.FrameRate);
-% For this to work, you MUST install LAVFilters codecs! https://github.com/Nevcairiel/LAVFilters
+% For videos to load, you MUST install LAVFilters codecs! https://github.com/Nevcairiel/LAVFilters
 temporal_data = zeros(temporal_data_reader.Height, temporal_data_reader.Width, num_frames);
 
 for f=1:num_frames
@@ -192,7 +197,9 @@ roweval = linspace(1,length(xshift_medians), size(temporal_data,1));
 indivxshift = zeros([num_frames, size(temporal_data,2)]);
 %Use a poly8 as this is what BMC's imreg software uses.
 for f=1:num_frames
-    ind_xshiftfit = fit( (1:length(xshift_medians))',xshifts(f,:)','poly8','Normalize','on'); 
+
+    ind_xshiftfit = fit( (1:length(xshift_medians))',xshifts(f,:)','poly8','Normalize','on','Exclude', isnan(xshifts(f,:)')); 
+    
     indivxshift(f,:) = feval(ind_xshiftfit, roweval);
 end
 % Do the INVERSE of what is represented in the data, to counteract it.
@@ -206,7 +213,7 @@ yshift_medians = median(yshifts,1);
 indivyshift = zeros([num_frames, size(temporal_data,2)]);
 %Use a poly8 as this is what BMC's imreg software uses. 
 for f=1:num_frames
-    ind_yshiftfit = fit( (1:length(yshift_medians))',yshifts(f,:)','poly8','Normalize','on'); 
+    ind_yshiftfit = fit( (1:length(yshift_medians))',yshifts(f,:)','poly8','Normalize','on','Exclude', isnan(yshifts(f,:)')); 
     indivyshift(f,:) = feval(ind_yshiftfit, roweval);
 end
 % Do the INVERSE of what is represented in the data, to counteract it.
