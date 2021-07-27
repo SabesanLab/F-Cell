@@ -51,16 +51,20 @@ for f=startind:length(fNames)
     [temporal_data, framestamps{f}, framerate(f)] = load_pipelined_MEAO_data(fullfile(rootDir, fNames{f}));
     
     % Extract temporal profiles at each pixel
-    [temporal_profiles, ref_coords]=extract_temporal_profiles(temporal_data,'SegmentationRadius',1, 'Coordinates', ref_coords, 'ProgBarHandle', wbh );
+    [temporal_profiles, ref_coords]=extract_temporal_profiles(temporal_data,'SegmentationRadius',2, 'Coordinates', ref_coords, 'ProgBarHandle', wbh );
 
     % Normalize the temporal profiles to each frame's mean
     [norm_temporal_profiles]=framewise_normalize_temporal_profiles(temporal_profiles, 'ProgBarHandle', wbh);
 
     % Standardize the temporal profiles to their *pre stimulus* behavior    
-    [finalized_temporal_profiles{f}]=standardize_temporal_profiles(norm_temporal_profiles, framestamps{f}', [1 stimTrain(1)], framerate(f),'Method', 'linear_stddev', 'ProgBarHandle', wbh);
+    [finalized_temporal_profiles{f}]=standardize_temporal_profiles(norm_temporal_profiles, framestamps{f}', [1 stimTrain(1)], framerate(f),'Method', 'linear_vast', 'ProgBarHandle', wbh);
 
+    figure(707); hold on;
+    Population_iORG(finalized_temporal_profiles{f},framestamps{f});
+    
 end
+hold off;
 
-
+iORG_Map(ref_coords, finalized_temporal_profiles(2:end), framestamps(2:end));
 
 close(wbh) 

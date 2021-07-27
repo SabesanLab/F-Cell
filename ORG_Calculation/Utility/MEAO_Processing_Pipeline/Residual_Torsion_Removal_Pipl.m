@@ -1,4 +1,4 @@
-function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mask_data, reference_frame)
+function [masked_temporal_data kept_framestamps]=Residual_Torsion_Removal_Pipl(temporal_data, framestamps, mask_data, reference_frame)
 % Robert F Cooper 7-12-2021
 
 
@@ -49,11 +49,11 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
     tforms(:,:,1)=affine2d().T;
     tforms(:,:,reference_frame)=affine2d().T;
     
-    ref_frame= cropped_temporal_data(:,:,reference_frame);
+    cropped_ref_frame= cropped_temporal_data(:,:,reference_frame);
     parfor n=1:size(cropped_temporal_data,3)
 
         % Register using the cropped frame
-        forward_reg_tform{n}=imregtform(cropped_temporal_data(:,:,n), ref_frame,'rigid',...
+        forward_reg_tform{n}=imregtform(cropped_temporal_data(:,:,n), cropped_ref_frame,'rigid',...
                                 optimizer, metric,'PyramidLevels',1, 'InitialTransformation', affine2d());%,'DisplayOptimization',true);
 
         
@@ -76,45 +76,70 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
     max_frob_dist = std_frob_dist+mean_frob_dist;
 
     %%
-    figure(1);
-%     imagesc(masked_temporal_data(:,:,1));
-    for f=1:size(temporal_data,3)    
+    howcorr = ones(size(temporal_data,3) ,1);
 
-            % We would NOT expect large changes here- so if there is a big
-            % jump, use the surrounding transforms to force some stablility on
-            % the registration.
-            tfo = tforms(:,:,f);
-            t=0;
-            theend = false;
-            
-            while abs(tfo(:)'*mean_tforms(:)) > max_frob_dist
+    ref_frame= masked_temporal_data(:,:,reference_frame);
+
+    parfor f=1:size(temporal_data,3)    
+
+        % We would NOT expect large changes here- so if there is a big
+        % jump, use the surrounding transforms to force some stablility on
+        % the registration.
+        tfo = tforms(:,:,f);
+        t=0;
+        theend = false;
+
+        while abs(tfo(:)'*mean_tforms(:)) > max_frob_dist
                 
 %                 lasttfo = tforms(:,:,f-1);
 %                 nexttfo = tforms(:,:,f+1);
                 
 %                 meantfo=mean(cat(3, lasttfo, nexttfo),3);
                 
-                tfo = tforms(:,:,f-t);
-                
+            tfo = tforms(:,:,f-t);
+
+            t=t+1;
+
+            if (f-t) == 0
+               theend = true;
+               break;
+            end
+        end
+
+        if theend % If we reached the end in that direction, check the other direction
+            t=1;
+            while abs(tfo(:)'*mean_tforms(:)) > max_frob_dist  && (f+t) < size(temporal_data,3)
+                tfo = tforms(:,:,f+t);
                 t=t+1;
-
-                if (f-t) == 0
-                   theend = true;
-                   break;
-                end
             end
-
-            if theend % If we reached the end in that direction, check the other direction
-                t=1;
-                while abs(tfo(:)'*mean_tforms(:)) > max_frob_dist  && (f+t) < size(temporal_data,3)
-                    tfo = tforms(:,:,f+t);
-                    t=t+1;
-                end
-            end
+        end
 
 
-            masked_temporal_data(:,:,f)= imwarp(masked_temporal_data(:,:,f), affine2d(tfo),'OutputView', imref2d(size(masked_temporal_data(:,:,f))) );
+        warped_frame = imwarp(masked_temporal_data(:,:,f), affine2d(tfo),'OutputView', imref2d(size(masked_temporal_data(:,:,f))) );
             
+        
+        warpedmask = imwarp(ones(size(masked_temporal_data(:,:,f))), affine2d(tfo),'OutputView', imref2d(size(masked_temporal_data(:,:,f))) );
+        
+            
+        [~, ~, ~, largest_rect] =FindLargestRectangles(warpedmask,[1 1 0], [300 150]);
+        % Find the coordinates for each corner of the rectangle, and
+        % return them
+        cropregion = regionprops(largest_rect,'BoundingBox');
+        cropregion = ceil(cropregion.BoundingBox);
+
+        cropregion = [cropregion(1:2), cropregion(1)+cropregion(3), cropregion(2)+cropregion(4)];
+        cropregion(cropregion<1) = 1;% Bound our crop region
+        if cropregion(4)>=size(warpedmask,1)
+            cropregion(4) = size(warpedmask,1);
+        end
+        if cropregion(3)>=size(warpedmask,2)
+            cropregion(3) = size(warpedmask,2);
+        end
+        
+        howcorr(f) = corr2(ref_frame(cropregion(2):cropregion(4), cropregion(1):cropregion(3)),...
+                           warped_frame(cropregion(2):cropregion(4), cropregion(1):cropregion(3)));    
+        
+        masked_temporal_data(:,:,f) = warped_frame;              
 %             if f>=2
 %                 imshowpair(masked_temporal_data(:,:,f-1), masked_temporal_data(:,:,f) );
 % %                 froby
@@ -125,6 +150,10 @@ function [masked_temporal_data]=Residual_Torsion_Removal_Pipl(temporal_data, mas
 %         imagesc(masked_temporal_data(:,:,f)); colormap gray; drawnow;pause(1/29.466)
     end
 
-
-  
+    if sum(howcorr<=0.1)> 0
+        warning(['Removed ' num2str( sum(howcorr<=0.1)) ' frames due to low reference correlation.'])
+    end
+    
+    masked_temporal_data = masked_temporal_data(:,:,howcorr>0.1);
+    kept_framestamps = framestamps(howcorr>0.1);
 end

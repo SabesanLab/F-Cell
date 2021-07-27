@@ -1,6 +1,6 @@
-function [pop_iORG]=Population_iORG(temporal_profiles, timestamps, varargin)
+function [population_iORG]=Population_iORG(temporal_profiles, timestamps, varargin)
 
-window_size = 5;
+
 half_window = 2;
 
 p = inputParser;
@@ -9,15 +9,16 @@ addRequired(p, 'temporal_profiles', @isnumeric)
 addOptional(p,'timestamps',@isnumeric);
 
 defaultmethod = 'moving_rms';
-validmethods = {'moving_rms', 'stddev'};
+validmethods = {'moving_rms', 'var'};
 checkMethods = @(x) any(validatestring(x,validmethods));
 
 addParameter(p, 'SummaryMethod', defaultmethod, checkMethods);
+addParameter(p, 'WindowSize', 7, @isnumeric);
 
 parse(p,temporal_profiles, varargin{:})
 
 method = p.Results.SummaryMethod;
-
+window_size = p.Results.WindowSize;
 iORG = nan(1, size(temporal_profiles,2));
 
 switch method
@@ -29,11 +30,16 @@ switch method
 
             iORG(j) = rms(window(~isnan(window)));
         end
-    case 'stddev'
-        iORG = std(temporal_profiles,0,2,'omitnan');
+    case 'var'
+        iORG = var(temporal_profiles,0,1,'omitnan');
 
 end
 
-plot(timestamps, iORG);
+population_iORG = iORG;
+
+if ~exist('timestamps','var') || isempty(timestamps)
+    timestamps=1:length(iORG);
+end
+figure(707); plot(timestamps, iORG); %axis([0 180 0 4]);
 
 end

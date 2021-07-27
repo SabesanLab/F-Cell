@@ -46,36 +46,20 @@ function [temporal_data, framestamps, framerate, reference_coordinates]=load_pip
 
 p = inputParser;
 
-% refimage = 'generated';
-% validrefimage = {'generated', 'loaded'};
-% checkrefimage = @(x) any(validatestring(x,validrefimage));
 
 addRequired(p,'temporal_data_path', @ischar);
 addParameter(p,'LoadCoordinates', false, @islogical);
-% addParameter(p,'ReferenceImage', refimage, checkrefimage);
 
 % Parse our inputs.
 parse(p,temporal_data_path,varargin{:})
 
 load_coords = p.Results.LoadCoordinates;
-% ref_im = p.Results.ReferenceImage;
-
 
 %Grab the base path provided; all other paths relevant to it can be derived
 %from it.
 [parentpath, filename] = getparent(temporal_data_path);
 
 under_indices=regexp(filename,'_');
-
-% reference_image=[];
-% if strcmp(ref_im, 'loaded')
-%     imfile = fullfile(parentpath,[common_prefix ref_modality '1_extract_reg_avg.tif']);
-%     if exist(imfile,'file')
-%         reference_image = imread(imfile);
-%     else
-%         warning(['Reference image file: ' imfile ' Not found.']);
-%     end
-% end
 
 reference_coordinates=[];
 if load_coords

@@ -227,7 +227,7 @@ for f=1:num_frames
     temporal_data(:,:,f) = imwarp(temporal_data(:,:,f), disp_field,'FillValues',0);
 end
 
-[temporal_data] = Residual_Torsion_Removal_Pipl(temporal_data, mask_data, referenceidx);
+[temporal_data, framestamps] = Residual_Torsion_Removal_Pipl(temporal_data, framestamps, mask_data, referenceidx);
 
 if strcmp(ref_im, 'generated')
     reference_image = sum(temporal_data,3)./sum(mask_data/255,3);

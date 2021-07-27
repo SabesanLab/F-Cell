@@ -91,54 +91,6 @@ for j=1:length(ref_images)
     end
 
 end
-% disp('Rescuing...');
-% % Try and rescue some data.
-% lowcorr = find(howcorr<quantile(howcorr, 0.1));
-% for j=lowcorr
-%     tforms{j} = affine2d();
-%     
-%         
-%     tic;
-%     % First get close via ncc
-%     [xcorr_map , ~] = normxcorr2_general(ref_images{j}, ref_images{ref_im}, prod(mean([imsize(j,:);imsize(ref_im,:)])/2) );
-% 
-%     [~, ncc_ind] = max(xcorr_map(:));
-%     [roff, coff]= ind2sub(size(xcorr_map), ncc_ind );
-%     roff = roff-size(ref_images{j},1);
-%     coff = coff-size(ref_images{j},2);
-% 
-%     tforms{j} = affine2d([1 0 0; 0 1 0; coff/2 roff/2 1]);
-%         
-%     % First, try and rerun the process with more pyramid levels.
-%     ref_images{j}(isnan(ref_images{j})) = 0;
-%     tforms{j} = imregtform( ref_images{j}, ref_images{ref_im},... % Then tweak for affine
-%                                  'rigid',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{j})
-% 
-%     % Rewarp it,
-%     reg_ims(:,:,j) = imwarp(ref_images{j}, imref2d(size(ref_images{j})), tforms{j}, 'OutputView', imref2d(size(ref_images{ref_im})) );
-%     % and re-eval the correlation.
-%     warpedmask = imwarp(true(size(ref_images{ref_im})), imref2d(size(ref_images{j})), tforms{j}, 'OutputView', imref2d(size(ref_images{ref_im})) );
-%         
-%     [~, ~, ~, largest_rect] =FindLargestRectangles(warpedmask,[1 1 0], [300 150]);
-%     % Find the coordinates for each corner of the rectangle, and
-%     % return them
-%     cropregion = regionprops(largest_rect,'BoundingBox');
-%     cropregion = ceil(cropregion.BoundingBox);
-% 
-%     cropregion = [cropregion(1:2), cropregion(1)+cropregion(3), cropregion(2)+cropregion(4)];
-%     cropregion(cropregion<1) = 1;% Bound our crop region
-%     if cropregion(4)>=size(warpedmask,1)
-%         cropregion(4) = size(warpedmask,1);
-%     end
-%     if cropregion(3)>=size(warpedmask,2)
-%         cropregion(3) = size(warpedmask,2);
-%     end
-% 
-%     howcorr(j) = corr2(reg_ims(cropregion(2):cropregion(4), cropregion(1):cropregion(3),ref_im),...
-%                     reg_ims(cropregion(2):cropregion(4), cropregion(1):cropregion(3),j));                   
-% 
-%     toc;
-% end
 
 
 % Actually write the data to a stacked tif for review.
