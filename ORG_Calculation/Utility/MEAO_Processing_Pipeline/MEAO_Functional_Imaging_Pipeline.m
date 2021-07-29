@@ -8,13 +8,19 @@ clear;
 close all force;
 pName = uigetdir(pwd, 'Select the folder containing all videos of interest.');
 
-instr = input('Input the desired modality string. [760nm]');
+instr = input('Input the analysis modality string. [760nm]: ','s');
 
 if isempty(instr)
     instr = '760nm';
 end
 
-allFiles = read_folder_contents(pName,'avi', '760nm');
+ref_mode = input('Input the *reference* modality string. [760nm]: ','s');
+
+if isempty(ref_mode)
+    ref_mode = '760nm';
+end
+
+allFiles = read_folder_contents(pName,'avi', instr);
 
 
 under_indices=cellfun(@(f)regexp(f,'_'),allFiles, 'UniformOutput', false);
@@ -55,8 +61,19 @@ for loc=startloc:length(loc_list)
         if ~contains(fNames{f}, 'mask') && ~contains(fNames{f}, 'piped')
             % Load the MEAO data.
             waitbar(f/length(fNames), wb, ['Loading ' strrep(fNames{f},'_','\_') ' (Location: ' unique_loc{loc} ')...']);
-            [temporal_data{f}, framestamps{f}, framerate(f), ~, ~, ref_images{f}] = load_reg_MEAO_data(fullfile(pName,fNames{f}));
-
+            
+            if ~strcmp(instr, ref_mode)
+                [temporal_data{f}, framestamps{f}, framerate(f), ~, ~, ana_ref_images{f}] = load_reg_MEAO_data(fullfile(pName,fNames{f}), 'RemoveTorsion', false);
+                
+                if exist(fullfile(pName,strrep(fNames{f},instr, ref_mode)),'file')
+                    [~, ~, ~, ~, ~, ref_images{f}] = load_reg_MEAO_data(fullfile(pName,strrep(fNames{f},instr, ref_mode)), 'RemoveTorsion', false);
+                else
+                   error(['File: ' strrep(fNames{f},instr, ref_mode) ' doesn''t exist!'] );
+                end
+            else
+                [temporal_data{f}, framestamps{f}, framerate(f), ~, ~, ref_images{f}] = load_reg_MEAO_data(fullfile(pName,fNames{f}));
+            end
+            
         end
     end
 
@@ -64,6 +81,9 @@ for loc=startloc:length(loc_list)
     framestamps = framestamps(~cellfun(@isempty, temporal_data));
     framerate = framerate(~cellfun(@isempty, temporal_data));
     ref_images = ref_images(~cellfun(@isempty, temporal_data));
+    if ~strcmp(instr, ref_mode)
+        ana_ref_images = ana_ref_images(~cellfun(@isempty, temporal_data));
+    end
     temporal_data = temporal_data(~cellfun(@isempty, temporal_data));
 
     % Relativize all of the videos together, and output the results of that.
@@ -72,10 +92,32 @@ for loc=startloc:length(loc_list)
         mkdir(outPath);
     end
 
-    [rel_tforms, ref_ind] = Relativize_Trials(ref_images, outPath, fNames);
+    [rel_tforms, ref_ind] = Relativize_Trials(ref_images, outPath, strrep(fNames,instr, ref_mode));
 
+    
+    if ~strcmp(instr, ref_mode)
+        sum_map = zeros(size(ana_ref_images{1}));
+        sum_data = zeros(size(ana_ref_images{1}));
+
+        for j=1:length(ana_ref_images)
+            if ~isempty(rel_tforms{j})
+                
+                ana_ref_images{j} = imwarp(ana_ref_images{j}, imref2d(size(ana_ref_images{j})), rel_tforms{j}, ...
+                                           'OutputView', imref2d(size(ana_ref_images{ref_ind})) );
+                
+                frm_nonzeros = (ana_ref_images{j}>0);
+                sum_data = sum_data+double(ana_ref_images{j});
+                sum_map = sum_map+frm_nonzeros;
+            end
+        end
+
+        under_indices = regexp(fNames{ref_ind},'_');
+        common_prefix = fNames{ref_ind}(1:under_indices(7));
+        imwrite(uint8(sum_data./sum_map), fullfile(outPath,[common_prefix 'ALL_ACQ_AVG.tif']));
+    end  
+    
     % Using these xforms, transform each dataset- and its coordinates
-    for f=1:length(fNames)
+    for f=1:length(fNames)    
         if ~isempty(rel_tforms{f})
             waitbar(f/length(fNames), wb, ['Saving pipelined dataset:' strrep([fNames{f}(1:end-4) '_piped.avi'],'_','\_') ' (Location: ' unique_loc{loc} ')...']);
 
@@ -91,7 +133,7 @@ for loc=startloc:length(loc_list)
             pipe_table.FrameStamps = framestamps{f};
 
             writetable(pipe_table, fullfile(outPath,[fNames{f}(1:end-4) '_piped.csv']));
-            
+       
         else
             warning(['Video: ' fNames{f} ' was removed due to a low final correlation. Please check your data.']);
         end

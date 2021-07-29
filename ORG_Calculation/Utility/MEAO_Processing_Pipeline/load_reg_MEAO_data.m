@@ -69,6 +69,8 @@ function [temporal_data, framestamps, framerate, reference_coordinates, mask_dat
 %       ReferenceModality - Defines the string embedded in the reference modality filename.
 %       [{'Confocal'} | character vector]
 %
+%       RemoveTorsion - A flag that indicates that torsio
+%
 %       ReferenceImage - Specifies the method for obtaining a reference
 %       image. Generating a reference image (default) creates a reference
 %       from the input dataset. Otherwise, it is loaded from disk using the
@@ -85,6 +87,7 @@ addRequired(p,'temporal_data_path', @ischar);
 addParameter(p,'ReferenceModality', 'Confocal', @ischar);
 addParameter(p,'LoadCoordinates', true, @islogical);
 addParameter(p,'LoadMasks', true, @islogical);
+addParameter(p,'RemoveTorsion', true, @islogical);
 addParameter(p,'ReferenceImage', refimage, checkrefimage);
 
 % Parse our inputs.
@@ -94,6 +97,7 @@ ref_modality = p.Results.ReferenceModality;
 load_coords = p.Results.LoadCoordinates;
 ref_im = p.Results.ReferenceImage;
 load_masks = p.Results.LoadMasks;
+rem_torsion = p.Results.RemoveTorsion;
 
 %Grab the base path provided; all other paths relevant to it can be derived
 %from it.
@@ -160,7 +164,7 @@ if load_masks
         mask_data = zeros(mask_data_reader.Height, mask_data_reader.Width, num_mask_frames);
 
         for f=1:num_mask_frames
-            mask_data(:,:,f) = rgb2gray(readFrame(mask_data_reader));
+            mask_data(:,:,f) = double(rgb2gray(readFrame(mask_data_reader))/255);
             
         end
 
@@ -224,16 +228,20 @@ ygriddistortion = repmat(-median(indivyshift,1)', [1 size(temporal_data,2)]);
 disp_field = cat(3,xgriddistortion,ygriddistortion);
 
 for f=1:num_frames
+    temporal_data(:,:,f) = mask_data(:,:,f).*temporal_data(:,:,f);
     temporal_data(:,:,f) = imwarp(temporal_data(:,:,f), disp_field,'FillValues',0);
+    mask_data(:,:,f) = imwarp(mask_data(:,:,f), disp_field,'FillValues',0);
 end
 
-[temporal_data, framestamps] = Residual_Torsion_Removal_Pipl(temporal_data, framestamps, mask_data, referenceidx);
+if rem_torsion
+    [temporal_data, framestamps] = Residual_Torsion_Removal_Pipl(temporal_data, framestamps, mask_data, referenceidx);
+end
 
 if strcmp(ref_im, 'generated')
-    reference_image = sum(temporal_data,3)./sum(mask_data/255,3);
+    reference_image = sum(temporal_data,3)./sum(mask_data,3);
     reference_image(isinf(reference_image)) = 0;
     reference_image(isnan(reference_image)) = 0;
-    figure(3);  imagesc(reference_image); axis image; colormap gray; title(filename);
+    figure(3);  imagesc(reference_image); axis image; colormap gray; title(strrep(filename,'_','\_'));
 end
 
 end
