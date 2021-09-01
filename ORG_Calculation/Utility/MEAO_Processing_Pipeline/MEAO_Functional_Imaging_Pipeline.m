@@ -134,10 +134,11 @@ for loc=startloc:length(loc_list)
 
             writetable(pipe_table, fullfile(outPath,[fNames{f}(1:end-4) '_piped.csv']));
        
+            close(confocal_vidout);
         else
             warning(['Video: ' fNames{f} ' was removed due to a low final correlation. Please check your data.']);
         end
-        close(confocal_vidout);
+        
     end
 
 end

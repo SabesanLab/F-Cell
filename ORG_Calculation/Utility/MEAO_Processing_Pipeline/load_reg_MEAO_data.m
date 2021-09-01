@@ -134,7 +134,7 @@ end
 regdata = readtable(fullfile(parentpath, [filename(1:end-3) 'csv'] ));
 framestamps = regdata.OriginalFrameNumber; % The framestamps column.
 [~, minind] = min(1-regdata.NCC);
-referenceidx = framestamps(minind); % The reference frame should be perfectly correlated to itself; use this as the reference.
+referenceidx = minind; %framestamps(minind); % The reference frame should be perfectly correlated to itself; use this as the reference.
 % floor(regdata.Strip0_NCC)
 temporal_data_reader = VideoReader( fullfile(parentpath, filename) );
 

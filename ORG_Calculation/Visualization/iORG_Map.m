@@ -120,6 +120,7 @@ for f=1:max_framestamp
     end
 
 
+    
 interped_map(:,:,f) = interped_map(:,:,f)./sum_map;
 
 % interped_map(isnan(interped_map(:,:,f)),f) =0;
