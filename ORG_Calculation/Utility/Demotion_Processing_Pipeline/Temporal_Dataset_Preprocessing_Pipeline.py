@@ -52,7 +52,10 @@ options['filetypes'] = [("MAT File", ".mat")]
 
 desinsoid_file = filedialog.askopenfilename(**options)
 
-static_distortion = mat_engi.Static_Distortion_Repair(desinsoid_file)
+if desinsoid_file:
+    static_distortion = mat_engi.Static_Distortion_Repair(desinsoid_file)
+else:
+    static_distortion = []
 
 just_the_dir = os.path.split(desinsoid_file)[0]
 
@@ -70,8 +73,8 @@ options['initialdir'] = dmp_folder_path
 
 image_folder_path = filedialog.askdirectory(**options)
 
-stimend = 90
-stimbegin = 72
+stimend = 60
+stimbegin = 50
 
 # progo = ttk.Progressbar(root, length=len(os.listdir(dmp_folder_path)))
 # progo.pack()
@@ -99,13 +102,13 @@ for thisfile in os.listdir(dmp_folder_path):
             ff_translation_info_rowshift = pick['full_frame_ncc']['row_shifts']
             ff_translation_info_colshift = pick['full_frame_ncc']['column_shifts']
             strip_translation_info = pick['sequence_interval_data_list']
-
+            
             firsttime = True
 
             pickle_file.close()
 
             # Find the dmp's matching image(s).
-            modalities = ('confocal', 'split_det', 'avg', 'visible')
+            modalities = ('confocal', 'split_det', 'avg', 'visible', 'HMM')
 
             images_to_fix =[]
             # Find all images in our folder that this dmp applies to.
@@ -149,17 +152,17 @@ for thisfile in os.listdir(dmp_folder_path):
                         minmaxpix[i, 1] = ref_pixels[-1]
                         i += 1
 
-                # print minmaxpix[:, 1].min()
-                # print minmaxpix[:, 0].max()
+                print(minmaxpix[:, 1].min())
+                print(minmaxpix[:, 0].max())
                 topmostrow = minmaxpix[:, 0].max()
                 bottommostrow = minmaxpix[:, 1].min()
 
                 # print np.array([pick['strip_cropping_ROI_2'][-1]])
                 # The first row is the crop ROI.
-                # np.savetxt(pickle_path[0:-4] + "_transforms.csv", np.array([pick['strip_cropping_ROI_2'][-1]]),
+                #np.savetxt(pickle_path[0:-4] + "_transforms.csv", np.array([pick['strip_cropping_ROI_2'][-1]]),
                 #            delimiter=",", newline="\n", fmt="%f")
 
-                shift_array = np.zeros([len(strip_translation_info)*3, 1000])
+                shift_array = np.zeros([len(strip_translation_info)*3, 1600])
                 shift_ind = 0
                 for frame in strip_translation_info:
                     if len(frame) > 0:
@@ -188,9 +191,9 @@ for thisfile in os.listdir(dmp_folder_path):
 
                 # progo.configure("Extracted the eye motion from the dmp file...")
 
-
+                
                 for image in images_to_fix:
-                    if "confocal" in image:
+                    if "confocal" in image or "HMM" in image:
                          print("Removing distortion from: "+image +"...")
                          anchorfile = mat_engi.Eye_Motion_Distortion_Repair_Pipl(image_folder_path, image, pick['strip_cropping_ROI_2'][-1],
                                                           shift_array.tolist(), static_distortion,nargout=3)                    
@@ -198,8 +201,8 @@ for thisfile in os.listdir(dmp_folder_path):
                          cropregion = anchorfile[2]
 
                 for image in images_to_fix:
-                    if "confocal" not in image:
-                         print("Removing distortion from: "+image +"...")
+                    if "confocal" not in image and "HMM" not in image:
+                         print("Removing distortion from nonconfocal: "+image +"...")
                          anchorfile = mat_engi.Eye_Motion_Distortion_Repair_Pipl(image_folder_path, image, pick['strip_cropping_ROI_2'][-1],
                                                           shift_array.tolist(), static_distortion, cropregion, nargout=3)                                             
 
@@ -208,7 +211,7 @@ for thisfile in os.listdir(dmp_folder_path):
                            pick['acceptable_frames'],
                            delimiter=',', fmt='%f')
                 
-                if "confocal" in writtenfile[0]:
+                if "confocal" in writtenfile[0] or "HMM" in image:
                     print("Culling excess frames from: " + writtenfile[0] + "...")
                     try:
                         writtenfile = mat_engi.Automatic_Frame_Culler_Pipl(writtenfile[0], writtenfile[1], nargout=2)

@@ -16,7 +16,10 @@ function [written_file, written_path, cropbox] = Eye_Motion_Distortion_Repair_Pi
 %    @static_grid_distortion: The residual static distortion (calculated from Static_Distortion_Repair)
 %                             that we'll remove.
 %    
-%    
+%
+
+	
+    
     repeats = 1;
     outlier_cutoff = 20;
     
@@ -131,7 +134,6 @@ clear tmp;
     all_ymotion = all_ymotion( crop_ROI(1):crop_ROI(2),:);
 
 
-
     %% View and adjust each row's translation so that we have something we can
     % move
 
@@ -154,15 +156,15 @@ clear tmp;
                      all_xmotion{i,r}>-outlier_cutoff & all_ymotion{i,r}>-outlier_cutoff);
 
         % For displaying the row offsets
-%             figure(1);
-%             plot(all_xmotion{i,r},all_ymotion{i,r},'.');hold on;
-%             plot(median(nooutx),median(noouty),'kx');
-%             plot(0,0,'r.'); hold off;
-%             axis square; axis([-outlier_cutoff outlier_cutoff -outlier_cutoff outlier_cutoff]); 
-%             title([ 'median x: ' num2str(median(all_xmotion{i,r})) ' median y: ' num2str(median(all_ymotion{i,r})) ]);
-%              drawnow;
-%              f= getframe;
-%              writeVideo(v,f);
+             %figure(1);
+             %plot(all_xmotion{i,r},all_ymotion{i,r},'.');hold on;
+             %plot(median(nooutx),median(noouty),'kx');
+             %plot(0,0,'r.'); hold off;
+             %axis square; axis([-outlier_cutoff outlier_cutoff -outlier_cutoff outlier_cutoff]); 
+             %title([ 'median x: ' num2str(median(all_xmotion{i,r})) ' median y: ' num2str(median(all_ymotion{i,r})) ]);
+             % drawnow;
+             % f= getframe;
+             % writeVideo(v,f);
 
             estimatevar(i,r) = sqrt(var(all_xmotion{i,r}).^2 + var(all_ymotion{i,r}).^2);
             xmotion_norm{i,r} = all_xmotion{i,r}-median(all_xmotion{i,r});
@@ -182,15 +184,16 @@ clear tmp;
 
         end
     end
+	
 
     for i=1:size(xmotion_vect,1)
 
         xgriddistortion(i,:) = repmat(median(xmotion_vect(i,:)), [1 size(imStk{1},2)] ); %The ref should be all 0s
-%         if i >= crop_ROI(1) && i<= crop_ROI(2) % Only apply the grid correction within the roi we've cropped to.           
+        if exist('static_grid_distortion', 'var') && ~isempty(static_grid_distortion)
             ygriddistortion(i,:) = repmat(median(ymotion_vect(i,:))+static_grid_distortion(i+crop_ROI(1)-1), [1 size(imStk{1},2)] );
-%         else
-%             ygriddistortion(i,:) = repmat(median(ymotion_vect(i,:)), [1 size(imStk{1},2)] );
-%         end
+        else
+            ygriddistortion(i,:) = repmat(median(ymotion_vect(i,:)), [1 size(imStk{1},2)] );
+		end
     end
     
     disp_field = cat(3,xgriddistortion,ygriddistortion);
@@ -199,6 +202,7 @@ clear tmp;
     
     for i=1:length(imStk)
         warpedStk(:,:,i) = uint8(imwarp(imStk{i},disp_field,'FillValues',0) );
+		
     end
 
 
@@ -214,7 +218,8 @@ clear tmp;
          imregions= bwconncomp(warpedIm>0);
          cropbox = regionprops(imregions,'Area','BoundingBox');
          [maxarea, maxind] = max([cropbox.Area]); % Take the bigger of the two areas
-         cropbox = cropbox(maxind).BoundingBox;
+		 
+         cropbox = cropbox(maxind(1)).BoundingBox;
     else
          cropbox = crop_region;
     end

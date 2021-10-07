@@ -37,8 +37,8 @@ for loc=1:length(unique_loc)
     loc_list{loc} = allFiles(contains(allFiles, unique_loc{loc}));
 end
 
-
-startloc = 1;
+%%
+startloc = 3;
 wb = waitbar(0, ['Loading ' strrep(loc_list{loc}{1},'_','\_') ' (Location: ' unique_loc{1} ')...']);
 
 %% Load all of the data, processing each location separately.

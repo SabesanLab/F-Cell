@@ -170,7 +170,7 @@ if load_masks
 
         delete(mask_data_reader)
     else
-        warning(['Mask video file: ' maskpat ' Not found.']);
+        warning(['Mask video file: ' maskpath ' Not found.']);
     end    
 end
 

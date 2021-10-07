@@ -22,31 +22,37 @@ for k=1:length(video_fname)
 
     confind = strfind(video_fname{k},'confocal');
 
-    avg_fname = strrep(video_fname{k}, 'confocal', 'avg');
+	if ~isempty(confind)
 
-    if exist(fullfile(pathname,avg_fname),'file')
-       loadavg = 1;       
-    else
-       loadavg = 0;
-    end
-    
-    split_fname = strrep(video_fname{k}, 'confocal', 'split_det');
+		avg_fname = strrep(video_fname{k}, 'confocal', 'avg');
 
-    if exist(fullfile(pathname,split_fname),'file')
-       loadsplit = 1;       
-    else
-       loadsplit = 0;
-    end
-    
-    visible_fname = strrep(video_fname{k}, 'confocal', 'visible');
+		if exist(fullfile(pathname,avg_fname),'file')
+		   loadavg = 1;       
+		else
+		   loadavg = 0;
+		end
+		
+		split_fname = strrep(video_fname{k}, 'confocal', 'split_det');
 
-    if exist(fullfile(pathname,visible_fname),'file')
-       loadvisible = 1;
-    else
-       loadvisible = 0;
+		if exist(fullfile(pathname,split_fname),'file')
+		   loadsplit = 1;       
+		else
+		   loadsplit = 0;
+		end
+		
+		visible_fname = strrep(video_fname{k}, 'confocal', 'visible');
+
+		if exist(fullfile(pathname,visible_fname),'file')
+		   loadvisible = 1;
+		else
+		   loadvisible = 0;
+		end
+	else
+		confind = strfind(video_fname{k},'HMM');
+		loadavg=0;
+		loadsplit=0;
+		loadvisible=0;
     end
-    
-    
     
     if ~isempty(confind)
 %        error('Could not find confocal in the filename. Needed for proper function of this script!'); 
@@ -424,6 +430,8 @@ for k=1:length(video_fname)
             break;
         end
     end
+	
+	ref_ind=50
 
     [optimizer, metric]  = imregconfig('monomodal');
     % optimizer.GradientMagnitudeTolerance = 1e-4;
@@ -436,10 +444,15 @@ for k=1:length(video_fname)
     forward_reg_tform = cell(length(reg_only_vid),1);
     % Register the image stack forward. It is more stable if we align to the 
     % frame with the largest percentage of the cropped region covered.
+	tforms = zeros(3, 3, length(reg_only_vid));
+    tforms(:,:,1)=affine2d().T;
+    tforms(:,:,ref_ind)=affine2d().T;
+	
+	ref_image = reg_only_vid{ref_ind};
     parfor n=1:length(reg_only_vid)
 
         % Register using the cropped frame
-        forward_reg_tform{n}=imregtform(reg_only_vid{n}, reg_only_vid{ref_ind},'affine',...
+        forward_reg_tform{n}=imregtform(reg_only_vid{n}, ref_image,'rigid',...
                                 optimizer, metric,'PyramidLevels',1, 'InitialTransformation', affine2d());%,'DisplayOptimization',true);
 
         tforms(:,:,n) = forward_reg_tform{n}.T;
@@ -465,7 +478,7 @@ for k=1:length(video_fname)
     reg_split_vid = cell(length(confocal_vid),1);
     reg_avg_vid = cell(length(confocal_vid),1);
     reg_vis_vid = cell(length(confocal_vid),1);
-
+	howcorr = ones(length(confocal_vid) ,1);
     for f=1:length(im_only_vid)    
 
         if f~=ref_ind
@@ -519,8 +532,14 @@ for k=1:length(video_fname)
                 reg_vis_vid{f}= vis_im_only_vid{f};
             end
         end
+		
+		howcorr(f) = corr2(im_only_vid{ref_ind},...
+                           reg_confocal_vid{f});    
     end
 
+	if sum(howcorr<=0.1)> 0
+        warning([num2str( sum(howcorr<=0.1)) ' frames have a low reference correlation.'])
+    end
 
     %% Remake the sum map with our rotated data.
 

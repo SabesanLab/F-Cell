@@ -32,26 +32,43 @@ for j=1:length(ref_images)
     tforms{j} = affine2d();
     if i~=j
         %%
-        tic;
+        
 
         % First get close via ncc
         [xcorr_map , ~] = normxcorr2_general(ref_images{j}, ref_images{ref_im}, prod(mean([imsize(j,:);imsize(ref_im,:)])/2) );
 
         [~, ncc_ind] = max(xcorr_map(:));
-        [roff, coff]= ind2sub(size(xcorr_map), ncc_ind );
-        roff = roff-size(ref_images{j},1);
-        coff = coff-size(ref_images{j},2);
+        [roff(j), coff(j)]= ind2sub(size(xcorr_map), ncc_ind );
+        roff(j) = roff(j)-size(ref_images{j},1);
+        coff(j) = coff(j)-size(ref_images{j},2);
 
-        tforms{j} = affine2d([1 0 0; 0 1 0; coff roff 1]);
+        
 
-        ref_images{j}(isnan(ref_images{j})) = 0;
-        tforms{j} = imregtform( ref_images{j}, ref_images{ref_im},... % Then tweak for affine
-                                 'rigid',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{j});
-
-        toc;
+        
 
     end
 end
+
+roff = roff-median(roff);
+coff = coff-median(coff);
+
+[distfrommed, mindistind] = min( sqrt((roff.^2)+(coff.^2)) );
+
+ref_im = mindistind;
+
+
+
+
+for j=1:length(ref_images)
+    tic;
+    tforms{j} = affine2d([1 0 0; 0 1 0; coff(j) roff(j) 1]);
+
+    ref_images{j}(isnan(ref_images{j})) = 0;
+    tforms{j} = imregtform( ref_images{j}, ref_images{ref_im},... % Then tweak for affine
+                                 'affine',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{j});
+    toc;
+end
+
 % end
 
 %% Relativized stack
