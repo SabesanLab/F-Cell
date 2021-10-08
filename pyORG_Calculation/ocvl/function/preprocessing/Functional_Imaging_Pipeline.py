@@ -44,16 +44,20 @@ root.geometry(
     '%dx%d+%d+%d' % (w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
 root.update()
 
-instr = simpledialog.askstring(title="Input the analysis modality string: ",
-                               prompt="Input the analysis modality string:",
-                               initialvalue="760nm", parent=root)
-if not instr:
-    instr = "760nm"
+# instr = simpledialog.askstring(title="Input the analysis modality string: ",
+#                                prompt="Input the analysis modality string:",
+#                                initialvalue="760nm", parent=root)
+# if not instr:
+#     instr = "760nm"
+#
+# ref_mode = simpledialog.askstring(title="Input the *reference* modality string. ",
+#                                   prompt="Input the *reference* modality string:", initialvalue="760nm", parent=root)
+# if not ref_mode:
+#     ref_mode = "760nm"
 
-ref_mode = simpledialog.askstring(title="Input the *reference* modality string. ",
-                                  prompt="Input the *reference* modality string:", initialvalue="760nm", parent=root)
-if not ref_mode:
-    ref_mode = "760nm"
+# For debugging.
+instr = "760nm"
+ref_mode = "Confocal"
 
 print("Selected analysis modality name of: " + instr + ", and a reference modality of: " + ref_mode)
 
@@ -104,10 +108,11 @@ for loc in allFiles:
         pb_label["text"] = "Processing " + file + "..."
         curFile += 1
 
-        # Here is where we'll place the options. For now, just MEAO...
-        dataset = MEAODataset(file, ref_modality=ref_mode)
+        if "_mask.avi" not in file:
+            # Here is where we'll place the options. For now, just MEAO...
+            dataset = MEAODataset(file, ref_modality=ref_mode)
 
-        dataset.load_unpipelined_data()
+            dataset.load_unpipelined_data()
 
 
 pb.stop()
