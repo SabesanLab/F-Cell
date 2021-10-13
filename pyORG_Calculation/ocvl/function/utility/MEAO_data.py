@@ -7,6 +7,7 @@ from numpy.polynomial.polynomial import polyval
 from numpy.polynomial import Polynomial
 
 
+
 class MEAODataset():
     def __init__(self, video_path="", ref_modality="760nm", pipelined=False):
 
@@ -121,7 +122,7 @@ class MEAODataset():
                     yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
 
             allrows = np.linspace(0, numstrips-1, num=self.height) # Make a linspace for all of our images' rows.
-            substrip = np.linspace(0, numstrips - 1, num=numstrips)
+            substrip = np.linspace(0, numstrips-1, num=numstrips)
 
             indivxshift = np.zeros([self.num_frames, self.height])
 
@@ -130,9 +131,21 @@ class MEAODataset():
                 row_strip_fit = Polynomial.fit(substrip, xshifts[f, :], deg=8)
                 indivxshift[f, :] = row_strip_fit(allrows)
 
+            centered_indivxshift = indivxshift-np.median(indivxshift, axis=0)
+
+            indivyshift = np.zeros([self.num_frames, self.height])
+
+            # Fit across rows, in order to capture all strips for a given dataset
+            for f in range(self.num_frames):
+                row_strip_fit = Polynomial.fit(substrip, yshifts[f, :], deg=8)
+                indivyshift[f, :] = row_strip_fit(allrows)
+
+            centered_indivyshift = indivyshift-np.median(indivyshift, axis=0)
+
+            print(indivxshift)
 
 
-            print(xshifts)
+
             # for i in range(this_data.shape[-1]):
             #     # Display the resulting frame
             #
