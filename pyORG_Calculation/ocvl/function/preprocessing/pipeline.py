@@ -13,16 +13,24 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import os
-from os.path import splitext
-from os import walk
-import numpy as np
+from enum import Enum
+
 import cv2 as cv
+import numpy as np
+import os
+from os import walk
+from os.path import splitext
 from tkinter import *
 from tkinter import filedialog, simpledialog
 from tkinter import ttk
 
-from ocvl.function.utility.MEAO_data import MEAODataset
+from ocvl.function.preprocessing.improc import flat_field
+from ocvl.function.utility.generic import GenericDataset, PipeStages
+from ocvl.function.utility.meao import MEAODataset
+
+
+
+
 
 root = Tk()
 root.lift()
@@ -51,17 +59,18 @@ root.update()
 #     instr = "760nm"
 #
 # ref_mode = simpledialog.askstring(title="Input the *reference* modality string. ",
-#                                   prompt="Input the *reference* modality string:", initialvalue="760nm", parent=root)
+#                                   prompt="Input the *reference* modality string:", initialvalue=instr, parent=root)
 # if not ref_mode:
 #     ref_mode = "760nm"
 
 # For debugging.
-instr = "760nm"
-ref_mode = "Confocal"
+instr = "HMM"
+ref_mode = instr
 
 print("Selected analysis modality name of: " + instr + ", and a reference modality of: " + ref_mode)
 
 allFiles = dict()
+allFiles["Unknown"] = [] # Prep an empty list for all the locations we can't parse.
 totFiles = 0
 # Parse out the locations and filenames, store them in a hash table.
 for (dirpath, dirnames, filenames) in walk(pName):
@@ -76,15 +85,15 @@ for (dirpath, dirnames, filenames) in walk(pName):
                     allFiles[loc].append(os.path.join(pName, fName))
                 else:
                     allFiles[loc].append(os.path.join(pName, fName))
+            else:
+                allFiles["Unknown"].append(os.path.join(pName, fName))
 
-                totFiles += 1
+            totFiles += 1
 
     break  # Break after the first run so we don't go recursive.
 
 if not allFiles:
-    pass # Handle this for non-MEAO data.
-
-
+    pass  # Handle this for non-MEAO data.
 
 pb = ttk.Progressbar(root, orient=HORIZONTAL, length=378)
 pb.grid(column=0, row=0, columnspan=2, padx=3, pady=5)
@@ -104,15 +113,24 @@ curFile = 0
 for loc in allFiles:
 
     for file in allFiles[loc]:
-        pb["value"]= curFile/totFiles
+        pb["value"] = curFile / totFiles
         pb_label["text"] = "Processing " + file + "..."
         curFile += 1
 
-        if "_mask.avi" not in file:
+        if "extract_reg_cropped.avi" in file and "_mask.avi" not in file:
             # Here is where we'll place the options. For now, just MEAO...
-            dataset = MEAODataset(file, ref_modality=ref_mode)
+            dataset = MEAODataset(file, ref_modality=ref_mode, stage=PipeStages.PROCESSED)
 
             dataset.load_unpipelined_data()
+        else:
+            dataset = GenericDataset(file, stage=PipeStages.RAW)
+
+            dataset.load_data()
+
+            dataset.video_data = flat_field(dataset.video_data)
+
+            dataset.save_data("_ff")
+            print("yay!")
 
 
 pb.stop()

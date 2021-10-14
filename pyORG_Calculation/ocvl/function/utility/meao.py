@@ -1,15 +1,16 @@
-import os.path
-from os import path
-import numpy as np
 import cv2
+import numpy as np
+import os.path
 import pandas as pd
-from numpy.polynomial.polynomial import polyval
 from numpy.polynomial import Polynomial
+from os import path
 
+from ocvl.function.utility.generic import PipeStages
+from ocvl.function.utility.resources import ResourceLoader
 
 
 class MEAODataset():
-    def __init__(self, video_path="", ref_modality="760nm", pipelined=False):
+    def __init__(self, video_path="", ref_modality="760nm", stage=PipeStages.RAW):
 
         self.reference_modality = ref_modality
 
@@ -27,7 +28,7 @@ class MEAODataset():
                                     common_prefix + "_" + self.reference_modality + "1_extract_reg_avg_coords.csv")
 
         # Information about the dataset
-        self.pipelined = pipelined
+        self.stage = stage
         self.framerate = -1
         self.num_frames = -1
         self.width = -1
@@ -45,7 +46,7 @@ class MEAODataset():
     def load_unpipelined_data(self, force = False):
 
         # Establish our unpipelined filenames
-        if not self.pipelined and not force:
+        if self.stage is not (PipeStages.RAW or PipeStages.PIPELINED) or force:
 
             # Load the video data.
             vid = cv2.VideoCapture(self.video_path)
