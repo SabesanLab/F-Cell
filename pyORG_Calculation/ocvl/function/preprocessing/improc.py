@@ -1,5 +1,8 @@
 import cv2
 import numpy as np
+from numpy.polynomial import Polynomial
+
+from ocvl.function.utility.resources import save_video
 
 
 def flat_field(dataset, sigma=20):
@@ -41,24 +44,119 @@ def flat_field(dataset, sigma=20):
 # Where the image data is N rows x M cols and F frames
 # and the row_shifts and col_shifts are F x N.
 # Assumes a row-wise distortion/a row-wise fast scan ("distortionless" along each row)
-def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
-    allrows = np.linspace(0, numstrips - 1, num=self.height)  # Make a linspace for all of our images' rows.
+# Returns a float image (spans from 0-1).
+def dewarp_2D_data(image_data, mask_data, row_shifts, col_shifts, method="median"):
+
+    numstrips = row_shifts.shape[1]
+    height = image_data.shape[0]
+    width = image_data.shape[1]
+    num_frames = image_data.shape[-1]
+
+    allrows = np.linspace(0, numstrips - 1, num=height)  # Make a linspace for all of our images' rows.
     substrip = np.linspace(0, numstrips - 1, num=numstrips)
 
-    indivxshift = np.zeros([self.num_frames, self.height])
+    indiv_colshift = np.zeros([num_frames, height])
+    indiv_rowshift = np.zeros([num_frames, height])
 
-    # Fit across rows, in order to capture all strips for a given dataset
-    for f in range(self.num_frames):
-        row_strip_fit = Polynomial.fit(substrip, xshifts[f, :], deg=8)
-        indivxshift[f, :] = row_strip_fit(allrows)
 
-    indivyshift = np.zeros([self.num_frames, self.height])
+    for f in range(num_frames):
+        # Fit across rows, in order to capture all strips for a given dataset
+        row_strip_fit = Polynomial.fit(substrip, col_shifts[f, :], deg=8)
+        indiv_colshift[f, :] = row_strip_fit(allrows)
+        # Fit across rows, in order to capture all strips for a given dataset
+        row_strip_fit = Polynomial.fit(substrip, row_shifts[f, :], deg=8)
+        indiv_rowshift[f, :] = row_strip_fit(allrows)
 
-    # Fit across rows, in order to capture all strips for a given dataset
-    for f in range(self.num_frames):
-        row_strip_fit = Polynomial.fit(substrip, yshifts[f, :], deg=8)
-        indivyshift[f, :] = row_strip_fit(allrows)
 
     if method == "median":
-        centered_col_shifts = -np.median(col_shifts, axis=0)
-        centered_row_shifts = -np.median(row_shifts, axis=0)
+        centered_col_shifts = -np.median(indiv_colshift, axis=0)
+        centered_row_shifts = -np.median(indiv_rowshift, axis=0)
+
+    dewarped = np.zeros(image_data.shape)
+    dewarped_mask = np.ones(image_data.shape)
+
+    col_base = np.tile(np.arange(width, dtype=np.float32)[np.newaxis, :], [height, 1])
+    row_base = np.tile(np.arange(height, dtype=np.float32)[:, np.newaxis], [1, width])
+
+    centered_col_shifts = col_base + np.tile(centered_col_shifts[:, np.newaxis], [1, width]).astype("float32")
+    centered_row_shifts = row_base + np.tile(centered_row_shifts[:, np.newaxis], [1, width]).astype("float32")
+
+    for f in range(num_frames):
+        dewarped[..., f] = cv2.remap(image_data[..., f].astype("float64")/255, centered_col_shifts, centered_row_shifts,
+                                     interpolation=cv2.INTER_CUBIC)
+        dewarped_mask[..., f] = cv2.remap(mask_data[..., f].astype("float64"), centered_col_shifts,
+                                          centered_row_shifts, interpolation=cv2.INTER_NEAREST)
+        # cv2.imshow("diff warped", (image_data[..., f].astype("float64")/255)-dewarped[..., f])
+        # cv2.imshow("dewarped", dewarped[..., f])
+        # c = cv2.waitKey(1000)
+        # if c == 27:
+        #     break
+
+    # Clamp our values.
+    dewarped[dewarped < 0] = 0
+    dewarped[dewarped > 1] = 1
+
+    if image_data.dtype == np.uint8:
+        return (dewarped*255).astype("uint8"), dewarped_mask.astype("uint8")
+    else:
+        return dewarped, dewarped_mask
+
+    #save_video("C:\\Users\\rober\\Documents\\temp\\test.avi", (dewarped*255).astype("uint8"), 30)
+
+def remove_data_torsion(image_data, mask_data, framestamps=None, reference_indx=None):
+    num_frames = image_data.shape[-1]
+
+    if reference_indx is None:
+        reference_indx = 1
+
+    sift = cv2.SIFT_create(500)
+
+    keypoints = []
+    descriptors = []
+
+    for f in range(num_frames):
+        kp, des = sift.detectAndCompute(image_data[..., f], mask_data[..., f], None)
+        keypoints.append(kp)
+        descriptors.append(des)
+
+    # Set up FLANN parameters (feature matching)... review these.
+    FLANN_INDEX_KDTREE = 0
+    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+    search_params = dict(checks=100)
+
+    flan = cv2.FlannBasedMatcher(index_params, search_params)
+
+    xform = [0] * num_frames
+    for f in range(num_frames):
+        matches = flan.knnMatch(descriptors[f], descriptors[reference_indx], k=2)
+
+        good_matches = []
+        for f1, f2 in matches:
+            #print( str(f1.distance) +" vs "+ str(f2.distance))
+            if f1.distance < 0.8*f2.distance:
+                good_matches.append(f1)
+
+        if len(good_matches) > 10:
+            print("Found " + str(len(good_matches)) + " matches between frame " + str(f) + " and the reference.")
+            src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
+            dst_pts = np.float32([keypoints[reference_indx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
+
+
+            M, inliers = cv2.estimateAffine2D(src_pts, dst_pts)
+
+
+            h, w = image_data[..., f].shape
+            xform[f] = M
+
+            cv2.imshow("aligned", cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape, flags=cv2.INTER_LANCZOS4))
+            c = cv2.waitKey(500)
+            if c == 27:
+                break
+        else:
+            pass
+            #print("Not enough matches were found: "+str(len(good_matches)))
+
+
+
+
+    print("Hiya")

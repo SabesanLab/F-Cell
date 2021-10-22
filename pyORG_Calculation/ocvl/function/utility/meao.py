@@ -5,7 +5,7 @@ import pandas as pd
 from numpy.polynomial import Polynomial
 from os import path
 
-from ocvl.function.preprocessing.improc import dewarp_2D_data
+from ocvl.function.preprocessing.improc import dewarp_2D_data, remove_data_torsion
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.resources import ResourceLoader
 
@@ -124,10 +124,9 @@ class MEAODataset():
                     yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
 
 
+            self.video_data, self.mask_data = dewarp_2D_data(self.video_data, self.mask_data, xshifts, yshifts)
 
-            self.video_data = dewarp_2D_data(self.video_data, indivxshift, indivyshift)
-
-
+            remove_data_torsion(self.video_data, self.mask_data, framestamps=self.framestamps, reference_indx=self.reference_frame_idx)
 
 
             # for i in range(this_data.shape[-1]):

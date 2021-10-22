@@ -64,7 +64,7 @@ root.update()
 #     ref_mode = "760nm"
 
 # For debugging.
-instr = "HMM"
+instr = "760nm"
 ref_mode = instr
 
 print("Selected analysis modality name of: " + instr + ", and a reference modality of: " + ref_mode)
