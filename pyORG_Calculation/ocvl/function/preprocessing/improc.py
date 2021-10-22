@@ -38,3 +38,27 @@ def flat_field(dataset, sigma=20):
 
     return flat_fielded_dataset
 
+# Where the image data is N rows x M cols and F frames
+# and the row_shifts and col_shifts are F x N.
+# Assumes a row-wise distortion/a row-wise fast scan ("distortionless" along each row)
+def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
+    allrows = np.linspace(0, numstrips - 1, num=self.height)  # Make a linspace for all of our images' rows.
+    substrip = np.linspace(0, numstrips - 1, num=numstrips)
+
+    indivxshift = np.zeros([self.num_frames, self.height])
+
+    # Fit across rows, in order to capture all strips for a given dataset
+    for f in range(self.num_frames):
+        row_strip_fit = Polynomial.fit(substrip, xshifts[f, :], deg=8)
+        indivxshift[f, :] = row_strip_fit(allrows)
+
+    indivyshift = np.zeros([self.num_frames, self.height])
+
+    # Fit across rows, in order to capture all strips for a given dataset
+    for f in range(self.num_frames):
+        row_strip_fit = Polynomial.fit(substrip, yshifts[f, :], deg=8)
+        indivyshift[f, :] = row_strip_fit(allrows)
+
+    if method == "median":
+        centered_col_shifts = -np.median(col_shifts, axis=0)
+        centered_row_shifts = -np.median(row_shifts, axis=0)

@@ -5,6 +5,7 @@ import pandas as pd
 from numpy.polynomial import Polynomial
 from os import path
 
+from ocvl.function.preprocessing.improc import dewarp_2D_data
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.resources import ResourceLoader
 
@@ -84,7 +85,7 @@ class MEAODataset():
             while vid.isOpened():
                 ret, frm = vid.read()
                 if ret:
-                    # Only take the first channel.
+                    # Only take the first channel, and scale the mask from 0-1
                     this_mask[..., i] = frm[..., 0]/255
                     i += 1
                 else:
@@ -122,28 +123,10 @@ class MEAODataset():
                     shiftrow = col.split("_")[0][5:]
                     yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
 
-            allrows = np.linspace(0, numstrips-1, num=self.height) # Make a linspace for all of our images' rows.
-            substrip = np.linspace(0, numstrips-1, num=numstrips)
 
-            indivxshift = np.zeros([self.num_frames, self.height])
 
-            # Fit across rows, in order to capture all strips for a given dataset
-            for f in range(self.num_frames):
-                row_strip_fit = Polynomial.fit(substrip, xshifts[f, :], deg=8)
-                indivxshift[f, :] = row_strip_fit(allrows)
+            self.video_data = dewarp_2D_data(self.video_data, indivxshift, indivyshift)
 
-            centered_indivxshift = indivxshift-np.median(indivxshift, axis=0)
-
-            indivyshift = np.zeros([self.num_frames, self.height])
-
-            # Fit across rows, in order to capture all strips for a given dataset
-            for f in range(self.num_frames):
-                row_strip_fit = Polynomial.fit(substrip, yshifts[f, :], deg=8)
-                indivyshift[f, :] = row_strip_fit(allrows)
-
-            centered_indivyshift = indivyshift-np.median(indivyshift, axis=0)
-
-            print(indivxshift)
 
 
 

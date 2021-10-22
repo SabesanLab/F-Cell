@@ -130,7 +130,7 @@ for loc in allFiles:
             dataset.video_data = flat_field(dataset.video_data)
 
             dataset.save_data("_ff")
-            print("yay!")
+
 
 
 pb.stop()
