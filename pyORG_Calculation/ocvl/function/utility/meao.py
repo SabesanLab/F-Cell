@@ -7,26 +7,28 @@ from os import path
 
 from ocvl.function.preprocessing.improc import dewarp_2D_data, remove_data_torsion
 from ocvl.function.utility.generic import PipeStages
-from ocvl.function.utility.resources import ResourceLoader
+from ocvl.function.utility.resources import ResourceLoader, load_video, save_video
 
 
 class MEAODataset():
-    def __init__(self, video_path="", ref_modality="760nm", stage=PipeStages.RAW):
+    def __init__(self, video_path="", analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.RAW):
 
+        self.analysis_modality = analysis_modality
         self.reference_modality = ref_modality
 
 
         # Paths to the data used here.
         self.video_path = video_path
+        self.ref_video_path = video_path.replace(analysis_modality, ref_modality)
         self.metadata_path = self.video_path[0:-3] + "csv"
         self.mask_path = self.video_path[0:-4] + "_mask.avi"
         p_name = os.path.dirname(os.path.realpath(self.video_path))
         f_name = os.path.basename(os.path.realpath(self.video_path))
         common_prefix = f_name.split("_")
         common_prefix = "_".join(common_prefix[0:6])
-        self.image_path = path.join(p_name, common_prefix + "_" + self.reference_modality + "1_extract_reg_avg.tif")
+        self.image_path = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
         self.coord_path = path.join(p_name,
-                                    common_prefix + "_" + self.reference_modality + "1_extract_reg_avg_coords.csv")
+                                    common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg_coords.csv")
 
         # Information about the dataset
         self.stage = stage
@@ -39,6 +41,7 @@ class MEAODataset():
 
         # The data itself.
         self.video_data = np.empty([1])
+        self.ref_video_data = np.empty([1])
         self.mask_data = np.empty([1])
         self.coord_data = np.empty([1])
         self.reference_im = np.empty([1])
@@ -50,51 +53,27 @@ class MEAODataset():
         if self.stage is not (PipeStages.RAW or PipeStages.PIPELINED) or force:
 
             # Load the video data.
-            vid = cv2.VideoCapture(self.video_path)
+            res = load_video(self.video_path)
 
-            if vid.isOpened():
-                # If this video doesn't match our set framerate for the dataset, kick out.
-                if self.framerate != -1 and vid.get(cv2.CAP_PROP_FPS) != self.framerate:
-                    return
-                self.framerate = vid.get(cv2.CAP_PROP_FPS)
-                self.num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
-                self.height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.framerate = res.metadict["framerate"]
+            self.num_frames = res.data.shape[-1]
+            self.width = res.data.shape[1]
+            self.height = res.data.shape[0]
+            self.video_data = res.data
 
-                this_data = np.empty([self.height, self.width, self.num_frames], dtype=np.uint8)
+            res = load_video(self.mask_path)
+            self.mask_data = res.data / 255
+            self.video_data = self.video_data * self.mask_data
 
-            i=0
-            while vid.isOpened():
-                ret, frm = vid.read()
-                if ret:
-                    # Only take the first channel.
-                    this_data[..., i] = frm[..., 0]
-                    i += 1
-                else:
-                    break
+            if self.ref_video_path != self.video_path:
+                # Load the reference video data.
+                res = load_video(self.ref_video_path)
+                self.ref_video_data = res.data*self.mask_data
 
-            vid.release()
 
-            # Load the mask data.
-            vid = cv2.VideoCapture(self.mask_path)
 
-            if vid.isOpened():
-                this_mask = np.empty([self.height, self.width, self.num_frames], dtype=np.uint8)
 
-            i = 0
-            while vid.isOpened():
-                ret, frm = vid.read()
-                if ret:
-                    # Only take the first channel, and scale the mask from 0-1
-                    this_mask[..., i] = frm[..., 0]/255
-                    i += 1
-                else:
-                    break
 
-            vid.release()
-
-            self.video_data = this_data*this_mask
-            self.mask_data = this_mask
 
             # Load our text data.
             metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
@@ -124,9 +103,28 @@ class MEAODataset():
                     yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
 
 
-            self.video_data, self.mask_data = dewarp_2D_data(self.video_data, self.mask_data, xshifts, yshifts)
+            self.video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(self.video_data, xshifts, yshifts)
 
-            remove_data_torsion(self.video_data, self.mask_data, framestamps=self.framestamps, reference_indx=self.reference_frame_idx)
+            warp_mask = np.zeros(self.video_data.shape)
+            ref_vid = np.zeros(self.video_data.shape)
+            for f in range(self.num_frames):
+                warp_mask[..., f] = cv2.remap(self.mask_data[..., f].astype("float64"), map_mesh_x,
+                                              map_mesh_y, interpolation=cv2.INTER_NEAREST)
+
+                ref_vid[..., f] = cv2.remap(self.ref_video_data[..., f].astype("float64")/255,
+                                                 map_mesh_x, map_mesh_y,
+                                                 interpolation=cv2.INTER_LANCZOS4)
+            # Clamp our values.
+            warp_mask[warp_mask < 0] = 0
+            warp_mask[warp_mask >= 1] = 1
+            ref_vid[ref_vid < 0] = 0
+            ref_vid[ref_vid >= 1] = 1
+
+            self.mask_data = warp_mask.astype("uint8")
+            self.ref_video_data = (255*ref_vid).astype("uint8")
+
+            remove_data_torsion(self.ref_video_data, self.mask_data, framestamps=self.framestamps, reference_indx=self.reference_frame_idx)
+
 
 
             # for i in range(this_data.shape[-1]):

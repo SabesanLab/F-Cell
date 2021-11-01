@@ -52,22 +52,22 @@ root.geometry(
     '%dx%d+%d+%d' % (w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
 root.update()
 
-# instr = simpledialog.askstring(title="Input the analysis modality string: ",
+# a_mode = simpledialog.askstring(title="Input the analysis modality string: ",
 #                                prompt="Input the analysis modality string:",
 #                                initialvalue="760nm", parent=root)
-# if not instr:
-#     instr = "760nm"
+# if not a_mode:
+#     a_mode = "760nm"
 #
-# ref_mode = simpledialog.askstring(title="Input the *reference* modality string. ",
-#                                   prompt="Input the *reference* modality string:", initialvalue=instr, parent=root)
+# ref_mode = simpledialog.askstring(title="Input the *alignment reference* modality string. ",
+#                                   prompt="Input the *alignment reference* modality string:", initialvalue=a_mode, parent=root)
 # if not ref_mode:
 #     ref_mode = "760nm"
 
 # For debugging.
-instr = "760nm"
-ref_mode = instr
+a_mode = "760nm"
+ref_mode = "Confocal"
 
-print("Selected analysis modality name of: " + instr + ", and a reference modality of: " + ref_mode)
+print("Selected analysis modality name of: " + a_mode + ", and a reference modality of: " + ref_mode)
 
 allFiles = dict()
 allFiles["Unknown"] = [] # Prep an empty list for all the locations we can't parse.
@@ -75,7 +75,7 @@ totFiles = 0
 # Parse out the locations and filenames, store them in a hash table.
 for (dirpath, dirnames, filenames) in walk(pName):
     for fName in filenames:
-        if instr in fName and splitext(fName)[1] == ".avi":
+        if a_mode in fName and splitext(fName)[1] == ".avi":
             splitfName = fName.split("_")
 
             if splitfName[3][0] == "(" and splitfName[3][-1] == ")":
@@ -119,7 +119,7 @@ for loc in allFiles:
 
         if "extract_reg_cropped.avi" in file and "_mask.avi" not in file:
             # Here is where we'll place the options. For now, just MEAO...
-            dataset = MEAODataset(file, ref_modality=ref_mode, stage=PipeStages.PROCESSED)
+            dataset = MEAODataset(file, analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PROCESSED)
 
             dataset.load_unpipelined_data()
         else:

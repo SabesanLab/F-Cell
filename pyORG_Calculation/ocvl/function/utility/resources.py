@@ -57,7 +57,7 @@ def save_video(video_path, video_data, framerate):
     if vidout.isOpened():
         i=0
         while(True):
-            vidout.write(video_data[..., i])
+            vidout.write(video_data[..., i].astype("uint8"))
             i+=1
 
             if i >= video_data.shape[-1]:
@@ -111,7 +111,7 @@ class ResourceSaver:
 
 
 class Resource:
-    def __init__(self, dattype=ResourceType.CUSTOM, name="", data=[], metadict={}):
+    def __init__(self, dattype=ResourceType.CUSTOM, name="", data=np.empty([1]), metadict={}):
         self.type = dattype
         self.name = name
         self.data = data

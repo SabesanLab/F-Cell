@@ -45,7 +45,7 @@ def flat_field(dataset, sigma=20):
 # and the row_shifts and col_shifts are F x N.
 # Assumes a row-wise distortion/a row-wise fast scan ("distortionless" along each row)
 # Returns a float image (spans from 0-1).
-def dewarp_2D_data(image_data, mask_data, row_shifts, col_shifts, method="median"):
+def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
 
     numstrips = row_shifts.shape[1]
     height = image_data.shape[0]
@@ -73,7 +73,6 @@ def dewarp_2D_data(image_data, mask_data, row_shifts, col_shifts, method="median
         centered_row_shifts = -np.median(indiv_rowshift, axis=0)
 
     dewarped = np.zeros(image_data.shape)
-    dewarped_mask = np.ones(image_data.shape)
 
     col_base = np.tile(np.arange(width, dtype=np.float32)[np.newaxis, :], [height, 1])
     row_base = np.tile(np.arange(height, dtype=np.float32)[:, np.newaxis], [1, width])
@@ -83,9 +82,8 @@ def dewarp_2D_data(image_data, mask_data, row_shifts, col_shifts, method="median
 
     for f in range(num_frames):
         dewarped[..., f] = cv2.remap(image_data[..., f].astype("float64")/255, centered_col_shifts, centered_row_shifts,
-                                     interpolation=cv2.INTER_CUBIC)
-        dewarped_mask[..., f] = cv2.remap(mask_data[..., f].astype("float64"), centered_col_shifts,
-                                          centered_row_shifts, interpolation=cv2.INTER_NEAREST)
+                                     interpolation=cv2.INTER_LANCZOS4)
+
         # cv2.imshow("diff warped", (image_data[..., f].astype("float64")/255)-dewarped[..., f])
         # cv2.imshow("dewarped", dewarped[..., f])
         # c = cv2.waitKey(1000)
@@ -97,9 +95,9 @@ def dewarp_2D_data(image_data, mask_data, row_shifts, col_shifts, method="median
     dewarped[dewarped > 1] = 1
 
     if image_data.dtype == np.uint8:
-        return (dewarped*255).astype("uint8"), dewarped_mask.astype("uint8")
+        return (dewarped*255).astype("uint8"), centered_col_shifts, centered_row_shifts
     else:
-        return dewarped, dewarped_mask
+        return dewarped, centered_col_shifts, centered_row_shifts
 
     #save_video("C:\\Users\\rober\\Documents\\temp\\test.avi", (dewarped*255).astype("uint8"), 30)
 
@@ -109,7 +107,30 @@ def remove_data_torsion(image_data, mask_data, framestamps=None, reference_indx=
     if reference_indx is None:
         reference_indx = 1
 
-    sift = cv2.SIFT_create(500)
+    xform = [0] * num_frames
+    corrected_im = np.zeros(image_data.shape)
+    # number_of_iterations = 5000;
+    # # Specify the threshold of the increment
+    # # in the correlation coefficient between two iterations
+    # termination_eps = 1e-5;
+    #
+    # # Define termination criteria
+    # criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, number_of_iterations, termination_eps)
+    #
+    #
+    #
+    # for f in range(num_frames):
+    #     xform[f] = np.eye(2, 3, dtype=np.float32)
+    #     try:
+    #         (cc, xform[f]) = cv2.findTransformECC(image_data[..., f], image_data[..., reference_indx], xform[f],
+    #                                               cv2.MOTION_AFFINE, criteria, inputMask=mask_data[..., reference_indx])
+    #         corrected_im[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
+    #                                               flags=cv2.INTER_LANCZOS4)
+    #         print(cc)
+    #     except cv2.error:
+    #         print("Frame " + str(f) + " failed to align.")
+
+    sift = cv2.SIFT_create(1000)
 
     keypoints = []
     descriptors = []
@@ -119,14 +140,13 @@ def remove_data_torsion(image_data, mask_data, framestamps=None, reference_indx=
         keypoints.append(kp)
         descriptors.append(des)
 
-    # Set up FLANN parameters (feature matching)... review these.
+    #Set up FLANN parameters (feature matching)... review these.
     FLANN_INDEX_KDTREE = 0
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    search_params = dict(checks=100)
+    search_params = dict(checks=1000)
 
     flan = cv2.FlannBasedMatcher(index_params, search_params)
-
-    xform = [0] * num_frames
+    #Specify the number of iterations.
     for f in range(num_frames):
         matches = flan.knnMatch(descriptors[f], descriptors[reference_indx], k=2)
 
@@ -141,22 +161,28 @@ def remove_data_torsion(image_data, mask_data, framestamps=None, reference_indx=
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
             dst_pts = np.float32([keypoints[reference_indx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
-
             M, inliers = cv2.estimateAffine2D(src_pts, dst_pts)
 
-
             h, w = image_data[..., f].shape
-            xform[f] = M
+            if M is not None:
+                xform[f] = M
 
-            cv2.imshow("aligned", cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape, flags=cv2.INTER_LANCZOS4))
-            c = cv2.waitKey(500)
-            if c == 27:
-                break
+                corrected_im[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
+                                                      flags=cv2.INTER_LANCZOS4)
+
+
+            # Need to add double-check and
+
+            # cv2.imshow("aligned", corrected_im[..., f])
+            # c = cv2.waitKey(500)
+            # if c == 27:
+            #     break
         else:
             pass
-            #print("Not enough matches were found: "+str(len(good_matches)))
+            print("Not enough matches were found: " + str(len(good_matches)))
 
+    save_video("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test.avi",
+               corrected_im, 29.4)
 
+    return corrected_im, xform
 
-
-    print("Hiya")
