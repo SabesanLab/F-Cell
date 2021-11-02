@@ -123,13 +123,14 @@ for loc in allFiles:
 
             dataset.load_unpipelined_data()
         else:
-            dataset = GenericDataset(file, stage=PipeStages.RAW)
+            pass
+           # dataset = GenericDataset(file, stage=PipeStages.RAW)
 
-            dataset.load_data()
+          #  dataset.load_data()
 
-            dataset.video_data = flat_field(dataset.video_data)
+            #dataset.video_data = flat_field(dataset.video_data)
 
-            dataset.save_data("_ff")
+           # dataset.save_data("_ff")
 
 
 

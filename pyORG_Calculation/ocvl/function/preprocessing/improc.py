@@ -1,5 +1,8 @@
+import itertools
+
 import cv2
 import numpy as np
+from cv2 import matchTemplate
 from numpy.polynomial import Polynomial
 
 from ocvl.function.utility.resources import save_video
@@ -19,7 +22,6 @@ def flat_field(dataset, sigma=20):
                                          sigmaX=sigma, sigmaY=sigma)
 
         flat_fielded = (dataset[..., i].astype("float64") / blurred_frame)
-
 
 
         flat_fielded -= np.amin(flat_fielded)
@@ -108,29 +110,12 @@ def remove_data_torsion(image_data, mask_data, framestamps=None, reference_indx=
         reference_indx = 1
 
     xform = [0] * num_frames
+    corrcoeff = np.empty((num_frames, 1))
+    corrcoeff[:] = np.NAN
     corrected_im = np.zeros(image_data.shape)
-    # number_of_iterations = 5000;
-    # # Specify the threshold of the increment
-    # # in the correlation coefficient between two iterations
-    # termination_eps = 1e-5;
-    #
-    # # Define termination criteria
-    # criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, number_of_iterations, termination_eps)
-    #
-    #
-    #
-    # for f in range(num_frames):
-    #     xform[f] = np.eye(2, 3, dtype=np.float32)
-    #     try:
-    #         (cc, xform[f]) = cv2.findTransformECC(image_data[..., f], image_data[..., reference_indx], xform[f],
-    #                                               cv2.MOTION_AFFINE, criteria, inputMask=mask_data[..., reference_indx])
-    #         corrected_im[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
-    #                                               flags=cv2.INTER_LANCZOS4)
-    #         print(cc)
-    #     except cv2.error:
-    #         print("Frame " + str(f) + " failed to align.")
 
-    sift = cv2.SIFT_create(1000)
+    # Contrast threshold raise (from 0.05) minimizes features in uniform regions, but is lower than the original paper (0.09)
+    sift = cv2.SIFT_create(1000, contrastThreshold=0.05)
 
     keypoints = []
     descriptors = []
@@ -156,33 +141,40 @@ def remove_data_torsion(image_data, mask_data, framestamps=None, reference_indx=
             if f1.distance < 0.8*f2.distance:
                 good_matches.append(f1)
 
-        if len(good_matches) > 10:
-            print("Found " + str(len(good_matches)) + " matches between frame " + str(f) + " and the reference.")
+        if len(good_matches) >= 5:
+
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
             dst_pts = np.float32([keypoints[reference_indx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
-            M, inliers = cv2.estimateAffine2D(src_pts, dst_pts)
+            M, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts)
 
+            print("Found " + str(sum(inliers)) + " matches between frame " + str(f) + " and the reference.")
             h, w = image_data[..., f].shape
             if M is not None:
                 xform[f] = M
 
                 corrected_im[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
                                                       flags=cv2.INTER_LANCZOS4)
+                warped_mask = cv2.warpAffine(mask_data[..., f], xform[f], mask_data[..., f].shape,
+                                                      flags=cv2.INTER_NEAREST)
 
+                # Calculate and store the final correlation. It should be decent, if the transform was.
+                res = matchTemplate(image_data[..., reference_indx], corrected_im[..., f].astype("uint8"), cv2.TM_CCOEFF_NORMED, mask=warped_mask)
+                corrcoeff[f] = res.max()
 
-            # Need to add double-check and
-
-            # cv2.imshow("aligned", corrected_im[..., f])
-            # c = cv2.waitKey(500)
-            # if c == 27:
-            #     break
         else:
             pass
             print("Not enough matches were found: " + str(len(good_matches)))
 
+    dropthresh = np.nanmean(corrcoeff) - np.nanstd(corrcoeff)
+    corrcoeff[np.isnan(corrcoeff)] = 0 # Make all nans into zero for easy tracking.
+    print("Dropped " + str(np.sum(corrcoeff < dropthresh)) + " frames.")
+    corrected_im = corrected_im[..., np.where(corrcoeff > dropthresh)[0]]
+    xform = list(itertools.compress(xform, corrcoeff > dropthresh))
+    framestamps = list(itertools.compress(framestamps, corrcoeff > dropthresh))
+
     save_video("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test.avi",
                corrected_im, 29.4)
 
-    return corrected_im, xform
+    return corrected_im, framestamps, xform
 

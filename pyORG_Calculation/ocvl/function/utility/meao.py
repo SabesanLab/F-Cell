@@ -5,7 +5,7 @@ import pandas as pd
 from numpy.polynomial import Polynomial
 from os import path
 
-from ocvl.function.preprocessing.improc import dewarp_2D_data, remove_data_torsion
+from ocvl.function.preprocessing.improc import dewarp_2D_data, remove_data_torsion, flat_field
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.resources import ResourceLoader, load_video, save_video
 
@@ -68,7 +68,7 @@ class MEAODataset():
             if self.ref_video_path != self.video_path:
                 # Load the reference video data.
                 res = load_video(self.ref_video_path)
-                self.ref_video_data = res.data*self.mask_data
+                self.ref_video_data = flat_field(res.data)*self.mask_data
 
 
 
@@ -123,7 +123,9 @@ class MEAODataset():
             self.mask_data = warp_mask.astype("uint8")
             self.ref_video_data = (255*ref_vid).astype("uint8")
 
-            remove_data_torsion(self.ref_video_data, self.mask_data, framestamps=self.framestamps, reference_indx=self.reference_frame_idx)
+            self.ref_video_data, xforms, self.framestamps = remove_data_torsion(self.ref_video_data, self.mask_data,
+                                                                                framestamps=self.framestamps,
+                                                                                reference_indx=self.reference_frame_idx)
 
 
 
