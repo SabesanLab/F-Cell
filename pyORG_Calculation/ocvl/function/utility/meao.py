@@ -5,7 +5,7 @@ import pandas as pd
 from numpy.polynomial import Polynomial
 from os import path
 
-from ocvl.function.preprocessing.improc import dewarp_2D_data, remove_data_torsion, flat_field
+from ocvl.function.preprocessing.improc import dewarp_2D_data, relativize_image_stack, flat_field
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.resources import ResourceLoader, load_video, save_video
 
@@ -15,7 +15,6 @@ class MEAODataset():
 
         self.analysis_modality = analysis_modality
         self.reference_modality = ref_modality
-
 
         # Paths to the data used here.
         self.video_path = video_path
@@ -47,7 +46,7 @@ class MEAODataset():
         self.reference_im = np.empty([1])
         self.metadata_data = np.empty([1])
 
-    def load_unpipelined_data(self, force = False):
+    def load_unpipelined_data(self, force=False):
 
         # Establish our unpipelined filenames
         if self.stage is not (PipeStages.RAW or PipeStages.PIPELINED) or force:
@@ -63,26 +62,20 @@ class MEAODataset():
 
             res = load_video(self.mask_path)
             self.mask_data = res.data / 255
-            self.video_data = self.video_data * self.mask_data
+            self.video_data = (self.video_data * self.mask_data).astype("uint8")
 
             if self.ref_video_path != self.video_path:
                 # Load the reference video data.
                 res = load_video(self.ref_video_path)
-                self.ref_video_data = flat_field(res.data)*self.mask_data
-
-
-
-
-
+                self.ref_video_data = res.data * self.mask_data
 
             # Load our text data.
             metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
             metadata.columns = metadata.columns.str.strip()
 
             self.framestamps = metadata["OriginalFrameNumber"].to_numpy()
-            ncc = 1-metadata["NCC"].to_numpy(dtype=float)
+            ncc = 1 - metadata["NCC"].to_numpy(dtype=float)
             self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__)
-
 
             # Dewarp our data.
             # First find out how many strips we have.
@@ -102,7 +95,6 @@ class MEAODataset():
                     shiftrow = col.split("_")[0][5:]
                     yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
 
-
             self.video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(self.video_data, xshifts, yshifts)
 
             warp_mask = np.zeros(self.video_data.shape)
@@ -111,9 +103,9 @@ class MEAODataset():
                 warp_mask[..., f] = cv2.remap(self.mask_data[..., f].astype("float64"), map_mesh_x,
                                               map_mesh_y, interpolation=cv2.INTER_NEAREST)
 
-                ref_vid[..., f] = cv2.remap(self.ref_video_data[..., f].astype("float64")/255,
-                                                 map_mesh_x, map_mesh_y,
-                                                 interpolation=cv2.INTER_LANCZOS4)
+                ref_vid[..., f] = cv2.remap(self.ref_video_data[..., f].astype("float64") / 255,
+                                            map_mesh_x, map_mesh_y,
+                                            interpolation=cv2.INTER_LANCZOS4)
             # Clamp our values.
             warp_mask[warp_mask < 0] = 0
             warp_mask[warp_mask >= 1] = 1
@@ -121,11 +113,21 @@ class MEAODataset():
             ref_vid[ref_vid >= 1] = 1
 
             self.mask_data = warp_mask.astype("uint8")
-            self.ref_video_data = (255*ref_vid).astype("uint8")
+            self.ref_video_data = (255 * ref_vid).astype("uint8")
 
-            self.ref_video_data, xforms, self.framestamps = remove_data_torsion(self.ref_video_data, self.mask_data,
-                                                                                framestamps=self.framestamps,
-                                                                                reference_indx=self.reference_frame_idx)
+            self.ref_video_data, xforms, inliers = relativize_image_stack(self.ref_video_data, self.mask_data,
+                                                                          reference_indx=self.reference_frame_idx)
+
+            self.framestamps = self.framestamps[np.where(inliers)[0]]
+
+            for f in range(self.num_frames):
+                if xforms[f] is not None:
+                    self.video_data[..., f] = cv2.warpAffine(self.video_data[..., f], xforms[f],
+                                                             self.video_data[..., f].shape,
+                                                             flags=cv2.INTER_LANCZOS4)
+                    self.mask_data[..., f] = cv2.warpAffine(self.mask_data[..., f], xforms[f],
+                                                            self.mask_data[..., f].shape,
+                                                            flags=cv2.INTER_NEAREST)
 
 
 

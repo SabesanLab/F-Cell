@@ -109,19 +109,23 @@ y = root.winfo_screenheight() / 2 - 64
 root.geometry('%dx%d+%d+%d' % (w, h, x, y))
 root.update()
 
+dataset = []
 curFile = 0
 for loc in allFiles:
 
     for file in allFiles[loc]:
         pb["value"] = curFile / totFiles
-        pb_label["text"] = "Processing " + file + "..."
-        curFile += 1
+        pb_label["text"] = "Processing " + os.path.basename(os.path.realpath(file)) + "..."
+        pb_label.update()
 
         if "extract_reg_cropped.avi" in file and "_mask.avi" not in file:
-            # Here is where we'll place the options. For now, just MEAO...
-            dataset = MEAODataset(file, analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PROCESSED)
 
-            dataset.load_unpipelined_data()
+            # Here is where we'll place the options. For now, just MEAO...
+            dataset.append(MEAODataset(file, analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PROCESSED))
+
+            dataset[curFile].load_unpipelined_data()
+
+            curFile += 1
         else:
             pass
            # dataset = GenericDataset(file, stage=PipeStages.RAW)
