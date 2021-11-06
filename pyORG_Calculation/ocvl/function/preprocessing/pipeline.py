@@ -15,6 +15,7 @@
 #
 from enum import Enum
 
+import cv2
 import cv2 as cv
 import numpy as np
 import os
@@ -24,7 +25,7 @@ from tkinter import *
 from tkinter import filedialog, simpledialog
 from tkinter import ttk
 
-from ocvl.function.preprocessing.improc import flat_field
+from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, relativize_image_stack
 from ocvl.function.utility.generic import GenericDataset, PipeStages
 from ocvl.function.utility.meao import MEAODataset
 
@@ -109,10 +110,14 @@ y = root.winfo_screenheight() / 2 - 64
 root.geometry('%dx%d+%d+%d' % (w, h, x, y))
 root.update()
 
-dataset = []
-curFile = 0
+
 for loc in allFiles:
 
+    dataset = []
+    ref_im_proj = []
+    im_proj = []
+    weight_proj = []
+    curFile = 0
     for file in allFiles[loc]:
         pb["value"] = curFile / totFiles
         pb_label["text"] = "Processing " + os.path.basename(os.path.realpath(file)) + "..."
@@ -125,6 +130,14 @@ for loc in allFiles:
 
             dataset[curFile].load_unpipelined_data()
 
+            imp, wp = weighted_z_projection(dataset[curFile].video_data, dataset[curFile].mask_data)
+
+            im_proj.append(imp)
+            weight_proj.append(wp)
+
+            imp = weighted_z_projection(dataset[curFile].ref_video_data, dataset[curFile].mask_data)
+            ref_im_proj.append(imp[0])
+
             curFile += 1
         else:
             pass
@@ -135,7 +148,22 @@ for loc in allFiles:
             #dataset.video_data = flat_field(dataset.video_data)
 
            # dataset.save_data("_ff")
+    if allFiles[loc]:
+        weight_proj = np.stack(weight_proj, axis=-1)
+        im_proj = np.stack(im_proj, axis=-1)
+        ref_im_proj = np.stack(ref_im_proj, axis=-1)
 
+        ref_im_proj, xform, inliers = relativize_image_stack(ref_im_proj.astype("uint8"),
+                                                             np.ceil(weight_proj).astype("uint8"))
+
+        for f in range(ref_im_proj.shape[-1]):
+            # cv2.imwrite("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\frm"+str(f)+".tif", ref_im_proj[..., f])
+            if xform[f] is not None:
+                weight_proj[..., f] = cv2.warpAffine(weight_proj[..., f], xform[f],
+                                                     weight_proj[..., f].shape,
+                                                     flags=cv2.INTER_LANCZOS4)
+        
+        weighted_z_projection(ref_im_proj * weight_proj, weight_proj)
 
 
 pb.stop()

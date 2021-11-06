@@ -38,7 +38,7 @@ for loc=1:length(unique_loc)
 end
 
 %%
-startloc = 3;
+startloc = 1;
 wb = waitbar(0, ['Loading ' strrep(loc_list{loc}{1},'_','\_') ' (Location: ' unique_loc{1} ')...']);
 
 %% Load all of the data, processing each location separately.

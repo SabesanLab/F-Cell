@@ -59,8 +59,8 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
 
     for f in range(num_frames):
         # Fit across rows, in order to capture all strips for a given dataset
-        row_strip_fit = Polynomial.fit(substrip, col_shifts[f, :], deg=8)
-        indiv_colshift[f, :] = row_strip_fit(allrows)
+        col_strip_fit = Polynomial.fit(substrip, col_shifts[f, :], deg=8)
+        indiv_colshift[f, :] = col_strip_fit(allrows)
         # Fit across rows, in order to capture all strips for a given dataset
         row_strip_fit = Polynomial.fit(substrip, row_shifts[f, :], deg=8)
         indiv_rowshift[f, :] = row_strip_fit(allrows)
@@ -100,11 +100,8 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
     # save_video("C:\\Users\\rober\\Documents\\temp\\test.avi", (dewarped*255).astype("uint8"), 30)
 
 
-def relativize_image_stack(image_data, mask_data, reference_indx=None):
+def relativize_image_stack(image_data, mask_data, reference_idx=1):
     num_frames = image_data.shape[-1]
-
-    if reference_indx is None:
-        reference_indx = 1
 
     xform = [0] * num_frames
     corrcoeff = np.empty((num_frames, 1))
@@ -134,7 +131,7 @@ def relativize_image_stack(image_data, mask_data, reference_indx=None):
 
     # Specify the number of iterations.
     for f in range(num_frames):
-        matches = flan.knnMatch(descriptors[f], descriptors[reference_indx], k=2)
+        matches = flan.knnMatch(descriptors[f], descriptors[reference_idx], k=2)
 
         good_matches = []
         for f1, f2 in matches:
@@ -145,9 +142,9 @@ def relativize_image_stack(image_data, mask_data, reference_indx=None):
         if len(good_matches) >= 5:
 
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
-            dst_pts = np.float32([keypoints[reference_indx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
+            dst_pts = np.float32([keypoints[reference_idx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
-            M, inliers = cv2.estimateAffine2D(src_pts, dst_pts)
+            M, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts)
 
             h, w = image_data[..., f].shape
             if M is not None and np.sum(inliers) > 2:
@@ -159,13 +156,13 @@ def relativize_image_stack(image_data, mask_data, reference_indx=None):
                                              flags=cv2.INTER_NEAREST)
 
                 # Calculate and store the final correlation. It should be decent, if the transform was.
-                res = matchTemplate(image_data[..., reference_indx], corrected_im[..., f].astype("uint8"),
+                res = matchTemplate(image_data[..., reference_idx], corrected_im[..., f].astype("uint8"),
                                     cv2.TM_CCOEFF_NORMED, mask=warped_mask)
 
                 corrcoeff[f] = res.max()
 
-                #print("Found " + str(np.sum(inliers)) + " matches between frame " + str(f) + " and the reference, for a"
-                #                                        " normalized correlation of " + str(corrcoeff[f]))
+                print("Found " + str(np.sum(inliers)) + " matches between frame " + str(f) + " and the reference, for a"
+                                                        " normalized correlation of " + str(corrcoeff[f]))
             else:
                 pass
                 #print("Not enough inliers were found: " + str(np.sum(inliers)))
@@ -191,7 +188,20 @@ def relativize_image_stack(image_data, mask_data, reference_indx=None):
     return corrected_im, xform, inliers
 
 
-def weighted_z_projection(image_data, weights, type="average"):
+def weighted_z_projection(image_data, weights, projection_axis=2, type="average"):
     num_frames = image_data.shape[-1]
 
+    image_projection = np.nansum(image_data.astype("float64"), axis=projection_axis)
+    weight_projection = np.nansum(weights.astype("float64"), axis=projection_axis)
+    weight_projection[weight_projection == 0] = np.nan
 
+    image_projection /= weight_projection
+
+    weight_projection[np.isnan(weight_projection)] = 0
+
+    cv2.imshow("projected", image_projection.astype("uint8"))
+    c = cv2.waitKey(1000)
+    if c == 27:
+        return
+
+    return image_projection, (weight_projection / np.amax(weight_projection))

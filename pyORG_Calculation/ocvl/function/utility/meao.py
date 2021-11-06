@@ -95,7 +95,7 @@ class MEAODataset():
                     shiftrow = col.split("_")[0][5:]
                     yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
 
-            self.video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(self.video_data, xshifts, yshifts)
+            self.video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(self.video_data, yshifts, xshifts)
 
             warp_mask = np.zeros(self.video_data.shape)
             ref_vid = np.zeros(self.video_data.shape)
@@ -116,7 +116,7 @@ class MEAODataset():
             self.ref_video_data = (255 * ref_vid).astype("uint8")
 
             self.ref_video_data, xforms, inliers = relativize_image_stack(self.ref_video_data, self.mask_data,
-                                                                          reference_indx=self.reference_frame_idx)
+                                                                          reference_idx=self.reference_frame_idx)
 
             self.framestamps = self.framestamps[np.where(inliers)[0]]
 
