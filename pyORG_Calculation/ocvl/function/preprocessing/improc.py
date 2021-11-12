@@ -59,15 +59,17 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
 
     for f in range(num_frames):
         # Fit across rows, in order to capture all strips for a given dataset
-        col_strip_fit = Polynomial.fit(substrip, col_shifts[f, :], deg=8)
+        finite = np.isfinite(col_shifts[f, :])
+        col_strip_fit = Polynomial.fit(substrip[finite], col_shifts[f, finite], deg=8)
         indiv_colshift[f, :] = col_strip_fit(allrows)
         # Fit across rows, in order to capture all strips for a given dataset
-        row_strip_fit = Polynomial.fit(substrip, row_shifts[f, :], deg=8)
+        finite = np.isfinite(row_shifts[f, :])
+        row_strip_fit = Polynomial.fit(substrip[finite], row_shifts[f, finite], deg=8)
         indiv_rowshift[f, :] = row_strip_fit(allrows)
 
     if method == "median":
-        centered_col_shifts = -np.median(indiv_colshift, axis=0)
-        centered_row_shifts = -np.median(indiv_rowshift, axis=0)
+        centered_col_shifts = -np.nanmedian(indiv_colshift, axis=0)
+        centered_row_shifts = -np.nanmedian(indiv_rowshift, axis=0)
 
     dewarped = np.zeros(image_data.shape)
 
@@ -106,7 +108,7 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
     xform = [0] * num_frames
     corrcoeff = np.empty((num_frames, 1))
     corrcoeff[:] = np.NAN
-    corrected_im = np.zeros(image_data.shape)
+    corrected_stk = np.zeros(image_data.shape)
 
     # Contrast threshold raise (from 0.05) minimizes features in uniform regions, but is lower than the original
     # paper (0.09)
@@ -144,19 +146,19 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
             dst_pts = np.float32([keypoints[reference_idx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
-            M, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts)
+            M, inliers = cv2.estimateAffinePartial2D(dst_pts, src_pts) # More stable- also means we have to set the inverse flag below.
 
             h, w = image_data[..., f].shape
             if M is not None and np.sum(inliers) > 2:
                 xform[f] = M
 
-                corrected_im[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
-                                                      flags=cv2.INTER_LANCZOS4)
+                corrected_stk[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
+                                                      flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                 warped_mask = cv2.warpAffine(mask_data[..., f], xform[f], mask_data[..., f].shape,
-                                             flags=cv2.INTER_NEAREST)
+                                             flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
 
                 # Calculate and store the final correlation. It should be decent, if the transform was.
-                res = matchTemplate(image_data[..., reference_idx], corrected_im[..., f].astype("uint8"),
+                res = matchTemplate(image_data[..., reference_idx], corrected_stk[..., f].astype("uint8"),
                                     cv2.TM_CCOEFF_NORMED, mask=warped_mask)
 
                 corrcoeff[f] = res.max()
@@ -170,22 +172,21 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
             pass
             #print("Not enough matches were found: " + str(len(good_matches)))
 
-    dropthresh = np.nanmean(corrcoeff) - np.nanstd(corrcoeff)
+    print( str(np.nanquantile(corrcoeff, 0.075)) + " vs fixed threshold of 0.45.")
+    dropthresh = min(np.nanquantile(corrcoeff, 0.075), 0.45) # Whichever is smaller.
     corrcoeff[np.isnan(corrcoeff)] = 0  # Make all nans into zero for easy tracking.
 
     inliers = corrcoeff >= dropthresh
-    corrected_im = corrected_im[..., np.where(inliers)[0]]
+    corrected_stk = corrected_stk[..., np.where(inliers)[0]]
 
     for i in range(len(inliers)):
         if not inliers[i]:
             xform[i] = None # If we drop a frame, eradicate its xform. It's meaningless anyway.
 
-    print("Kept " + str(np.sum(corrcoeff >= dropthresh)) + " frames. (of " + str(num_frames) + ")")
-    # save_video(
-    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test.avi",
-    #     corrected_im, 29.4)
+    print("Using a threshold of "+ str(dropthresh) +", we kept " + str(np.sum(corrcoeff >= dropthresh)) + " frames. (of " + str(num_frames) + ")")
 
-    return corrected_im, xform, inliers
+
+    return corrected_stk, xform, inliers
 
 
 def weighted_z_projection(image_data, weights, projection_axis=2, type="average"):

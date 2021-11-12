@@ -28,10 +28,7 @@ from tkinter import ttk
 from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, relativize_image_stack
 from ocvl.function.utility.generic import GenericDataset, PipeStages
 from ocvl.function.utility.meao import MEAODataset
-
-
-
-
+from ocvl.function.utility.resources import save_video
 
 root = Tk()
 root.lift()
@@ -126,6 +123,7 @@ for loc in allFiles:
         if "extract_reg_cropped.avi" in file and "_mask.avi" not in file:
 
             # Here is where we'll place the options. For now, just MEAO...
+            print(file)
             dataset.append(MEAODataset(file, analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PROCESSED))
 
             dataset[curFile].load_unpipelined_data()
@@ -155,6 +153,9 @@ for loc in allFiles:
 
         ref_im_proj, xform, inliers = relativize_image_stack(ref_im_proj.astype("uint8"),
                                                              np.ceil(weight_proj).astype("uint8"))
+        save_video(
+            "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\rel_projected.avi",
+            ref_im_proj, 29.4)
 
         for f in range(ref_im_proj.shape[-1]):
             # cv2.imwrite("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\frm"+str(f)+".tif", ref_im_proj[..., f])
@@ -162,8 +163,10 @@ for loc in allFiles:
                 weight_proj[..., f] = cv2.warpAffine(weight_proj[..., f], xform[f],
                                                      weight_proj[..., f].shape,
                                                      flags=cv2.INTER_LANCZOS4)
-        
+
         weighted_z_projection(ref_im_proj * weight_proj, weight_proj)
+
+        print("yay")
 
 
 pb.stop()

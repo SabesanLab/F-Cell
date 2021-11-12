@@ -88,12 +88,14 @@ class MEAODataset():
             yshifts = np.zeros([ncc.shape[0], numstrips])
 
             for col in metadata.columns.tolist():
+                shiftrow = col.strip().split("_")[0][5:]
+                npcol = metadata[col].to_numpy()
+                if npcol.dtype == "object":
+                    npcol[ npcol == " "] = np.nan
                 if col != "XShift" and "XShift" in col:
-                    shiftrow = col.split("_")[0][5:]
-                    xshifts[:, int(shiftrow)] = metadata[col].to_numpy()
+                    xshifts[:, int(shiftrow)] = npcol
                 if col != "YShift" and "YShift" in col:
-                    shiftrow = col.split("_")[0][5:]
-                    yshifts[:, int(shiftrow)] = metadata[col].to_numpy()
+                    yshifts[:, int(shiftrow)] = npcol
 
             self.video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(self.video_data, yshifts, xshifts)
 
