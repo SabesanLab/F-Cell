@@ -2,43 +2,47 @@ import itertools
 
 import cv2
 import numpy as np
-from cv2 import matchTemplate
+from skimage.registration import phase_cross_correlation
 from numpy.polynomial import Polynomial
 
 from ocvl.function.utility.resources import save_video
 
 
-def flat_field(dataset, sigma=20):
+def flat_field_frame(dataframe, sigma):
     kernelsize = 3 * sigma
     if (kernelsize % 2) == 0:
         kernelsize += 1
 
-    flat_fielded_dataset = np.zeros(dataset.shape, dtype=dataset.dtype)
+    mask = np.ones(dataframe.shape, dtype=dataframe.dtype)
+    mask[dataframe == 0] = 0
 
-    for i in range(dataset.shape[-1]):
-        dataframe = dataset[..., i]
-        dataframe[dataframe == 0] = 1
-        blurred_frame = cv2.GaussianBlur(dataframe.astype("float64"), (kernelsize, kernelsize),
-                                         sigmaX=sigma, sigmaY=sigma)
+    dataframe[dataframe == 0] = 1
+    blurred_frame = cv2.GaussianBlur(dataframe.astype("float64"), (kernelsize, kernelsize),
+                                     sigmaX=sigma, sigmaY=sigma)
+    flat_fielded = (dataframe.astype("float64") / blurred_frame)
 
-        flat_fielded = (dataset[..., i].astype("float64") / blurred_frame)
+    flat_fielded *= mask
+    flat_fielded -= np.amin(flat_fielded)
+    flat_fielded = np.divide(flat_fielded, np.amax(flat_fielded), where=flat_fielded != 0)
+    if dataframe.dtype == "uint8":
+        flat_fielded *= 255
+    elif dataframe.dtype == "uint16":
+        flat_fielded *= 65535
 
-        flat_fielded -= np.amin(flat_fielded)
-        flat_fielded /= np.amax(flat_fielded)
-        if dataset.dtype == "uint8":
-            flat_fielded *= 255
-        elif dataset.dtype == "uint16":
-            flat_fielded *= 65535
+    return flat_fielded.astype(dataframe.dtype)
 
-        # cv2.imshow('Frame', flat_fielded.astype(dataset.dtype))
+def flat_field(dataset, sigma=20):
 
-        flat_fielded_dataset[..., i] = flat_fielded
+    if len(dataset.shape) > 2:
+        flat_fielded_dataset = np.zeros(dataset.shape, dtype=dataset.dtype)
+        for i in range(dataset.shape[-1]):
+            flat_fielded_dataset[..., i] = flat_field_frame(dataset[..., i], sigma)
+            return flat_fielded_dataset.astype(dataset.dtype)
+    else:
+        return flat_field_frame(dataset, sigma)
 
-        # Press Q on keyboard to  exit
-        # if cv2.waitKey(25) & 0xFF == ord('q'):
-        #    return
 
-    return flat_fielded_dataset.astype(dataset.dtype)
+
 
 
 # Where the image data is N rows x M cols and F frames
@@ -102,32 +106,43 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
     # save_video("C:\\Users\\rober\\Documents\\temp\\test.avi", (dewarped*255).astype("uint8"), 30)
 
 
-def relativize_image_stack(image_data, mask_data, reference_idx=1):
+def im_dist_to_stk(ref_idx, im_stack, mask_stack):
+    num_frames = im_stack.shape[-1]
+    dists = [10000] * num_frames
+    print("Aligning to frame "+str(ref_idx))
+
+    for f2 in range(num_frames):
+        dists[f2] = phase_cross_correlation(im_stack[..., ref_idx], im_stack[..., f2],
+                                            reference_mask=mask_stack[..., ref_idx], moving_mask=mask_stack[..., f2])
+
+    median_dist = np.nanmedian(dists, axis=0)
+    return np.sqrt(median_dist[0] * median_dist[0] + median_dist[1] * median_dist[1])
+
+
+def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=5000, method="affine", dropthresh=None):
     num_frames = image_data.shape[-1]
 
-    xform = [0] * num_frames
+    xform = [None] * num_frames
     corrcoeff = np.empty((num_frames, 1))
     corrcoeff[:] = np.NAN
     corrected_stk = np.zeros(image_data.shape)
 
-    # Contrast threshold raise (from 0.05) minimizes features in uniform regions, but is lower than the original
-    # paper (0.09)
-    sift = cv2.SIFT_create(1000)
+    sift = cv2.SIFT_create(numkeypoints, nOctaveLayers=105)
 
     keypoints = []
     descriptors = []
 
     for f in range(num_frames):
-        kp, des = sift.detectAndCompute(image_data[..., f], mask_data[..., f], None)
-
+        kp, des = sift.detectAndCompute(flat_field_frame(image_data[..., f], 20), mask_data[..., f], None)
+        if numkeypoints > 8000:
+            print("Found "+ str(len(kp)) + " keypoints")
         keypoints.append(kp)
         descriptors.append(des)
-
 
     # Set up FLANN parameters (feature matching)... review these.
     FLANN_INDEX_KDTREE = 0
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    search_params = dict(checks=1000)
+    search_params = dict(checks=64)
 
     flan = cv2.FlannBasedMatcher(index_params, search_params)
 
@@ -137,19 +152,25 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
 
         good_matches = []
         for f1, f2 in matches:
-
-            if f1.distance < 0.8 * f2.distance:
+            if f1.distance < 0.7 * f2.distance:
                 good_matches.append(f1)
 
         if len(good_matches) >= 5:
-
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
             dst_pts = np.float32([keypoints[reference_idx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
-            M, inliers = cv2.estimateAffinePartial2D(dst_pts, src_pts) # More stable- also means we have to set the inverse flag below.
+            img_matches = np.empty((max(image_data[..., f].shape[0], image_data[..., f].shape[0]), image_data[..., f].shape[1] + image_data[..., f].shape[1], 3),
+                                   dtype=np.uint8)
+            cv2.drawMatches( image_data[..., f], keypoints[f], image_data[..., reference_idx], keypoints[reference_idx], good_matches, img_matches)
+            cv2.imshow("meh", img_matches)
+            cv2.waitKey()
 
-            h, w = image_data[..., f].shape
-            if M is not None and np.sum(inliers) > 2:
+            if method == "affine":
+                M, inliers = cv2.estimateAffine2D(dst_pts, src_pts) # More stable- also means we have to set the inverse flag below.
+            else:
+                M, inliers = cv2.estimateAffinePartial2D(dst_pts, src_pts)
+
+            if M is not None and np.sum(inliers) >= 5:
                 xform[f] = M
 
                 corrected_stk[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
@@ -158,13 +179,13 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
                                              flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
 
                 # Calculate and store the final correlation. It should be decent, if the transform was.
-                res = matchTemplate(image_data[..., reference_idx], corrected_stk[..., f].astype("uint8"),
+                res = cv2.matchTemplate(image_data[..., reference_idx], corrected_stk[..., f].astype("uint8"),
                                     cv2.TM_CCOEFF_NORMED, mask=warped_mask)
 
                 corrcoeff[f] = res.max()
 
-                print("Found " + str(np.sum(inliers)) + " matches between frame " + str(f) + " and the reference, for a"
-                                                        " normalized correlation of " + str(corrcoeff[f]))
+                # print("Found " + str(np.sum(inliers)) + " matches between frame " + str(f) + " and the reference, for a"
+                #                                         " normalized correlation of " + str(corrcoeff[f]))
             else:
                 pass
                 #print("Not enough inliers were found: " + str(np.sum(inliers)))
@@ -172,13 +193,18 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
             pass
             #print("Not enough matches were found: " + str(len(good_matches)))
 
-    print( str(np.nanquantile(corrcoeff, 0.075)) + " vs fixed threshold of 0.45.")
-    dropthresh = min(np.nanquantile(corrcoeff, 0.075), 0.45) # Whichever is smaller.
+    if not dropthresh:
+        print("No drop threshold detected, auto-generating...")
+        dropthresh = np.nanquantile(corrcoeff, 0.01)
+
+
     corrcoeff[np.isnan(corrcoeff)] = 0  # Make all nans into zero for easy tracking.
 
-    inliers = corrcoeff >= dropthresh
-    corrected_stk = corrected_stk[..., np.where(inliers)[0]]
-
+    inliers = np.squeeze(corrcoeff >= dropthresh)
+    corrected_stk = corrected_stk[..., inliers]
+    # save_video(
+    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test_corrected_stk.avi",
+    #     corrected_stk, 29.4)
     for i in range(len(inliers)):
         if not inliers[i]:
             xform[i] = None # If we drop a frame, eradicate its xform. It's meaningless anyway.
@@ -189,7 +215,7 @@ def relativize_image_stack(image_data, mask_data, reference_idx=1):
     return corrected_stk, xform, inliers
 
 
-def weighted_z_projection(image_data, weights, projection_axis=2, type="average"):
+def weighted_z_projection(image_data, weights, projection_axis=-1, type="average"):
     num_frames = image_data.shape[-1]
 
     image_projection = np.nansum(image_data.astype("float64"), axis=projection_axis)
@@ -200,9 +226,9 @@ def weighted_z_projection(image_data, weights, projection_axis=2, type="average"
 
     weight_projection[np.isnan(weight_projection)] = 0
 
-    cv2.imshow("projected", image_projection.astype("uint8"))
-    c = cv2.waitKey(1000)
-    if c == 27:
-        return
+    #cv2.imshow("projected", image_projection.astype("uint8"))
+    #c = cv2.waitKey(1000)
+    # if c == 27:
+    #     return
 
     return image_projection, (weight_projection / np.amax(weight_projection))

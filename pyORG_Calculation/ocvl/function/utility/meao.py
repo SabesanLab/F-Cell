@@ -22,8 +22,8 @@ class MEAODataset():
         self.metadata_path = self.video_path[0:-3] + "csv"
         self.mask_path = self.video_path[0:-4] + "_mask.avi"
         p_name = os.path.dirname(os.path.realpath(self.video_path))
-        f_name = os.path.basename(os.path.realpath(self.video_path))
-        common_prefix = f_name.split("_")
+        self.filename = os.path.basename(os.path.realpath(self.video_path))
+        common_prefix = self.filename.split("_")
         common_prefix = "_".join(common_prefix[0:6])
         self.image_path = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
         self.coord_path = path.join(p_name,
@@ -62,6 +62,7 @@ class MEAODataset():
 
             res = load_video(self.mask_path)
             self.mask_data = res.data / 255
+            self.mask_data[self.mask_data < 0] = 0
             self.video_data = (self.video_data * self.mask_data).astype("uint8")
 
             if self.ref_video_path != self.video_path:
@@ -97,8 +98,10 @@ class MEAODataset():
                 if col != "YShift" and "YShift" in col:
                     yshifts[:, int(shiftrow)] = npcol
 
+            # Determine the residual error in our dewarping, and obtain the maps
             self.video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(self.video_data, yshifts, xshifts)
 
+            # Dewarp our other two datasets as well.
             warp_mask = np.zeros(self.video_data.shape)
             ref_vid = np.zeros(self.video_data.shape)
             for f in range(self.num_frames):
@@ -118,9 +121,16 @@ class MEAODataset():
             self.ref_video_data = (255 * ref_vid).astype("uint8")
 
             self.ref_video_data, xforms, inliers = relativize_image_stack(self.ref_video_data, self.mask_data,
-                                                                          reference_idx=self.reference_frame_idx)
+                                                                          reference_idx=self.reference_frame_idx,
+                                                                          dropthresh=0.4)
+            inliers = np.squeeze(inliers)
 
-            self.framestamps = self.framestamps[np.where(inliers)[0]]
+            # Update everything else with what's an inlier now.
+            self.framestamps = self.framestamps[inliers]
+            self.video_data = self.video_data[..., inliers]
+            self.mask_data = self.mask_data[..., inliers]
+
+            self.num_frames = self.video_data.shape[-1]
 
             for f in range(self.num_frames):
                 if xforms[f] is not None:
@@ -131,8 +141,7 @@ class MEAODataset():
                                                             self.mask_data[..., f].shape,
                                                             flags=cv2.INTER_NEAREST)
 
-
-
+            #save_video("//134.48.93.176/Raw Study Data/00-64774/MEAOSLO1/20210824/Processed/Functional Pipeline/", dataset[f].video_data, 29.4)
             # for i in range(this_data.shape[-1]):
             #     # Display the resulting frame
             #
