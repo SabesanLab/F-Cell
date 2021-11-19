@@ -29,7 +29,8 @@ from tkinter import ttk
 
 import pandas as pd
 
-from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, relativize_image_stack, im_dist_to_stk
+from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, relativize_image_stack, \
+    im_dist_to_stk, pairwise_stack_alignment
 from ocvl.function.utility.generic import GenericDataset, PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_video, load_video
@@ -248,7 +249,7 @@ if __name__ == "__main__":
     mask[vid.data == 0] = 0
     numfrm = vid.data.shape[-1]
 
-    relativize_image_stack(vid.data, mask)
+    relativize_image_stack(vid.data, mask, 34)
     # avg_loc_dist = np.zeros( (numfrm) )
     # for f in range(numfrm):
     #     avg_loc_dist[f] = im_dist_to_stk(f, vid.data, mask)

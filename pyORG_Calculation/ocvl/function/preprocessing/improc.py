@@ -127,17 +127,21 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
     corrcoeff[:] = np.NAN
     corrected_stk = np.zeros(image_data.shape)
 
-    sift = cv2.SIFT_create(numkeypoints, nOctaveLayers=105)
+    sift = cv2.SIFT_create(numkeypoints, nOctaveLayers=55, contrastThreshold=0)
 
     keypoints = []
     descriptors = []
 
     for f in range(num_frames):
-        kp, des = sift.detectAndCompute(flat_field_frame(image_data[..., f], 20), mask_data[..., f], None)
+        kp, des = sift.detectAndCompute(image_data[..., f], mask_data[..., f], None)
         if numkeypoints > 8000:
             print("Found "+ str(len(kp)) + " keypoints")
+        # Normalize the features by L1; (make this RootSIFT) instead.
+        des /= (des.sum(axis=1, keepdims=True) + np.finfo(np.float).eps)
+        des = np.sqrt(des)
         keypoints.append(kp)
         descriptors.append(des)
+
 
     # Set up FLANN parameters (feature matching)... review these.
     FLANN_INDEX_KDTREE = 0
@@ -152,18 +156,18 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
 
         good_matches = []
         for f1, f2 in matches:
-            if f1.distance < 0.7 * f2.distance:
+            if f1.distance < 0.75 * f2.distance:
                 good_matches.append(f1)
 
         if len(good_matches) >= 5:
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
             dst_pts = np.float32([keypoints[reference_idx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
-            img_matches = np.empty((max(image_data[..., f].shape[0], image_data[..., f].shape[0]), image_data[..., f].shape[1] + image_data[..., f].shape[1], 3),
-                                   dtype=np.uint8)
-            cv2.drawMatches( image_data[..., f], keypoints[f], image_data[..., reference_idx], keypoints[reference_idx], good_matches, img_matches)
-            cv2.imshow("meh", img_matches)
-            cv2.waitKey()
+            # img_matches = np.empty((max(image_data[..., f].shape[0], image_data[..., f].shape[0]), image_data[..., f].shape[1] + image_data[..., f].shape[1], 3),
+            #                        dtype=np.uint8)
+            # cv2.drawMatches( image_data[..., f], keypoints[f], image_data[..., reference_idx], keypoints[reference_idx], good_matches, img_matches)
+            # cv2.imshow("meh", img_matches)
+            # cv2.waitKey()
 
             if method == "affine":
                 M, inliers = cv2.estimateAffine2D(dst_pts, src_pts) # More stable- also means we have to set the inverse flag below.
@@ -202,9 +206,9 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
 
     inliers = np.squeeze(corrcoeff >= dropthresh)
     corrected_stk = corrected_stk[..., inliers]
-    # save_video(
-    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test_corrected_stk.avi",
-    #     corrected_stk, 29.4)
+    save_video(
+        "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test_corrected_stk.avi",
+        corrected_stk, 29.4)
     for i in range(len(inliers)):
         if not inliers[i]:
             xform[i] = None # If we drop a frame, eradicate its xform. It's meaningless anyway.
