@@ -28,9 +28,11 @@ from tkinter import filedialog, simpledialog
 from tkinter import ttk
 
 import pandas as pd
+from matplotlib import pyplot
+from matplotlib.pyplot import imshow
 
 from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, relativize_image_stack, \
-    im_dist_to_stk, pairwise_stack_alignment
+    im_dist_to_stk, simple_image_stack_align, general_normxcorr2, optimizer_stack_align
 from ocvl.function.utility.generic import GenericDataset, PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_video, load_video
@@ -249,7 +251,11 @@ if __name__ == "__main__":
     mask[vid.data == 0] = 0
     numfrm = vid.data.shape[-1]
 
-    relativize_image_stack(vid.data, mask, 34)
+    # shift, val, xcorrmap = general_normxcorr2(vid.data[..., 0], vid.data[..., 1])
+    # pyplot.imshow(xcorrmap)
+    # pyplot.show()
+
+    optimizer_stack_align(vid.data, mask, 20)
     # avg_loc_dist = np.zeros( (numfrm) )
     # for f in range(numfrm):
     #     avg_loc_dist[f] = im_dist_to_stk(f, vid.data, mask)

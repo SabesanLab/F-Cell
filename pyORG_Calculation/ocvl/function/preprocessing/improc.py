@@ -1,9 +1,15 @@
 import itertools
 
+import SimpleITK
 import cv2
 import numpy as np
-from skimage.registration import phase_cross_correlation
+from SimpleITK import ImageRegistrationMethod, TranslationTransform, GetImageFromArray
+from matplotlib import pyplot
+from matplotlib.pyplot import imshow
+from scipy.signal import correlate2d, fftconvolve
+from skimage.registration import phase_cross_correlation, optical_flow_tvl1
 from numpy.polynomial import Polynomial
+from skimage.transform import warp, AffineTransform
 
 from ocvl.function.utility.resources import save_video
 
@@ -31,13 +37,15 @@ def flat_field_frame(dataframe, sigma):
 
     return flat_fielded.astype(dataframe.dtype)
 
+
 def flat_field(dataset, sigma=20):
 
     if len(dataset.shape) > 2:
         flat_fielded_dataset = np.zeros(dataset.shape, dtype=dataset.dtype)
         for i in range(dataset.shape[-1]):
             flat_fielded_dataset[..., i] = flat_field_frame(dataset[..., i], sigma)
-            return flat_fielded_dataset.astype(dataset.dtype)
+
+        return flat_fielded_dataset.astype(dataset.dtype)
     else:
         return flat_field_frame(dataset, sigma)
 
@@ -118,6 +126,133 @@ def im_dist_to_stk(ref_idx, im_stack, mask_stack):
     median_dist = np.nanmedian(dists, axis=0)
     return np.sqrt(median_dist[0] * median_dist[0] + median_dist[1] * median_dist[1])
 
+# Calculate a running sum in all four directions - apparently more memory efficient
+# Used for determining the total energy at every point that an image contains.
+def local_sum(matrix, overlap_shape):
+
+    if matrix.shape[0] == overlap_shape[0] and matrix.shape[1] == overlap_shape[1]:
+        energy_mat = np.cumsum(matrix, axis=0)
+        energy_mat = np.pad(energy_mat, ((0, energy_mat.shape[0]-1), (0, 0)),  mode="reflect") # This is wrong- needs to be a pad with end value
+                # and a subtraction of the above nrg matrix. Not sure why intuitively. Maybe FD wrapping?
+        energy_mat = np.cumsum(energy_mat, axis=1)
+        energy_mat = np.pad(energy_mat, ((0, 0), (0, energy_mat.shape[1]-1)), mode="reflect")
+
+    else:
+        print("This code does not yet support unequal image sizes!")
+
+    return energy_mat
+
+
+# From Dirk Padfield's Masked FFT Registration
+# https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=5540032
+def general_normxcorr2(template, reference, template_mask=None, reference_mask=None, required_overlap=None):
+    temp_size = template.shape
+    ref_size = reference.shape
+
+    template = template.astype("float64")
+    reference = reference.astype("float64")
+
+    if template_mask is None:
+        template_mask = np.ones(temp_size)
+    if reference_mask is None:
+        reference_mask = np.ones(ref_size)
+
+    # First, cross correlate our two images (but this isn't normalized, yet!)
+    # The templates should be rotated by 90 degrees. So...
+    template_mask = np.rot90(template_mask, k=2)
+    template = np.rot90(template, k=2)
+    base_xcorr = fftconvolve(template, reference)
+
+    # Fulfill equations 10-12 from the paper.
+    # First get the overlapping energy...
+    pixelwise_overlap = fftconvolve(template_mask, reference_mask)  # Eq 10
+    pixelwise_overlap[pixelwise_overlap <= 0] = 1
+    # For the template frame denominator portion.
+    ref_corrw_one = fftconvolve(reference, reference_mask)  # Eq 11
+    ref_sq_corrw_one = fftconvolve(reference * reference, reference_mask)  # Eq 12
+
+    ref_denom = ref_sq_corrw_one - ((ref_corrw_one * ref_corrw_one) / pixelwise_overlap)
+    ref_denom[ref_denom < 0] = 0  # Clamp these values to 0.
+
+    # For the reference frame denominator portion.
+    temp_corrw_one = fftconvolve(template, template_mask)  # Eq 11
+    temp_sq_corrw_one = fftconvolve(template * template, template_mask)  # Eq 12
+
+    temp_denom = temp_sq_corrw_one - ((temp_corrw_one * temp_corrw_one) / pixelwise_overlap)
+    temp_denom[temp_denom < 0] = 0  # Clamp these values to 0.
+
+    # Construct our numerator
+    numerator = base_xcorr - ((temp_corrw_one*ref_corrw_one)/pixelwise_overlap)
+    denom = np.sqrt(temp_denom*ref_denom)
+
+    # Need this bit to avoid dividing by zero.
+    tolerance = 1000*np.finfo(np.amax(denom)).eps
+
+    xcorr_out = np.zeros(numerator.shape, dtype=np.float)
+    xcorr_out[denom > tolerance] = numerator[denom > tolerance] / denom[denom > tolerance]
+
+    # By default, the images have to overlap by more than 20% of their maximal overlap.
+    if not required_overlap:
+        required_overlap = np.amax(pixelwise_overlap)*.5
+    xcorr_out[pixelwise_overlap < required_overlap ] = 0
+
+    maxval = np.amax(xcorr_out[:])
+    maxloc = np.unravel_index(np.argmax(xcorr_out[:]), xcorr_out.shape)
+    maxshift = (ref_size[0]-maxloc[0], ref_size[1]-maxloc[1])
+
+    return maxshift, maxval, xcorr_out
+
+
+def simple_image_stack_align(im_stack, mask_stack, ref_idx):
+    num_frames = im_stack.shape[-1]
+    shifts = [None] * num_frames
+    flattened = flat_field(im_stack)
+
+    for f2 in range(0, num_frames):
+        shift, val, xcorrmap = general_normxcorr2(flattened[..., f2], flattened[..., ref_idx],
+                                                  template_mask=mask_stack[..., f2],
+                                                  reference_mask=mask_stack[..., ref_idx])
+        print("Found shift of: " + str(shift) + ", value of " + str(val))
+        shifts[f2] = shift
+
+    return shifts
+    # thattransform = np.eye(3)
+    # for f2 in range(1, num_frames):
+    #     thistransform = np.eye(3)
+    #     thistransform[0, 2] = shifts[f2][0]
+    #     thistransform[1, 2] = shifts[f2][1]
+    #
+    #     # thistransform = np.matmul(thistransform, thattransform)
+    #     # thattransform = thistransform
+    #     im_stack[..., f2] = warp(im_stack[..., f2], AffineTransform(thistransform), order=3, preserve_range=True)
+
+
+
+    # save_video(
+    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\shifted_stk.avi",
+    #     im_stack, 29.4)
+
+def optimizer_stack_align(im_stack, mask_stack, ref_idx):
+    num_frames = im_stack.shape[-1]
+
+
+    initial_shifts = simple_image_stack_align(im_stack, mask_stack, ref_idx)
+
+    imreg_method = SimpleITK.ImageRegistrationMethod()
+    imreg_method.SetMetricAsMattesMutualInformation()
+    imreg_method.SetOptimizerAsOnePlusOneEvolutionary()
+
+    ref_im = SimpleITK.GetImageFromArray(im_stack[..., ref_idx])
+    ref_im = SimpleITK.Normalize(ref_im)
+    dims = ref_im.GetDimension()
+    for f in range(1, num_frames):
+
+        moving_im = SimpleITK.GetImageFromArray(im_stack[..., f])
+        moving_im = SimpleITK.Normalize(moving_im)
+
+        imreg_method.SetInitialTransform(SimpleITK.AffineTransform([], [float(initial_shifts[f][0]), float(initial_shifts[f][1])],) ))
+        outXform = imreg_method.Execute(ref_im, moving_im)
+        print(outXform)
 
 def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=5000, method="affine", dropthresh=None):
     num_frames = image_data.shape[-1]
@@ -159,7 +294,7 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
             if f1.distance < 0.75 * f2.distance:
                 good_matches.append(f1)
 
-        if len(good_matches) >= 5:
+        if len(good_matches) >= 4:
             src_pts = np.float32([keypoints[f][f1.queryIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
             dst_pts = np.float32([keypoints[reference_idx][f1.trainIdx].pt for f1 in good_matches]).reshape(-1, 1, 2)
 
@@ -174,7 +309,7 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
             else:
                 M, inliers = cv2.estimateAffinePartial2D(dst_pts, src_pts)
 
-            if M is not None and np.sum(inliers) >= 5:
+            if M is not None and np.sum(inliers) >= 4:
                 xform[f] = M
 
                 corrected_stk[..., f] = cv2.warpAffine(image_data[..., f], xform[f], image_data[..., f].shape,
