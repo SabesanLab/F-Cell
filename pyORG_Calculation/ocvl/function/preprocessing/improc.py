@@ -1,11 +1,12 @@
 import itertools
 
-import SimpleITK
+
 import cv2
 import numpy as np
-from SimpleITK import ImageRegistrationMethod, TranslationTransform, GetImageFromArray
+import SimpleITK as sitk
 from matplotlib import pyplot
 from matplotlib.pyplot import imshow
+from scipy.ndimage import binary_erosion
 from scipy.signal import correlate2d, fftconvolve
 from skimage.registration import phase_cross_correlation, optical_flow_tvl1
 from numpy.polynomial import Polynomial
@@ -198,7 +199,7 @@ def general_normxcorr2(template, reference, template_mask=None, reference_mask=N
 
     maxval = np.amax(xcorr_out[:])
     maxloc = np.unravel_index(np.argmax(xcorr_out[:]), xcorr_out.shape)
-    maxshift = (ref_size[0]-maxloc[0], ref_size[1]-maxloc[1])
+    maxshift = (float(ref_size[1]-maxloc[1]-1), float(ref_size[0]-maxloc[0])-1) #Output as X and Y.
 
     return maxshift, maxval, xcorr_out
 
@@ -207,12 +208,12 @@ def simple_image_stack_align(im_stack, mask_stack, ref_idx):
     num_frames = im_stack.shape[-1]
     shifts = [None] * num_frames
     flattened = flat_field(im_stack)
-
+    print("Aligning to frame " + str(ref_idx))
     for f2 in range(0, num_frames):
         shift, val, xcorrmap = general_normxcorr2(flattened[..., f2], flattened[..., ref_idx],
                                                   template_mask=mask_stack[..., f2],
                                                   reference_mask=mask_stack[..., ref_idx])
-        print("Found shift of: " + str(shift) + ", value of " + str(val))
+        # print("Found shift of: " + str(shift) + ", value of " + str(val))
         shifts[f2] = shift
 
     return shifts
@@ -232,27 +233,89 @@ def simple_image_stack_align(im_stack, mask_stack, ref_idx):
     #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\shifted_stk.avi",
     #     im_stack, 29.4)
 
-def optimizer_stack_align(im_stack, mask_stack, ref_idx):
+def optimizer_stack_align(im_stack, mask_stack, ref_idx, initial_shifts=None):
     num_frames = im_stack.shape[-1]
 
+    reg_stack = np.zeros(im_stack.shape)
 
-    initial_shifts = simple_image_stack_align(im_stack, mask_stack, ref_idx)
+    # Erode our masks a bit to help with stability.
+    for f in range(0, num_frames):
+        mask_stack[..., f] = binary_erosion(mask_stack[..., f], structure=np.ones((11, 11)))
+      #  im_stack[..., f] *= mask_stack[..., f]
 
-    imreg_method = SimpleITK.ImageRegistrationMethod()
-    imreg_method.SetMetricAsMattesMutualInformation()
-    imreg_method.SetOptimizerAsOnePlusOneEvolutionary()
+    if initial_shifts is None:
+        initial_shifts = simple_image_stack_align(im_stack*mask_stack, mask_stack, ref_idx)
+        #print(initial_shifts)
 
-    ref_im = SimpleITK.GetImageFromArray(im_stack[..., ref_idx])
-    ref_im = SimpleITK.Normalize(ref_im)
+    imreg_method = sitk.ImageRegistrationMethod()
+    #imreg_method.SetMetricAsMeanSquares() #Equivalent to MATLAB results
+    #imreg_method.SetMetricAsANTSNeighborhoodCorrelation(16) # Similar to, but not better than the above
+    imreg_method.SetMetricAsCorrelation() # Amusingly enough, appears to be the best.
+
+    #imreg_method.SetInterpolator(sitk.sitkLanczosWindowedSinc)
+
+    ref_im = sitk.GetImageFromArray(im_stack[..., ref_idx])
+    ref_im = sitk.Normalize(ref_im)
     dims = ref_im.GetDimension()
-    for f in range(1, num_frames):
 
-        moving_im = SimpleITK.GetImageFromArray(im_stack[..., f])
-        moving_im = SimpleITK.Normalize(moving_im)
+    imreg_method.SetMetricFixedMask(sitk.GetImageFromArray(mask_stack[..., ref_idx], sitk.sitkInt8))
+    xforms = [None] * num_frames
+    inliers = np.zeros(num_frames, dtype=bool)
+    for f in range(0, num_frames):
 
-        imreg_method.SetInitialTransform(SimpleITK.AffineTransform([], [float(initial_shifts[f][0]), float(initial_shifts[f][1])],) ))
+        imreg_method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.0625, minStep=1e-5,
+                                                              numberOfIterations=5000,
+                                                              relaxationFactor=0.65, gradientMagnitudeTolerance=1e-5)
+        affineXform = sitk.AffineTransform(dims)
+        affineXform.SetTranslation(initial_shifts[f])
+
+        moving_im = sitk.GetImageFromArray(im_stack[..., f])
+        #moving_im = sitk.Cast(moving_im, sitk.sitkFloat64)
+        moving_im = sitk.Normalize(moving_im)
+
+        imreg_method.SetMetricMovingMask(sitk.GetImageFromArray(mask_stack[..., f], sitk.sitkInt8))
+        imreg_method.SetInitialTransform(affineXform)
+
         outXform = imreg_method.Execute(ref_im, moving_im)
-        print(outXform)
+        #print("starting: " + str(initial_shifts[f]) + " ending: " + str(outXform))
+
+        print("Final metric value for frame: " + str(f) + " to " + str(ref_idx) + ": "+str(imreg_method.GetMetricValue()))
+        print("Number of iterations for frame: " + str(f) + " to " + str(ref_idx) + ": " + str(imreg_method.GetOptimizerIteration()))
+
+        if imreg_method.GetMetricValue() > -0.15:
+            print("Attempting re-run due to low metric value...")
+            imreg_method.SetInitialTransform(affineXform)
+            imreg_method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.04, minStep=1e-6,
+                                                                  numberOfIterations=5000,
+                                                                  relaxationFactor=0.7, gradientMagnitudeTolerance=1e-6)
+            outXform = imreg_method.Execute(ref_im, moving_im)
+            print("Final metric value for frame: " + str(f) + " to " + str(ref_idx) + ": " + str(
+                imreg_method.GetMetricValue()))
+            print("Number of iterations for frame: " + str(f) + " to " + str(ref_idx) + ": " + str(
+                imreg_method.GetOptimizerIteration()))
+
+            # If we see an improvement, make this frame an inlier.
+            if imreg_method.GetMetricValue() < -0.15:
+                inliers[f] = True
+        else:
+            inliers[f] = True
+
+
+        out_im = sitk.Resample(sitk.GetImageFromArray(im_stack[..., f]), ref_im, outXform, sitk.sitkLanczosWindowedSinc)
+        reg_stack[..., f] = sitk.GetArrayFromImage(out_im)
+
+        xforms[f] = np.reshape(np.asarray(outXform.GetParameters()), (2, 3), order="F")
+
+        # pyplot.imshow(reg_stack[..., f])
+        # pyplot.show()
+    # save_video(
+    #           "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\shifted_stk.avi",
+    #           reg_stack, 29.4)
+
+    return reg_stack, xforms, inliers
+
+
+
 
 def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=5000, method="affine", dropthresh=None):
     num_frames = image_data.shape[-1]
@@ -269,8 +332,8 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
 
     for f in range(num_frames):
         kp, des = sift.detectAndCompute(image_data[..., f], mask_data[..., f], None)
-        if numkeypoints > 8000:
-            print("Found "+ str(len(kp)) + " keypoints")
+        # if numkeypoints > 8000:
+        #     print("Found "+ str(len(kp)) + " keypoints")
         # Normalize the features by L1; (make this RootSIFT) instead.
         des /= (des.sum(axis=1, keepdims=True) + np.finfo(np.float).eps)
         des = np.sqrt(des)
@@ -341,9 +404,9 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
 
     inliers = np.squeeze(corrcoeff >= dropthresh)
     corrected_stk = corrected_stk[..., inliers]
-    save_video(
-        "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test_corrected_stk.avi",
-        corrected_stk, 29.4)
+    # save_video(
+    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\test_corrected_stk.avi",
+    #     corrected_stk, 29.4)
     for i in range(len(inliers)):
         if not inliers[i]:
             xform[i] = None # If we drop a frame, eradicate its xform. It's meaningless anyway.

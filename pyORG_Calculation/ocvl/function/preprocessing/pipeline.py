@@ -172,38 +172,46 @@ def run_pipeline():
 
             num_vid_proj = ref_im_proj.shape[-1]
             print("Selecting ideal central frame...")
-            dist_res = pool.starmap_async(im_dist_to_stk, zip(range(num_vid_proj),
-                                                              repeat(ref_im_proj.astype("uint8")),
-                                                              repeat(np.ceil(weight_proj).astype("uint8"))) )
-            avg_loc_dist = dist_res.get()
-            del dist_res
-            avg_loc_dist = np.argsort(avg_loc_dist)
-            dist_ref_idx = avg_loc_dist[0]
+            dist_res = pool.starmap_async(simple_image_stack_align, zip(repeat(ref_im_proj.astype("uint8")),
+                                                                        repeat(np.ceil(weight_proj).astype("uint8")),
+                                                                        range(len(loc_results))))
+            shift_info = dist_res.get()
+
+            avg_loc_dist = np.zeros(len(shift_info))
+            f = 0
+            for allshifts in shift_info:
+                # allshifts = simple_image_stack_align(vid.data, mask, f)
+                allshifts = np.stack(allshifts)
+                allshifts **= 2
+                allshifts = np.sum(allshifts, axis=1)
+                avg_loc_dist[f] = np.mean(np.sqrt(allshifts))  # Find the average distance to this reference.
+                f += 1
+
+            avg_loc_idx = np.argsort(avg_loc_dist)
+            dist_ref_idx = avg_loc_idx[0]
+
             print("Determined it to be frame " + str(dist_ref_idx) + ".")
 
             # Begin writing our results to disk.
             writepath = os.path.join(pName, "Functional Pipeline", loc)
             Path(writepath).mkdir(parents=True, exist_ok=True)
 
-            ref_im_proj, xform, inliers = relativize_image_stack(ref_im_proj.astype("uint8"),
+            ref_im_proj, xform, inliers = optimizer_stack_align(ref_im_proj.astype("uint8"),
                                                                  np.ceil(weight_proj).astype("uint8"),
-                                                                 dist_ref_idx,
-                                                                 numkeypoints=20000,
-                                                                 method="rigid",
-                                                                 dropthresh=0.4)
+                                                                 dist_ref_idx)
 
             for f in range(len(xform)):
                 if inliers[f]:
                     for i in range(dataset[f].num_frames): # Make all of the data in our dataset relative as well.
                         dataset[f].video_data[..., i] = cv2.warpAffine(dataset[f].video_data[..., i], xform[f],
                                                                        dataset[f].video_data[..., i].shape,
-                                                                       flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                                       flags=cv2.INTER_LANCZOS4)
                         dataset[f].ref_video_data[..., i] = cv2.warpAffine(dataset[f].ref_video_data[..., i], xform[f],
                                                                            dataset[f].ref_video_data[..., i].shape,
-                                                                           flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                                           flags=cv2.INTER_LANCZOS4)
                         dataset[f].mask_data[..., i] = cv2.warpAffine(dataset[f].mask_data[..., i], xform[f],
                                                                       dataset[f].mask_data[..., i].shape,
-                                                                      flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                                      flags=cv2.INTER_LANCZOS4)
                     # Save the pipelined dataset.
                     metadata = pd.DataFrame(dataset[f].framestamps, columns=["FrameStamps"])
                     metadata.to_csv(os.path.join(writepath, dataset[f].filename[:-4]+"_piped.csv"), index=False)
@@ -211,14 +219,14 @@ def run_pipeline():
 
                     im_proj[..., f] = cv2.warpAffine(im_proj[..., f], xform[f],
                                                      im_proj[..., f].shape,
-                                                     flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                     flags=cv2.INTER_LANCZOS4)
                     weight_proj[..., f] = cv2.warpAffine(weight_proj[..., f], xform[f],
                                                          weight_proj[..., f].shape,
-                                                         flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                         flags=cv2.INTER_LANCZOS4)
 
             weight_proj = weight_proj[..., inliers]
             im_proj = im_proj[..., inliers]
-
+            save_video(os.path.join(writepath, "test.avi"), im_proj, 29.4)
             # Z Project each of our image types
             ref_zproj, weight_zproj = weighted_z_projection(ref_im_proj.astype("float64") * weight_proj, weight_proj)
             analysis_zproj, weight_zproj = weighted_z_projection(im_proj.astype("float64") * weight_proj, weight_proj)
@@ -246,22 +254,12 @@ def run_pipeline():
 
 
 if __name__ == "__main__":
-    vid = load_video("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\pre_selected_stk.avi")
-    mask = np.ones(vid.data.shape, dtype="uint8")
-    mask[vid.data == 0] = 0
-    numfrm = vid.data.shape[-1]
-
-    # shift, val, xcorrmap = general_normxcorr2(vid.data[..., 0], vid.data[..., 1])
-    # pyplot.imshow(xcorrmap)
-    # pyplot.show()
-
-    optimizer_stack_align(vid.data, mask, 20)
-    # avg_loc_dist = np.zeros( (numfrm) )
-    # for f in range(numfrm):
-    #     avg_loc_dist[f] = im_dist_to_stk(f, vid.data, mask)
-    #     print(str(avg_loc_dist[f]))
+    # vid = load_video("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\pre_selected_stk.avi")
+    # mask = np.ones(vid.data.shape, dtype="uint8")
+    # mask[vid.data == 0] = 0
+    # numfrm = vid.data.shape[-1]
     #
-    # avg_loc_dist = np.argsort(avg_loc_dist)
-
-    print("wtfbbq")
-    #run_pipeline()
+    # optimizer_stack_align(vid.data, mask, 0)
+    #
+    # print("wtfbbq")
+    run_pipeline()
