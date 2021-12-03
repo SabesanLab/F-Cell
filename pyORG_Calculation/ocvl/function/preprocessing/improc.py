@@ -52,8 +52,6 @@ def flat_field(dataset, sigma=20):
 
 
 
-
-
 # Where the image data is N rows x M cols and F frames
 # and the row_shifts and col_shifts are F x N.
 # Assumes a row-wise distortion/a row-wise fast scan ("distortionless" along each row)
@@ -115,18 +113,6 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
     # save_video("C:\\Users\\rober\\Documents\\temp\\test.avi", (dewarped*255).astype("uint8"), 30)
 
 
-def im_dist_to_stk(ref_idx, im_stack, mask_stack):
-    num_frames = im_stack.shape[-1]
-    dists = [10000] * num_frames
-    print("Aligning to frame "+str(ref_idx))
-
-    for f2 in range(num_frames):
-        dists[f2] = phase_cross_correlation(im_stack[..., ref_idx], im_stack[..., f2],
-                                            reference_mask=mask_stack[..., ref_idx], moving_mask=mask_stack[..., f2])
-
-    median_dist = np.nanmedian(dists, axis=0)
-    return np.sqrt(median_dist[0] * median_dist[0] + median_dist[1] * median_dist[1])
-
 # Calculate a running sum in all four directions - apparently more memory efficient
 # Used for determining the total energy at every point that an image contains.
 def local_sum(matrix, overlap_shape):
@@ -144,14 +130,14 @@ def local_sum(matrix, overlap_shape):
     return energy_mat
 
 
-# From Dirk Padfield's Masked FFT Registration
+# Using Dirk Padfield's Masked FFT Registration approach (Normalized xcorr for arbitrary masks).
 # https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=5540032
-def general_normxcorr2(template, reference, template_mask=None, reference_mask=None, required_overlap=None):
-    temp_size = template.shape
-    ref_size = reference.shape
+def general_normxcorr2(template_im, reference_im, template_mask=None, reference_mask=None, required_overlap=None):
+    temp_size = template_im.shape
+    ref_size = reference_im.shape
 
-    template = template.astype("float64")
-    reference = reference.astype("float64")
+    template = template_im.astype("float64")
+    reference = reference_im.astype("float64")
 
     if template_mask is None:
         template_mask = np.ones(temp_size)
@@ -160,7 +146,7 @@ def general_normxcorr2(template, reference, template_mask=None, reference_mask=N
 
     # First, cross correlate our two images (but this isn't normalized, yet!)
     # The templates should be rotated by 90 degrees. So...
-    template_mask = np.rot90(template_mask, k=2)
+    template_mask = np.rot90(template_mask.copy(), k=2)
     template = np.rot90(template, k=2)
     base_xcorr = fftconvolve(template, reference)
 
@@ -199,7 +185,7 @@ def general_normxcorr2(template, reference, template_mask=None, reference_mask=N
 
     maxval = np.amax(xcorr_out[:])
     maxloc = np.unravel_index(np.argmax(xcorr_out[:]), xcorr_out.shape)
-    maxshift = (float(ref_size[1]-maxloc[1]-1), float(ref_size[0]-maxloc[0])-1) #Output as X and Y.
+    maxshift = (-float(maxloc[1]-ref_size[1]), -float(maxloc[0]-ref_size[0])) #Output as X and Y.
 
     return maxshift, maxval, xcorr_out
 
@@ -207,7 +193,8 @@ def general_normxcorr2(template, reference, template_mask=None, reference_mask=N
 def simple_image_stack_align(im_stack, mask_stack, ref_idx):
     num_frames = im_stack.shape[-1]
     shifts = [None] * num_frames
-    flattened = flat_field(im_stack)
+    # flattened = flat_field(im_stack)
+    flattened = (im_stack)
     print("Aligning to frame " + str(ref_idx))
     for f2 in range(0, num_frames):
         shift, val, xcorrmap = general_normxcorr2(flattened[..., f2], flattened[..., ref_idx],
@@ -217,104 +204,101 @@ def simple_image_stack_align(im_stack, mask_stack, ref_idx):
         shifts[f2] = shift
 
     return shifts
-    # thattransform = np.eye(3)
-    # for f2 in range(1, num_frames):
-    #     thistransform = np.eye(3)
-    #     thistransform[0, 2] = shifts[f2][0]
-    #     thistransform[1, 2] = shifts[f2][1]
-    #
-    #     # thistransform = np.matmul(thistransform, thattransform)
-    #     # thattransform = thistransform
-    #     im_stack[..., f2] = warp(im_stack[..., f2], AffineTransform(thistransform), order=3, preserve_range=True)
 
 
-
-    # save_video(
-    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\shifted_stk.avi",
-    #     im_stack, 29.4)
-
-def optimizer_stack_align(im_stack, mask_stack, ref_idx, initial_shifts=None):
+def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial_shifts=False, dropthresh=None, transformtype="affine"):
     num_frames = im_stack.shape[-1]
 
     reg_stack = np.zeros(im_stack.shape)
+    eroded_mask = np.zeros(mask_stack.shape)
 
     # Erode our masks a bit to help with stability.
     for f in range(0, num_frames):
-        mask_stack[..., f] = binary_erosion(mask_stack[..., f], structure=np.ones((11, 11)))
-      #  im_stack[..., f] *= mask_stack[..., f]
+        eroded_mask[..., f] = binary_erosion(mask_stack[..., f], structure=np.ones((21, 21)))
+    #   #  im_stack[..., f] *= mask_stack[..., f]
 
-    if initial_shifts is None:
-        initial_shifts = simple_image_stack_align(im_stack*mask_stack, mask_stack, ref_idx)
-        #print(initial_shifts)
+    if determine_initial_shifts:
+        initial_shifts = simple_image_stack_align(im_stack * eroded_mask, eroded_mask, reference_idx)
+    else:
+        initial_shifts = [(0.0, 0.0)] * num_frames
+
 
     imreg_method = sitk.ImageRegistrationMethod()
-    #imreg_method.SetMetricAsMeanSquares() #Equivalent to MATLAB results
+    imreg_method.SetMetricAsCorrelation()
+    #imreg_method.SetMetricAsMeanSquares() #Equivalent to MATLAB results ?
     #imreg_method.SetMetricAsANTSNeighborhoodCorrelation(16) # Similar to, but not better than the above
-    imreg_method.SetMetricAsCorrelation() # Amusingly enough, appears to be the best.
+    imreg_method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.0625, minStep=1e-5,
+                                                          numberOfIterations=500,
+                                                          relaxationFactor=0.6, gradientMagnitudeTolerance=1e-5)
+    imreg_method.SetOptimizerScalesFromPhysicalShift() #This apparently allows parameters to change independently of one another.
+                                                      # And is incredibly important.
+    # #https://insightsoftwareconsortium.github.io/SimpleITK-Notebooks/Python_html/61_Registration_Introduction_Continued.html#Final-registration
 
-    #imreg_method.SetInterpolator(sitk.sitkLanczosWindowedSinc)
+    #imreg_method.SetInterpolator(sitk.sitkLanczosWindowedSinc) # Adding this just makes it dog slow.
 
-    ref_im = sitk.GetImageFromArray(im_stack[..., ref_idx])
+    ref_im = sitk.GetImageFromArray(im_stack[..., reference_idx])
+    # ref_im = sitk.Cast(ref_im, sitk.sitkFloat64)
     ref_im = sitk.Normalize(ref_im)
+
     dims = ref_im.GetDimension()
 
-    imreg_method.SetMetricFixedMask(sitk.GetImageFromArray(mask_stack[..., ref_idx], sitk.sitkInt8))
+    imreg_method.SetMetricFixedMask(sitk.GetImageFromArray(eroded_mask[..., reference_idx], sitk.sitkInt8))
     xforms = [None] * num_frames
     inliers = np.zeros(num_frames, dtype=bool)
     for f in range(0, num_frames):
 
-        imreg_method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.0625, minStep=1e-5,
-                                                              numberOfIterations=5000,
-                                                              relaxationFactor=0.65, gradientMagnitudeTolerance=1e-5)
-        affineXform = sitk.AffineTransform(dims)
-        affineXform.SetTranslation(initial_shifts[f])
+        if transformtype == "rigid":
+            xForm = sitk.Euler2DTransform()
+        elif transformtype == "affine":
+            xForm = sitk.AffineTransform(2)
+
+        xForm.SetCenter(np.array(im_stack[..., reference_idx].shape, dtype="float") / 2)
+        xForm.SetTranslation(initial_shifts[f])
+
+
+        imreg_method.SetInitialTransform(xForm)
+        imreg_method.SetInterpolator(sitk.sitkLinear)
 
         moving_im = sitk.GetImageFromArray(im_stack[..., f])
-        #moving_im = sitk.Cast(moving_im, sitk.sitkFloat64)
+        # moving_im = sitk.Cast(moving_im, sitk.sitkFloat64)
         moving_im = sitk.Normalize(moving_im)
+        imreg_method.SetMetricMovingMask(sitk.GetImageFromArray(eroded_mask[..., f], sitk.sitkInt8))
 
-        imreg_method.SetMetricMovingMask(sitk.GetImageFromArray(mask_stack[..., f], sitk.sitkInt8))
-        imreg_method.SetInitialTransform(affineXform)
 
         outXform = imreg_method.Execute(ref_im, moving_im)
-        #print("starting: " + str(initial_shifts[f]) + " ending: " + str(outXform))
+        # print("starting: " + str(initial_shifts[f]) + " ending: " + str(outXform))
 
-        print("Final metric value for frame: " + str(f) + " to " + str(ref_idx) + ": "+str(imreg_method.GetMetricValue()))
-        print("Number of iterations for frame: " + str(f) + " to " + str(ref_idx) + ": " + str(imreg_method.GetOptimizerIteration()))
+        # print("Metric value for frame: " + str(f) + " to " + str(reference_idx) + ": " + str(imreg_method.GetMetricValue()))
+        # print("Number of iterations for frame: " + str(f) + " to " + str(reference_idx) + ": " + str(imreg_method.GetOptimizerIteration()))
 
-        if imreg_method.GetMetricValue() > -0.15:
-            print("Attempting re-run due to low metric value...")
-            imreg_method.SetInitialTransform(affineXform)
-            imreg_method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.04, minStep=1e-6,
-                                                                  numberOfIterations=5000,
-                                                                  relaxationFactor=0.7, gradientMagnitudeTolerance=1e-6)
-            outXform = imreg_method.Execute(ref_im, moving_im)
-            print("Final metric value for frame: " + str(f) + " to " + str(ref_idx) + ": " + str(
-                imreg_method.GetMetricValue()))
-            print("Number of iterations for frame: " + str(f) + " to " + str(ref_idx) + ": " + str(
-                imreg_method.GetOptimizerIteration()))
-
-            # If we see an improvement, make this frame an inlier.
-            if imreg_method.GetMetricValue() < -0.15:
-                inliers[f] = True
+        if dropthresh is not None and imreg_method.GetMetricValue() > -dropthresh:
+            inliers[f] = False
         else:
             inliers[f] = True
 
+        if transformtype == "rigid":
+            outXform = sitk.Euler2DTransform(outXform)
+        elif transformtype == "affine":
+            outXform = sitk.AffineTransform(outXform)
+
+        # ITK's "true" transforms are found as follows: T(x)=A(x−c)+t+c
+        A = np.array(outXform.GetMatrix()).reshape(2, 2)
+        c = np.array(outXform.GetCenter())
+        t = np.array(outXform.GetTranslation())
+
+        Tx = np.eye(3)
+        Tx[:2, :2] = A
+        Tx[0:2, 2] = -np.dot(A, c)+t+c
+        xforms[f] = Tx[0:2, :]
 
         out_im = sitk.Resample(sitk.GetImageFromArray(im_stack[..., f]), ref_im, outXform, sitk.sitkLanczosWindowedSinc)
         reg_stack[..., f] = sitk.GetArrayFromImage(out_im)
 
-        xforms[f] = np.reshape(np.asarray(outXform.GetParameters()), (2, 3), order="F")
-
-        # pyplot.imshow(reg_stack[..., f])
-        # pyplot.show()
     # save_video(
-    #           "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\shifted_stk.avi",
-    #           reg_stack, 29.4)
+    #            "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\testalign.avi",
+    #            reg_stack, 29.4)
 
     return reg_stack, xforms, inliers
-
-
 
 
 def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=5000, method="affine", dropthresh=None):
@@ -428,9 +412,8 @@ def weighted_z_projection(image_data, weights, projection_axis=-1, type="average
 
     weight_projection[np.isnan(weight_projection)] = 0
 
-    #cv2.imshow("projected", image_projection.astype("uint8"))
-    #c = cv2.waitKey(1000)
-    # if c == 27:
-    #     return
+    # pyplot.imshow(image_projection.astype("uint8"))
+    # pyplot.show()
+
 
     return image_projection, (weight_projection / np.amax(weight_projection))

@@ -5,7 +5,7 @@ import pandas as pd
 from numpy.polynomial import Polynomial
 from os import path
 
-from ocvl.function.preprocessing.improc import dewarp_2D_data, relativize_image_stack, flat_field
+from ocvl.function.preprocessing.improc import dewarp_2D_data, relativize_image_stack, flat_field, optimizer_stack_align
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.resources import ResourceLoader, load_video, save_video
 
@@ -92,7 +92,7 @@ class MEAODataset():
                 shiftrow = col.strip().split("_")[0][5:]
                 npcol = metadata[col].to_numpy()
                 if npcol.dtype == "object":
-                    npcol[ npcol == " "] = np.nan
+                    npcol[npcol == " "] = np.nan
                 if col != "XShift" and "XShift" in col:
                     xshifts[:, int(shiftrow)] = npcol
                 if col != "YShift" and "YShift" in col:
@@ -120,12 +120,12 @@ class MEAODataset():
             self.mask_data = warp_mask.astype("uint8")
             self.ref_video_data = (255 * ref_vid).astype("uint8")
 
-            self.ref_video_data, xforms, inliers = relativize_image_stack(self.ref_video_data, self.mask_data,
-                                                                          reference_idx=self.reference_frame_idx,
-                                                                          dropthresh=0.4)
-            inliers = np.squeeze(inliers)
+            self.ref_video_data, xforms, inliers = optimizer_stack_align(self.ref_video_data, self.mask_data,
+                                                                         reference_idx=self.reference_frame_idx,
+                                                                         dropthresh=0.15)
 
-            # Update everything else with what's an inlier now.
+            # Update everything with what's an inlier now.
+            self.ref_video_data = self.ref_video_data[..., inliers]
             self.framestamps = self.framestamps[inliers]
             self.video_data = self.video_data[..., inliers]
             self.mask_data = self.mask_data[..., inliers]
@@ -136,12 +136,12 @@ class MEAODataset():
                 if xforms[f] is not None:
                     self.video_data[..., f] = cv2.warpAffine(self.video_data[..., f], xforms[f],
                                                              self.video_data[..., f].shape,
-                                                             flags=cv2.INTER_LANCZOS4)
+                                                             flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                     self.mask_data[..., f] = cv2.warpAffine(self.mask_data[..., f], xforms[f],
                                                             self.mask_data[..., f].shape,
-                                                            flags=cv2.INTER_NEAREST)
+                                                            flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
 
-            #save_video("//134.48.93.176/Raw Study Data/00-64774/MEAOSLO1/20210824/Processed/Functional Pipeline/", dataset[f].video_data, 29.4)
+            # save_video("//134.48.93.176/Raw Study Data/00-64774/MEAOSLO1/20210824/Processed/Functional Pipeline/", dataset[f].video_data, 29.4)
             # for i in range(this_data.shape[-1]):
             #     # Display the resulting frame
             #

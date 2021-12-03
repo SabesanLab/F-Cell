@@ -12,7 +12,7 @@ end
 
 
 defaultmethod = 'linear_stddev';
-validmethods = {'linear_stddev', 'stddev','linear_vast','vast'};
+validmethods = {'linear_stddev', 'stddev','linear_vast','vast','relative_change'};
 checkMethods = @(x) any(validatestring(x,validmethods));
 
 addRequired(p,'temporal_profiles', @isnumeric)
@@ -133,6 +133,27 @@ switch method
                 ranged_std(c) = std( ranged_sig ); % Calculate the standard deviation of that range.
 
                 standardized_profile_data(c,:) = ((temporal_profiles(c,:)-ranged_mean(c))/ranged_std(c)) / (ranged_std(c)/ranged_mean(c)); % Standardize our signal.
+            end
+        end
+    case 'relative_change'
+        % Standardize using percentage preceded by a linear fit to remove
+        % any residual low-frequency changes
+        for c=1:size(temporal_profiles,1)
+            if mod(c, size(temporal_profiles,1)/10) == 0
+                waitbar(c/size(temporal_profiles,1),wbh, ['Standardizing temporal profiles (' num2str(c) ' of ' num2str(size(temporal_profiles,1)) ')']);
+            end
+            
+            % Determine the framestamps that fall within our selected
+            % range, as well as any nan values in this profile.
+            validrange = framestamps>=range(1) & framestamps<=range(2) & ~isnan( temporal_profiles(c,:) );
+            
+            if sum(validrange) >= (range(2)-range(1))/4
+                ranged_sig = temporal_profiles(c, validrange); % Isolate the profile.
+                ranged_time = framestamps(validrange) / fps; % Get the timestamps for this signal.
+
+                ranged_mean(c) = mean( ranged_sig ); % Calculate the mean value of the signal before we do anything to it.
+
+                standardized_profile_data(c,:) = (temporal_profiles(c,:)-ranged_mean(c))/ranged_mean(c); % Standardize our signal.
             end
         end
     

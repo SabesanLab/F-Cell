@@ -65,7 +65,7 @@ for j=1:length(ref_images)
 
     ref_images{j}(isnan(ref_images{j})) = 0;
     tforms{j} = imregtform( ref_images{j}, ref_images{ref_im},... % Then tweak for affine
-                                 'affine',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{j});
+                                 'affine',monooptimizer,monometric, 'PyramidLevels',1,'InitialTransformation',tforms{j}, 'DisplayOptimization', true);
     toc;
 end
 
