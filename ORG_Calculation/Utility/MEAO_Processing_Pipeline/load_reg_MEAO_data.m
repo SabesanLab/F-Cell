@@ -198,7 +198,7 @@ xshift_medians = median(xshifts,1);
 
 roweval = linspace(1,length(xshift_medians), size(temporal_data,1));
 
-indivxshift = zeros([num_frames, size(temporal_data,2)]);
+indivxshift = zeros([num_frames, size(temporal_data,1)]);
 %Use a poly8 as this is what BMC's imreg software uses.
 for f=1:num_frames
 
@@ -214,7 +214,7 @@ yshifts = shiftvalues(:,yshiftheaders);
 yshifts = yshifts(:,sortind);
 yshift_medians = median(yshifts,1);
 
-indivyshift = zeros([num_frames, size(temporal_data,2)]);
+indivyshift = zeros([num_frames, size(temporal_data,1)]);
 %Use a poly8 as this is what BMC's imreg software uses. 
 for f=1:num_frames
     ind_yshiftfit = fit( (1:length(yshift_medians))',yshifts(f,:)','poly8','Normalize','on','Exclude', isnan(yshifts(f,:)')); 

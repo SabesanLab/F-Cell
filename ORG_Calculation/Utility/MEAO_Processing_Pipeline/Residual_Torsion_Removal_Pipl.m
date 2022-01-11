@@ -3,15 +3,15 @@ function [aligned_temporal_data, kept_framestamps, tforms]=Residual_Torsion_Remo
 
 
     [optimizer, metric]  = imregconfig('monomodal');
-    % optimizer.GradientMagnitudeTolerance = 1e-4;
-    % optimizer.MinimumStepLength = 1e-5;
-    % optimizer.MaximumStepLength = 0.04;
-    % optimizer.MaximumIterations = 100;
+    optimizer.GradientMagnitudeTolerance = 1e-5;
+    optimizer.MinimumStepLength = 1e-5;
+    optimizer.MaximumStepLength = 0.0625;
+    optimizer.MaximumIterations = 500;
 
     tic;
     if ~isempty(mask_data)
         sum_map = sum(mask_data,3);
-        average_frm_mask = sum_map >= ceil(mean(sum_map(:)));
+        average_frm_mask = sum_map >= size(mask_data,3)-2; %ceil(mean(sum_map(:)));
         % Find the largest incribed rectangle in this mask.
         [C, h, w, largest_rect] =FindLargestRectangles(average_frm_mask,[1 1 0], [300 150]);
 
@@ -50,8 +50,8 @@ function [aligned_temporal_data, kept_framestamps, tforms]=Residual_Torsion_Remo
     parfor n=1:size(cropped_temporal_data,3)
 
         % Register using the cropped frame.
-        forward_reg_tform{n}=imregtform(cropped_temporal_data(:,:,n), cropped_ref_frame,'rigid',...
-                                optimizer, metric,'PyramidLevels',1, 'InitialTransformation', affine2d());%,'DisplayOptimization',true);
+        forward_reg_tform{n}=imregtform(cropped_temporal_data(:,:,n), cropped_ref_frame,'affine',...
+                                optimizer, metric,'PyramidLevels',2, 'InitialTransformation', affine2d());%,'DisplayOptimization',true);
 
         
         tforms(:,:,n) = forward_reg_tform{n}.T;
