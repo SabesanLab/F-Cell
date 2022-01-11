@@ -235,6 +235,10 @@ end
 
 if rem_torsion
     [temporal_data, framestamps] = Residual_Torsion_Removal_Pipl(temporal_data, framestamps, mask_data, referenceidx);
+    
+%     for f=1:num_frames
+%         figure(3); imagesc(temporal_data(:,:,f)); colormap gray; axis image; pause(0.1);
+%     end
 end
 
 if strcmp(ref_im, 'generated')
