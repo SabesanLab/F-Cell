@@ -398,6 +398,6 @@ if __name__ == "__main__":
             w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
     root.update()
 
-    run_ff_pipeline(pName, tkroot=root)
+    #run_ff_pipeline(pName, tkroot=root)
 
-    #run_pipeline(pName, tkroot=root)
+    run_meao_pipeline(pName, tkroot=root)

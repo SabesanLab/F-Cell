@@ -12,7 +12,7 @@ clear;
 
 rootDir = uigetdir(pwd, 'Select the folder containing all videos of interest.');
 
-fNames = read_folder_contents(rootDir, 'avi', '760nm');
+fNames = read_folder_contents(rootDir, 'avi', 'Confocal');
 
 % Remove this from consideration.
 fNames = fNames(cellfun(@(name) ~contains(name, 'ALL_ACQ_AVG'), fNames)); 
@@ -61,7 +61,7 @@ for f=startind:endind
     [temporal_data, framestamps{f}, framerate(f)] = load_pipelined_MEAO_data(fullfile(rootDir, fNames{f}));
 
     % Extract temporal profiles at each pixel
-    [temporal_profiles, ~]=extract_temporal_profiles(temporal_data,'SegmentationRadius',2, 'Coordinates', ref_coords, 'ProgBarHandle', wbh );
+    [temporal_profiles, ~]=extract_temporal_profiles(temporal_data,'SegmentationRadius', 2, 'Coordinates', ref_coords, 'ProgBarHandle', wbh );
 
     num_extant_profiles(f) = sum(any(~isnan(temporal_profiles),2));
     % Normalize the temporal profiles to each frame's mean
@@ -70,14 +70,15 @@ for f=startind:endind
     % Standardize the temporal profiles to their *pre stimulus* behavior    
     [finalized_temporal_profiles{f}]=standardize_temporal_profiles(norm_temporal_profiles, framestamps{f}', [1 stimTrain(1)], framerate(f),...
                                                                   'Method', 'relative_change', 'ProgBarHandle', wbh);
-
-           
+figure(707); hold on;
+     pop_iORGs{f} = Population_iORG(finalized_temporal_profiles{f},framestamps{f}/100);        
 end
 
 
-%% Some PCA fitting.
 max_framestamp = max(cellfun(@max,framestamps));
 min_framestamp = min(cellfun(@min,framestamps));
+%% Some PCA fitting.
+
 
 all_profiles = nan(length(finalized_temporal_profiles)*size(ref_coords,1), max_framestamp);
 for f=startind:endind
@@ -136,15 +137,15 @@ return;
 %%
 legendfNames = fNames(startind:endind);
 
-for coi=3:size(finalized_temporal_profiles{1},1)
-    goodforlegend = true(length(legendfNames),1);
+for coi=500:size(finalized_temporal_profiles{1},1)
+%     goodforlegend = true(length(legendfNames),1);
     
-    std(finalized_temporal_profiles{f}(coi, [1 stimTrain(1)]))
+%     std(finalized_temporal_profiles{f}(coi, [1 stimTrain(1)]))
     
     figure(708); clf;
-    for f=startind:endind
-        if ~all(isnan(finalized_temporal_profiles{f}(coi,:))) && f <=0
-            plot(framestamps{f}, finalized_temporal_profiles{f}(coi,:), 'b'); hold on;
+    for f=startind:endind-1
+%         if ~all(isnan(finalized_temporal_profiles{f}(coi,:))) && f <=0
+%             plot(framestamps{f}, finalized_temporal_profiles{f}(coi,:), 'b'); hold on;
             
 %             profile = finalized_temporal_profiles{f}(coi,:)';
 %             fitstamps = framestamps{f}(~isnan(profile));
@@ -155,16 +156,18 @@ for coi=3:size(finalized_temporal_profiles{1},1)
 %             [fitted_curve, ~] = fit(fitstamps, profile, 'poly9');
 %             plot(1:80, (fitted_curve(1:80))); 
 %             plot(10:(80-1), cumsum(abs(diff(fitted_curve(10:80),1))) ); hold off;
-        elseif ~all(isnan(finalized_temporal_profiles{f}(coi,:))) && f > 1
-            plot(framestamps{f}, finalized_temporal_profiles{f}(coi,:)); hold on;
-        else
-            goodforlegend(f) = false;
-        end
-        plot([58 58],[-1 3], 'k')
-        axis([0 180 -1 3])
+%         elseif ~all(isnan(finalized_temporal_profiles{f}(coi,:))) && f > 1
+%             plot(framestamps{f}/100, finalized_temporal_profiles{f}(coi,:),'k'); hold on;
+            plot(framestamps{f}/100, movmean(finalized_temporal_profiles{f}(coi,:),10, 'SamplePoints', framestamps{f})); hold on;
+%         else
+%             goodforlegend(f) = false;
+%         end
+        plot([1 1],[-1 1], 'k')
+        axis([0 4 -0.5 0.5])
     end
-    hold off;
-    legend(legendfNames(goodforlegend), 'Interpreter', 'none')
+    hold off; xlabel('Time (s)'); ylabel('Fractional Change');
+    
+%     legend(legendfNames(goodforlegend), 'Interpreter', 'none')
     ref_coords(coi,:)
     pause;
 end
