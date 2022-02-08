@@ -17,6 +17,7 @@ from enum import Enum
 from itertools import repeat
 from pathlib import Path
 
+import time
 import cv2
 import numpy as np
 import multiprocessing as mp
@@ -106,20 +107,20 @@ def run_ff_pipeline(pName, tkroot):
 
 def run_meao_pipeline(pName, tkroot):
     root = tkroot
-    # a_mode = simpledialog.askstring(title="Input the analysis modality string: ",
-    #                                prompt="Input the analysis modality string:",
-    #                                initialvalue="760nm", parent=root)
-    # if not a_mode:
-    #     a_mode = "760nm"
-    #
-    # ref_mode = simpledialog.askstring(title="Input the *alignment reference* modality string. ",
-    #                                   prompt="Input the *alignment reference* modality string:", initialvalue=a_mode, parent=root)
-    # if not ref_mode:
-    #     ref_mode = "760nm"
+    a_mode = simpledialog.askstring(title="Input the analysis modality string: ",
+                                   prompt="Input the analysis modality string:",
+                                   initialvalue="760nm", parent=root)
+    if not a_mode:
+        a_mode = "760nm"
+
+    ref_mode = simpledialog.askstring(title="Input the *alignment reference* modality string. ",
+                                      prompt="Input the *alignment reference* modality string:", initialvalue=a_mode, parent=root)
+    if not ref_mode:
+        ref_mode = "760nm"
 
     # For debugging.
-    a_mode = "760nm"
-    ref_mode = "Confocal"
+    # a_mode = "760nm"
+    # ref_mode = "Confocal"
 
     print("Selected analysis modality name of: " + a_mode + ", and a reference modality of: " + ref_mode)
 
@@ -175,14 +176,13 @@ def run_meao_pipeline(pName, tkroot):
 
     # Create a pool of threads for processing.
     with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
-
         for loc in allFiles:
 
             first = True
             r = 0
             pb["maximum"] = len(allFiles[loc])
             for toload in allFiles[loc]:
-
+                #tic = time.perf_counter()
                 pb["value"] = r
                 pb_label["text"] = "Processing " + os.path.basename(os.path.realpath(toload)) + "..."
                 pb.update()
@@ -204,7 +204,8 @@ def run_meao_pipeline(pName, tkroot):
                     first = False
 
                 r += 1
-
+                #toc = time.perf_counter()
+                #print(f"Processed in {toc - tic:0.4f} seconds")
 
             # Given that optmization is already multithreaded, we don't want to double down on it... probably.
             # multiproc_res = pool.starmap_async(initialize_and_load_meao, zip(allFiles[loc], repeat(a_mode), repeat(ref_mode)) )
@@ -262,29 +263,31 @@ def run_meao_pipeline(pName, tkroot):
             ref_im_proj, ref_xforms, inliers = optimizer_stack_align(ref_im_proj.astype("uint8"),
                                                                 (weight_proj > 0).astype("uint8"),
                                                                 dist_ref_idx, determine_initial_shifts=True,
-                                                                dropthresh=0.3)
+                                                                dropthresh=0.0)
 
             # Use the xforms from each type (reference/analysis) to do the alignment.
             # Inliers will be determined by the reference modality.
             for f in range(len(ref_xforms)):
                 if inliers[f]:
+
                     for i in range(dataset[f].num_frames):  # Make all of the data in our dataset relative as well.
+                        (rows, cols) = dataset[f].video_data.shape[0:2]
                         dataset[f].video_data[..., i] = cv2.warpAffine(dataset[f].video_data[..., i], ref_xforms[f],
-                                                                       dataset[f].video_data[..., i].shape,
+                                                                       (cols, rows),
                                                                        flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                         dataset[f].ref_video_data[..., i] = cv2.warpAffine(dataset[f].ref_video_data[..., i], ref_xforms[f],
-                                                                           dataset[f].ref_video_data[..., i].shape,
+                                                                           (cols, rows),
                                                                            flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                         dataset[f].mask_data[..., i] = cv2.warpAffine(dataset[f].mask_data[..., i], ref_xforms[f],
-                                                                      dataset[f].mask_data[..., i].shape,
+                                                                      (cols, rows),
                                                                       flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
 
 
                     a_im_proj[..., f] = cv2.warpAffine(a_im_proj[..., f], ref_xforms[f],
-                                                     a_im_proj[..., f].shape,
+                                                     a_im_proj[..., f].shape[::-1],
                                                      flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                     weight_proj[..., f] = cv2.warpAffine(weight_proj[..., f], ref_xforms[f],
-                                                         weight_proj[..., f].shape,
+                                                         weight_proj[..., f].shape[::-1],
                                                          flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
 
             base_ref_frame = os.path.basename(os.path.realpath(dataset[dist_ref_idx].video_path))
@@ -398,6 +401,6 @@ if __name__ == "__main__":
             w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
     root.update()
 
-    run_ff_pipeline(pName, tkroot=root)
+    #run_ff_pipeline(pName, tkroot=root)
 
-    #run_pipeline(pName, tkroot=root)
+    run_meao_pipeline(pName, tkroot=root)

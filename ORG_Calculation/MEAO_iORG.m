@@ -88,21 +88,21 @@ notallnan = ~all(isnan(all_profiles),2);
 
 [COEFF, SCORE, LATENT, TSQUARED, EXPLAINED, MU] = pca(all_profiles(notallnan, :),'Algorithm','als');
 
-% all_profiles(notallnan, :) = SCORE(:,1:5)*COEFF(:, 1:5)'; % Reconstructed signals, using the first 5 components.
-all_profiles(notallnan, :) = SCORE(:,1:2)*COEFF(:, 1:2)'; 
+all_profiles(notallnan, :) = SCORE(:,1:5)*COEFF(:, 1:5)'; % Reconstructed signals, using the first 5 components.
+% all_profiles(notallnan, :) = SCORE(:,:)*COEFF(:, :)'; 
 
 % Put them back in the finalized temporal profiles, and make population
 % iORGs out of them.
-figure(707); clf;
+figure(708); clf;
 for f=startind:endind
     
-    finalized_temporal_profiles{f} = all_profiles( ((f-1)*size(ref_coords,1)+1):f*size(ref_coords,1), framestamps{f});
+    finalized_temporal_profiles{f} = all_profiles( ((f-1)*size(ref_coords,1)+1):f*size(ref_coords,1), :);
     
     figure(707); hold on;
-    pop_iORGs{f} = Population_iORG(finalized_temporal_profiles{f},framestamps{f}); 
+    pop_iORGs{f} = Population_iORG(finalized_temporal_profiles{f}, 0:(size(finalized_temporal_profiles{f},2)-1) ); 
     
 end
-legend(legendfNames, 'Interpreter', 'none')
+% legend(legendfNames, 'Interpreter', 'none')
 hold off;
 
 %% Make an average population iORG from our controls using pooled variance (weighted avg)
@@ -133,38 +133,82 @@ close(wbh)
 
 return;
 
+%% Code 
+
+
 %%
 legendfNames = fNames(startind:endind);
 
-for coi=3:size(finalized_temporal_profiles{1},1)
-    goodforlegend = true(length(legendfNames),1);
+acqtimes =23;%12; %:32;
+
+peakval = nan(size(finalized_temporal_profiles{acqtimes(1)},1), 1);
+for coi=1:size(finalized_temporal_profiles{acqtimes(1)},1)
+%     goodforlegend = true(length(legendfNames),1);
     
-    std(finalized_temporal_profiles{f}(coi, [1 stimTrain(1)]))
+%     std(finalized_temporal_profiles{f}(coi, [1 stimTrain(1)]))
     
-    figure(708); clf;
-    for f=startind:endind
-        if ~all(isnan(finalized_temporal_profiles{f}(coi,:))) && f <=0
-            plot(framestamps{f}, finalized_temporal_profiles{f}(coi,:), 'b'); hold on;
+    
+    for f=1:length(acqtimes)
+        t = acqtimes(f);
+
+        
+
+        fullsig = finalized_temporal_profiles{t}(coi,:);
+        origsig = fullsig;
+        if ~all(isnan(fullsig))
+%             minsig = min(fullsig);
+%             maxsig = max(fullsig);
+%             fullsig = fullsig-minsig;
+%             fullsig = 2*fullsig./max(fullsig);
+%             fullsig = fullsig -1;
+
+%             figure(708); clf;
+%             hold on;
+%             plot((0:179)/framerate(1), fullsig);
+%             plot([58/framerate(1) 58/framerate(1)],[-2 2], 'k')
+%             axis([0 180/framerate(1) -2 2])
+%             hold off;
+
+            filtbank =cwtfilterbank('Wavelet','morse','SignalLength',numel(fullsig),'SamplingFrequency',framerate(t),...
+                                    'WaveletParameters',[3 9], 'FrequencyLimits',[0.25 10]);
+%             [psi, t]=wavelets(filtbank);
+%             wavesc = scales(filtbank);
+%              figure(21); clf;
+%             cwt(fullsig,'Filterbank',filtbank);
             
-%             profile = finalized_temporal_profiles{f}(coi,:)';
-%             fitstamps = framestamps{f}(~isnan(profile));
-%             profile = profile(~isnan(profile));
-%             profile = profile( fitstamps>1 & fitstamps <80);
-%             fitstamps = fitstamps( fitstamps>1 & fitstamps <80);
-%             
-%             [fitted_curve, ~] = fit(fitstamps, profile, 'poly9');
-%             plot(1:80, (fitted_curve(1:80))); 
-%             plot(10:(80-1), cumsum(abs(diff(fitted_curve(10:80),1))) ); hold off;
-        elseif ~all(isnan(finalized_temporal_profiles{f}(coi,:))) && f > 1
-            plot(framestamps{f}, finalized_temporal_profiles{f}(coi,:)); hold on;
-        else
-            goodforlegend(f) = false;
+            [wt, f, cone_of_inter,fb,scalingfs]=cwt(fullsig,'Filterbank',filtbank);
+            wtpwrspect =(abs(wt));
+            
+            [maxvalrows, maxrow]=max(wtpwrspect(:,stimTrain(1):stimTrain(1)+30),[], 1);
+            [maxvalcols, maxcol]=max(maxvalrows);
+            maxvalcols;
+            peakval(coi) = maxvalcols;
+
+%             maxvalcols = sum(sum(wtpwrspect(:,stimTrain(1):stimTrain(1)+10).^2 )); %./numel(wtpwrspect(:,stimTrain(1):stimTrain(1)+10));
+            
+
+                figure(708); clf;
+                hold on;
+                plot((0:numel(origsig)-1)/framerate(t), origsig);
+                plot([58/framerate(t) 58/framerate(t)],[-2 2], 'k')
+                title(num2str(peakval(coi)));
+                hold off;
+                figure(21); clf;
+            cwt(fullsig,'Filterbank',filtbank);
+            caxis([0 0.5])
+                pause;
+
+
+
+            
         end
-        plot([58 58],[-1 3], 'k')
-        axis([0 180 -1 3])
+   
+        
     end
-    hold off;
-    legend(legendfNames(goodforlegend), 'Interpreter', 'none')
-    ref_coords(coi,:)
-    pause;
+    
+%     legend(legendfNames(goodforlegend), 'Interpreter', 'none')
+%     ref_coords(coi,:)
+    
 end
+
+histogram((peakval))

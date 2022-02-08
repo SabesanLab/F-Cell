@@ -295,9 +295,8 @@ def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial
         reg_stack[..., f] = sitk.GetArrayFromImage(out_im)
 
     # save_video(
-    #            "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\testalign.avi",
-    #            reg_stack, 29.4)
-
+    #     "E:\\Dropbox (Personal)\\Grant_Proposals\\2022_Feb_R01\\LSO_Prelim_data\\Processed\\testalign.avi",
+    #     reg_stack, 100)
     return reg_stack, xforms, inliers
 
 

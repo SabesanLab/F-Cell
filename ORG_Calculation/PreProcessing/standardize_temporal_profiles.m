@@ -151,7 +151,7 @@ switch method
                 ranged_sig = temporal_profiles(c, validrange); % Isolate the profile.
                 ranged_time = framestamps(validrange) / fps; % Get the timestamps for this signal.
 
-                ranged_mean(c) = mean( ranged_sig ); % Calculate the mean value of the signal before we do anything to it.
+                ranged_mean(c) = median( ranged_sig, 'omitnan' ); % Calculate the mean value of the signal before we do anything to it.
 
                 standardized_profile_data(c,:) = (temporal_profiles(c,:)-ranged_mean(c))/ranged_mean(c); % Standardize our signal.
             end

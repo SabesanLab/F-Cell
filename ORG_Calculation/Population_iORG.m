@@ -1,7 +1,7 @@
 function [population_iORG]=Population_iORG(temporal_profiles, timestamps, varargin)
 
 
-half_window = 2;
+
 
 p = inputParser;
 
@@ -15,10 +15,12 @@ checkMethods = @(x) any(validatestring(x,validmethods));
 addParameter(p, 'SummaryMethod', defaultmethod, checkMethods);
 addParameter(p, 'WindowSize', 7, @isnumeric);
 
+
 parse(p,temporal_profiles, varargin{:})
 
 method = p.Results.SummaryMethod;
 window_size = p.Results.WindowSize;
+half_window = floor(window_size/2);
 iORG = nan(1, size(temporal_profiles,2));
 
 switch method

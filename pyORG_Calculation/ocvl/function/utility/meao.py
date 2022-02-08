@@ -65,10 +65,10 @@ class MEAODataset():
             self.mask_data[self.mask_data < 0] = 0
             self.video_data = (self.video_data * self.mask_data).astype("uint8")
 
-            if self.ref_video_path != self.video_path:
-                # Load the reference video data.
-                res = load_video(self.ref_video_path)
-                self.ref_video_data = res.data * self.mask_data
+            # Load the reference video data.
+            res = load_video(self.ref_video_path)
+            self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+
 
             # Load our text data.
             metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
@@ -130,15 +130,16 @@ class MEAODataset():
             self.video_data = self.video_data[..., inliers]
             self.mask_data = self.mask_data[..., inliers]
 
+            (rows, cols) = self.video_data.shape[0:2]
             self.num_frames = self.video_data.shape[-1]
 
             for f in range(self.num_frames):
                 if xforms[f] is not None:
                     self.video_data[..., f] = cv2.warpAffine(self.video_data[..., f], xforms[f],
-                                                             self.video_data[..., f].shape,
+                                                             (cols, rows),
                                                              flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                     self.mask_data[..., f] = cv2.warpAffine(self.mask_data[..., f], xforms[f],
-                                                            self.mask_data[..., f].shape,
+                                                            (cols, rows),
                                                             flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
 
             # save_video("//134.48.93.176/Raw Study Data/00-64774/MEAOSLO1/20210824/Processed/Functional Pipeline/", dataset[f].video_data, 29.4)

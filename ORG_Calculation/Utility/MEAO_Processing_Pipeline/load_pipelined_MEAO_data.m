@@ -82,7 +82,7 @@ num_frames = round(temporal_data_reader.Duration*temporal_data_reader.FrameRate)
 temporal_data = zeros(temporal_data_reader.Height, temporal_data_reader.Width, num_frames);
 
 for f=1:num_frames
-    temporal_data(:,:,f) = rgb2gray(readFrame(temporal_data_reader));
+    temporal_data(:,:,f) = im2gray(readFrame(temporal_data_reader));
 end
 
 delete(temporal_data_reader)

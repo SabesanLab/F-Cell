@@ -29,9 +29,9 @@ if isempty(prestimulus_range)
    prestimulus_range=[1 framestamps(end)];
 end
 
-[stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps, prestimulus_range, fps,'Method', 'linear_stddev', 'ProgBarHandle', wbh);
+[stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps, prestimulus_range, fps,'Method', 'relative_change', 'ProgBarHandle', wbh);
 
-iORG=Population_iORG(stdz_temporal_profiles, framestamps/fps)
+iORG=Population_iORG(stdz_temporal_profiles, framestamps/fps,'SummaryMethod','var','WindowSize',5);
 
 close(wbh) 
 end
