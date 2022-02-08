@@ -14,17 +14,8 @@ clear;
 wbh = waitbar(0,['Loading dataset: ' strrep(fName,'_','\_')]);
 
 % Load the MEAO data.
-[temporal_data, framestamps, ~, mask_data]=load_reg_MEAO_data(fullfile(pName,fName));
-
-% Save the data to a torsion-removed tmp file.
-vidObj = VideoWriter('torsion_begone.avi','Uncompressed AVI');
-open(vidObj);
-for i=1:size(temporal_data, 3)
-    writeVideo(vidObj, uint8(temporal_data(:,:,i)));
-end
-close(vidObj);
-
-% [temporal_data, framestamps, ~, mask_data]=load_pipelined_MEAO_data(fullfile(pName,fName));
+% [temporal_data, framestamps, ~, mask_data]=load_reg_MEAO_data(fullfile(pName,fName));
+[temporal_data, framestamps, ~, mask_data]=load_pipelined_MEAO_data(fullfile(pName,fName));
 
 % Extract temporal profiles at each pixel (no coordinate list supplied)
 [temporal_profiles, ref_coords]=extract_temporal_profiles(temporal_data,'SegmentationRadius',1, 'ProgBarHandle', wbh );
@@ -34,7 +25,7 @@ close(vidObj);
 
 % Standardize the temporal profiles to their *pre stimulus* behavior
 % (frames: 1-58), 29.4Hz
-[stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps', [1 50], 10,'Method', 'linear_vast', 'ProgBarHandle', wbh);
+[stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps', [1 58], 29.4,'Method', 'linear_vast', 'ProgBarHandle', wbh);
 
 % Take a block of profiles, and output them to a video.
 profiles_to_video(stdz_temporal_profiles, size(temporal_data), fullfile(pName,[fName(1:end-4) '_pixelwise.avi']));
