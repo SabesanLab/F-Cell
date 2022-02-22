@@ -207,25 +207,6 @@ def run_meao_pipeline(pName, tkroot):
                 #toc = time.perf_counter()
                 #print(f"Processed in {toc - tic:0.4f} seconds")
 
-            # Given that optmization is already multithreaded, we don't want to double down on it... probably.
-            # multiproc_res = pool.starmap_async(initialize_and_load_meao, zip(allFiles[loc], repeat(a_mode), repeat(ref_mode)) )
-            #
-            # loc_results = multiproc_res.get()
-            # del multiproc_res
-            #
-            # # Instantiate the memory we'll need to store all this. (Datasets / zprojected data)
-            # dataset = np.empty((len(loc_results)), dtype=type(loc_results[0][0]))
-            # a_im_proj = np.empty((loc_results[0][1].shape[0], loc_results[0][1].shape[1], len(loc_results)),
-            #                    dtype=loc_results[0][1].dtype)
-            # weight_proj = np.empty((loc_results[0][2].shape[0], loc_results[0][2].shape[1], len(loc_results)),
-            #                    dtype=loc_results[0][2].dtype)
-            # ref_im_proj = np.empty((loc_results[0][3].shape[0], loc_results[0][3].shape[1], len(loc_results)),
-            #                    dtype=loc_results[0][3].dtype)
-            # for r in range(len(loc_results)):
-            #     dataset[r] = loc_results[r][0]
-            #     a_im_proj[..., r] = loc_results[r][1]
-            #     weight_proj[..., r] = loc_results[r][2]
-            #     ref_im_proj[..., r] = loc_results[r][3]
 
             num_vid_proj = ref_im_proj.shape[-1]
             print("Selecting ideal central frame...")
@@ -369,7 +350,7 @@ if __name__ == "__main__":
     # dataset.load_unpipelined_data()
     #vid = load_video("\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\(-1,0)\\stimulus\\00-64774_20210824_OS_(-1,0)_1x1_727_Confocal_ALL_ACQ_STK.avi")
     # vid = load_video(
-    #     "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\pre_selected_stk.avi")
+    #      "E:\\Dropbox (Personal)\\Grant_Proposals\\2022_Feb_R01\\LSO_Prelim_data\\Test\\Subject1_Session20220112_OD_(1.5,0)_1.2x0.8_43028_Confocal1_extract_reg_cropped.avi")
     #
     # mask = np.ones(vid.data.shape, dtype="uint8")
     # mask[vid.data == 0] = 0
