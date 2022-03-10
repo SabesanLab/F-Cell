@@ -1,3 +1,6 @@
+import glob
+import warnings
+
 import cv2
 import numpy as np
 import os.path
@@ -11,7 +14,8 @@ from ocvl.function.utility.resources import ResourceLoader, load_video, save_vid
 
 
 class MEAODataset():
-    def __init__(self, video_path="", analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.RAW):
+    def __init__(self, video_path="", image_path=None, coord_path=None,
+                 analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.RAW):
 
         self.analysis_modality = analysis_modality
         self.reference_modality = ref_modality
@@ -25,9 +29,60 @@ class MEAODataset():
         self.filename = os.path.basename(os.path.realpath(self.video_path))
         common_prefix = self.filename.split("_")
         common_prefix = "_".join(common_prefix[0:6])
-        self.image_path = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
-        self.coord_path = path.join(p_name,
-                                    common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg_coords.csv")
+
+        if not image_path:
+            imname = None
+            if stage is PipeStages.PROCESSED:
+                for filename in glob.glob( path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_avg.tif") ):
+                    print(filename)
+                    imname = filename
+            elif stage is PipeStages.PIPELINED:
+                # First look for an image associated with this dataset
+                for filename in glob.glob( path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_cropped_piped_avg.tif") ):
+                    imname = filename
+
+                # If we don't have an image specific to this dataset, search for the all acq avg
+                if not imname:
+                    for filename in glob.glob(path.join(p_name,"*"+self.analysis_modality + "_ALL_ACQ_AVG.tif")):
+                        print(filename)
+                        imname = filename
+            else:
+                imname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
+
+        if not imname:
+            warnings.warn("Unable to detect viable average image file. Dataset functionality may be limited.")
+            self.image_path = None
+        else:
+            self.image_path = path.join(p_name, imname)
+
+        if not coord_path:
+            coordname = None
+            if stage is PipeStages.PROCESSED:
+                for filename in glob.glob(
+                        path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_avg_coords.csv")):
+                    print(filename)
+                    coordname = filename
+            elif stage is PipeStages.PIPELINED:
+                # First look for an image associated with this dataset
+                for filename in glob.glob(path.join(p_name,
+                                                    common_prefix + "_" + self.analysis_modality + "?_extract_reg_cropped_piped_avg_coords.csv")):
+                    coordname = filename
+
+                # If we don't have an image specific to this dataset, search for the all acq avg
+                if not coordname:
+                    for filename in glob.glob(path.join(p_name, "*" + self.analysis_modality + "_ALL_ACQ_AVG_coords.csv")):
+                        print(filename)
+                        coordname = filename
+            else:
+                coordname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg_coords.csv")
+
+            if not coordname:
+                warnings.warn("Unable to detect viable coordinate file. Dataset functionality may be limited.")
+                self.coord_path = None
+            else:
+                self.coord_path = path.join(p_name, coordname)
+        else:
+            self.coord_path = coord_path
 
         # Information about the dataset
         self.stage = stage
@@ -46,6 +101,46 @@ class MEAODataset():
         self.reference_im = np.empty([1])
         self.metadata_data = np.empty([1])
 
+    def load_pipelined_data(self):
+        if self.stage is PipeStages.PIPELINED:
+            res = load_video(self.video_path)
+
+            self.framerate = res.metadict["framerate"]
+            self.num_frames = res.data.shape[-1]
+            self.width = res.data.shape[1]
+            self.height = res.data.shape[0]
+            self.video_data = res.data
+
+            if os.path.exists(self.mask_path):
+                res = load_video(self.mask_path)
+                self.mask_data = res.data / 255
+                self.mask_data[self.mask_data < 0] = 0
+                self.video_data = (self.video_data * self.mask_data).astype("uint8")
+            else:
+                warnings.warn("No pipelined mask data detected.")
+
+            # Load the reference video data.
+            if os.path.exists(self.ref_video_path):
+                res = load_video(self.ref_video_path)
+                self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+            else:
+                warnings.warn("No pipelined reference video data detected.")
+
+            # Load our text data.
+            metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
+            metadata.columns = metadata.columns.str.strip()
+
+            self.framestamps = metadata["FrameStamps"].to_numpy()
+            #self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__) # Should probably carry this forward
+
+            if self.image_path:
+                self.reference_im = cv2.imread(self.image_path)
+
+            if self.coord_path:
+                self.coord_data = pd.read_csv(self.coord_path, delimiter=',', encoding="utf-8-sig").to_numpy()
+                print(self.coord_data)
+
+
     def load_unpipelined_data(self, force=False):
 
         # Establish our unpipelined filenames
@@ -60,14 +155,20 @@ class MEAODataset():
             self.height = res.data.shape[0]
             self.video_data = res.data
 
-            res = load_video(self.mask_path)
-            self.mask_data = res.data / 255
-            self.mask_data[self.mask_data < 0] = 0
-            self.video_data = (self.video_data * self.mask_data).astype("uint8")
+            if os.path.exists(self.mask_path):
+                res = load_video(self.mask_path)
+                self.mask_data = res.data / 255
+                self.mask_data[self.mask_data < 0] = 0
+                self.video_data = (self.video_data * self.mask_data).astype("uint8")
+            else:
+                warnings.warn("No processed mask data detected.")
 
             # Load the reference video data.
-            res = load_video(self.ref_video_path)
-            self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+            if os.path.exists(self.ref_video_path):
+                res = load_video(self.ref_video_path)
+                self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+            else:
+                warnings.warn("No processed reference video data detected.")
 
 
             # Load our text data.

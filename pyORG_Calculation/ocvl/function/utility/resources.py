@@ -34,6 +34,8 @@ def load_video(video_path):
 
         video_data = np.empty([height, width, num_frames], dtype=frm.dtype)
         video_data[..., 0] = frm[..., 0]
+    else:
+        warnings.warn("Failed to open video: "+video_path)
 
     i = 1
     while vid.isOpened():

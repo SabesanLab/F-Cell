@@ -400,10 +400,14 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
     return corrected_stk, xform, inliers
 
 
-def weighted_z_projection(image_data, weights, projection_axis=-1, type="average"):
+def weighted_z_projection(image_data, weights=None, projection_axis=-1, type="average"):
     num_frames = image_data.shape[-1]
 
     image_projection = np.nansum(image_data.astype("float64"), axis=projection_axis)
+
+    if not weights:
+        weights = image_data > 0
+
     weight_projection = np.nansum(weights.astype("float64"), axis=projection_axis)
     weight_projection[weight_projection == 0] = np.nan
 
