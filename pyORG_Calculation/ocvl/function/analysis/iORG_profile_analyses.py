@@ -16,7 +16,7 @@ def population_iORG(temporal_profiles, framestamps, summary_method="var", window
     :param window_size: The window size used to summarize the population at each sample. Can be an odd integer from
                         1 (no window) to M/2. Default: 1
 
-    :return: the population iORG signal
+    :return: a 1xM population iORG signal.
     """
 
     if window_size % 2 < 1:

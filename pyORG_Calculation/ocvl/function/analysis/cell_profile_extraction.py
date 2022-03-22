@@ -54,36 +54,64 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     return profile_data
 
 
-def norm_profiles(profile_data, norm_type="mean", rescaled=True):
+def norm_profiles(temporal_profiles, norm_method="mean", rescaled=True):
+    """
+    This function normalizes the columns of the data (a single sample of all cells) using a method supplied by the user.
 
-    if norm_type == "mean":
-        all_norm = np.nanmean(profile_data)
-        framewise_norm = np.nanmean(profile_data, axis=0)
+    :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
+    :param norm_method: The normalization method chosen by the user. Default is "mean". Options: "mean", "median"
+    :param rescaled: Whether or not to keep the data at the original scale (only modulate the numbers in place). Useful
+                     if you want the data to stay in the same units. Default: True. Options: True/False
+
+    :return: a NxM numpy matrix of normalized temporal profiles.
+    """
+
+    if norm_method == "mean":
+        all_norm = np.nanmean(temporal_profiles[:])
+        framewise_norm = np.nanmean(temporal_profiles, axis=0)
+    elif norm_method == "median":
+        all_norm = np.nanmedian(temporal_profiles[:])
+        framewise_norm = np.nanmedian(temporal_profiles, axis=0)
     else:
-        all_norm = np.nanmean(profile_data)
-        framewise_norm = np.nanmean(profile_data, axis=0)
-        warnings.warn("The \""+norm_type+"\" normalization type is not recognized. Defaulting to mean.")
+        all_norm = np.nanmean(temporal_profiles[:])
+        framewise_norm = np.nanmean(temporal_profiles, axis=0)
+        warnings.warn("The \"" + norm_method + "\" normalization type is not recognized. Defaulting to mean.")
 
     if rescaled: # Provide the option to simply scale the data, instead of keeping it in relative terms
         ratio = framewise_norm / all_norm
-        return np.divide(profile_data, ratio[None, :])
+        return np.divide(temporal_profiles, ratio[None, :])
     else:
-        return np.divide(profile_data, framewise_norm[None, :])
+        return np.divide(temporal_profiles, framewise_norm[None, :])
 
 
-def standardize_profiles(framestamps, profile_data, stimulus_stamp, method="linear_std"):
+def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method="linear_std"):
+    """
+    This function standardizes each temporal profile (here, the rows of the supplied data) according to the provided
+    arguments.
+
+    :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
+    :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_profiles.
+    :param stimulus_stamp: The framestamp at which to limit the standardization. For functional studies, this is often
+                            the stimulus framestamp.
+    :param method: The method used to standardize. Default is "linear_std", which subtracts a linear fit to
+                    each signal before stimulus_stamp, followed by a standardization based on that pre-stamp linear-fit
+                    subtracted data. This was used in Cooper et al 2017/2020.
+                    Current options include: "linear_std", "linear_vast", "relative_change", and "mean_sub"
+
+    :return: a NxM numpy matrix of standardized temporal profiles.
+    """
 
     prestimulus_idx = np.where(framestamps <= stimulus_stamp, True, False)
     if len(prestimulus_idx) == 0:
         warnings.warn("Time before the stimulus framestamp doesn't exist in the provided list! No standardization performed.")
-        return profile_data
+        return temporal_profiles
 
     if method == "linear_std":
         # Standardize using Autoscaling preceded by a linear fit to remove
         # any residual low-frequency changes
-        for i in range(profile_data.shape[0]):
+        for i in range(temporal_profiles.shape[0]):
             prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
-            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
             thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
@@ -93,15 +121,15 @@ def standardize_profiles(framestamps, profile_data, stimulus_stamp, method="line
             prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
             prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
 
-            profile_data[i, :] = ((profile_data[i, :] - prestim_nofit_mean) / prestim_std)
+            temporal_profiles[i, :] = ((temporal_profiles[i, :] - prestim_nofit_mean) / prestim_std)
 
     elif method == "linear_vast":
         # Standardize using variable stability, or VAST scaling, preceeded by a linear fit:
         # https://www.sciencedirect.com/science/article/pii/S0003267003000941
         # this scaling is defined as autoscaling divided by the CoV.
-        for i in range(profile_data.shape[0]):
+        for i in range(temporal_profiles.shape[0]):
             prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
-            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
             thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
@@ -111,32 +139,32 @@ def standardize_profiles(framestamps, profile_data, stimulus_stamp, method="line
             prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
             prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
 
-            profile_data[i, :] = ((profile_data[i, :] - prestim_nofit_mean) / prestim_std) / \
-                                            (prestim_std / prestim_nofit_mean)
+            temporal_profiles[i, :] = ((temporal_profiles[i, :] - prestim_nofit_mean) / prestim_std) / \
+                                      (prestim_std / prestim_nofit_mean)
 
     elif method == "relative_change":
         # Make our output a representation of the relative change of the signal
-        for i in range(profile_data.shape[0]):
+        for i in range(temporal_profiles.shape[0]):
             prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
-            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
             prestim_mean = np.nanmean(prestim_profile[goodind])
-            profile_data[i, :] -= prestim_mean
-            profile_data[i, :] /= prestim_mean
-            profile_data[i, :] *= 100
+            temporal_profiles[i, :] -= prestim_mean
+            temporal_profiles[i, :] /= prestim_mean
+            temporal_profiles[i, :] *= 100
 
     elif method == "mean_sub":
         # Make our output just a prestim mean-subtracted signal.
-        for i in range(profile_data.shape[0]):
+        for i in range(temporal_profiles.shape[0]):
             prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
-            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
             prestim_mean = np.nanmean(prestim_profile[goodind])
-            profile_data[i, :] -= prestim_mean
+            temporal_profiles[i, :] -= prestim_mean
 
-    return profile_data
+    return temporal_profiles
 
 
 if __name__ == "__main__":
@@ -147,8 +175,8 @@ if __name__ == "__main__":
     dataset.load_pipelined_data()
 
     temporal_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
-    norm_temporal_profiles = norm_profiles(temporal_profiles, norm_type="mean")
-    stdize_profiles = standardize_profiles(dataset.framestamps, norm_temporal_profiles, 55, method="mean_sub")
+    norm_temporal_profiles = norm_profiles(temporal_profiles, norm_method="mean")
+    stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
     pop_iORG = population_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=3)
 
     plt.plot(dataset.framestamps, pop_iORG)
