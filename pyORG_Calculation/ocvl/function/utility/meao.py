@@ -130,7 +130,7 @@ class MEAODataset():
             metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
             metadata.columns = metadata.columns.str.strip()
 
-            self.framestamps = metadata["FrameStamps"].to_numpy()
+            self.framestamps = metadata["FrameStamps"].to_numpy()-1 # Subtract one, because they're stored where 1 is the first index.
             #self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__) # Should probably carry this forward
 
             if self.image_path:

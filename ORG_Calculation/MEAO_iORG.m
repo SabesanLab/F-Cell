@@ -15,7 +15,7 @@ rootDir = uigetdir(pwd, 'Select the folder containing all videos of interest.');
 fNames = read_folder_contents(rootDir, 'avi', '760nm');
 
 % Remove this from consideration.
-fNames = fNames(cellfun(@(name) ~contains(name, 'ALL_ACQ_AVG'), fNames)); 
+fNames = fNames(cellfun(@(name) ~contains(name, 'ALL_ACQ_STK'), fNames)); 
 
 % Load our reference image.
 all_acq_avg_im = read_folder_contents(rootDir, 'tif', 'ALL_ACQ_AVG');
@@ -71,7 +71,8 @@ for f=startind:endind
     [finalized_temporal_profiles{f}]=standardize_temporal_profiles(norm_temporal_profiles, framestamps{f}', [1 stimTrain(1)], framerate(f),...
                                                                   'Method', 'relative_change', 'ProgBarHandle', wbh);
 
-           
+
+    writematrix([framestamps{f}'; finalized_temporal_profiles{f}], [fNames{f}(1:end-4) '_profiles.csv'], 'Delimiter',',');
 end
 
 

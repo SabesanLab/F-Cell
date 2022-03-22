@@ -1,8 +1,10 @@
 import warnings
 
 import numpy as np
+from matplotlib import pyplot, pyplot as plt
 from numpy.polynomial import Polynomial
 
+from ocvl.function.analysis.iORG_profile_analyses import population_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 
@@ -69,14 +71,31 @@ def norm_profiles(profile_data, norm_type="mean", rescaled=True):
         return np.divide(profile_data, framewise_norm[None, :])
 
 
-def standardize_profiles(framestamps, profile_data, stimulus_stamp, method="linear_vast"):
+def standardize_profiles(framestamps, profile_data, stimulus_stamp, method="linear_std"):
 
     prestimulus_idx = np.where(framestamps <= stimulus_stamp, True, False)
     if len(prestimulus_idx) == 0:
         warnings.warn("Time before the stimulus framestamp doesn't exist in the provided list! No standardization performed.")
         return profile_data
 
-    if method == "linear_vast":
+    if method == "linear_std":
+        # Standardize using Autoscaling preceded by a linear fit to remove
+        # any residual low-frequency changes
+        for i in range(profile_data.shape[0]):
+            prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
+            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
+
+            thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
+            fitvals = thefit(prestim_frmstmp[goodind]) # The values we'll subtract from the profile
+
+            prestim_nofit_mean = np.nanmean(prestim_profile[goodind])
+            prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
+            prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
+
+            profile_data[i, :] = ((profile_data[i, :] - prestim_nofit_mean) / prestim_std)
+
+    elif method == "linear_vast":
         # Standardize using variable stability, or VAST scaling, preceeded by a linear fit:
         # https://www.sciencedirect.com/science/article/pii/S0003267003000941
         # this scaling is defined as autoscaling divided by the CoV.
@@ -95,17 +114,42 @@ def standardize_profiles(framestamps, profile_data, stimulus_stamp, method="line
             profile_data[i, :] = ((profile_data[i, :] - prestim_nofit_mean) / prestim_std) / \
                                             (prestim_std / prestim_nofit_mean)
 
-
     elif method == "relative_change":
-        pass
+        # Make our output a representation of the relative change of the signal
+        for i in range(profile_data.shape[0]):
+            prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
+            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
+
+            prestim_mean = np.nanmean(prestim_profile[goodind])
+            profile_data[i, :] -= prestim_mean
+            profile_data[i, :] /= prestim_mean
+            profile_data[i, :] *= 100
+
+    elif method == "mean_sub":
+        # Make our output just a prestim mean-subtracted signal.
+        for i in range(profile_data.shape[0]):
+            prestim_frmstmp = np.squeeze(framestamps[prestimulus_idx])
+            prestim_profile = np.squeeze(profile_data[i, prestimulus_idx])
+            goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
+
+            prestim_mean = np.nanmean(prestim_profile[goodind])
+            profile_data[i, :] -= prestim_mean
+
+    return profile_data
+
 
 if __name__ == "__main__":
     dataset = MEAODataset(
-        "Z:\\00-33388\\MEAOSLO1\\20210924\\Functional Processed\\Functional Pipeline\\(-1,-0.2)\\00-33388_20210924_OS_(-1,-0.2)_1x1_789_760nm1_extract_reg_cropped_piped.avi",
+        "\\\\134.48.93.176\\Raw Study Data\\00-33388\\MEAOSLO1\\20210924\\Functional Processed\\Functional Pipeline\\(-1,-0.2)\\00-33388_20210924_OS_(-1,-0.2)_1x1_939_760nm1_extract_reg_cropped_piped.avi",
                            analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
 
     dataset.load_pipelined_data()
 
     temporal_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
-    norm_temporal_profiles = norm_profiles(temporal_profiles, norm_type="your mom")
-    standardize_profiles(dataset.framestamps, norm_temporal_profiles, 55)
+    norm_temporal_profiles = norm_profiles(temporal_profiles, norm_type="mean")
+    stdize_profiles = standardize_profiles(dataset.framestamps, norm_temporal_profiles, 55, method="mean_sub")
+    pop_iORG = population_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=3)
+
+    plt.plot(dataset.framestamps, pop_iORG)
+    plt.show()

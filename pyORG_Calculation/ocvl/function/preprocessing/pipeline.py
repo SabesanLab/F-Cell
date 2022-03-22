@@ -130,7 +130,7 @@ def run_meao_pipeline(pName, tkroot):
     # Parse out the locations and filenames, store them in a hash table.
     for (dirpath, dirnames, filenames) in walk(pName):
         for fName in filenames:
-            if a_mode in fName and splitext(fName)[1] == ".avi":
+            if a_mode in fName and splitext(fName)[1] == ".avi" or splitext(fName)[1] == ".tif":
                 splitfName = fName.split("_")
 
                 if splitfName[3][0] == "(" and splitfName[3][-1] == ")":
@@ -158,7 +158,7 @@ def run_meao_pipeline(pName, tkroot):
     # (The MEAODataset will take care of the rest)
     for loc in allFiles:
         allFiles[loc] = [file for file in allFiles[loc] if
-                         "mask.avi" not in file and "extract_reg_cropped.avi" in file and a_mode in file]
+                         "_mask" not in file and "extract_reg_cropped" in file and a_mode in file]
 
     pb = ttk.Progressbar(root, orient=HORIZONTAL, length=512)
     pb.grid(column=0, row=0, columnspan=2, padx=3, pady=5)
@@ -276,7 +276,7 @@ def run_meao_pipeline(pName, tkroot):
             analysis_zproj_fname = "_".join(common_prefix[0:6]) + "_" + dataset[dist_ref_idx].analysis_modality + "_" + \
                                    "ALL_ACQ_AVG.tif"
             analysis_vid_fname = "_".join(common_prefix[0:6]) + "_" + dataset[dist_ref_idx].analysis_modality + "_" + \
-                                   "ALL_ACQ_AVG.avi"
+                                   "ALL_ACQ_STK.avi"
             ref_zproj_fname = "_".join(common_prefix[0:6]) + "_" + dataset[dist_ref_idx].reference_modality + "_" + \
                               "ALL_ACQ_AVG.tif"
             ref_vid_fname = "_".join(common_prefix[0:6]) + "_" + dataset[dist_ref_idx].reference_modality + "_" + \
