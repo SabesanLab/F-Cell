@@ -10,6 +10,22 @@ from ocvl.function.utility.meao import MEAODataset
 
 
 def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", centroid=None):
+    """
+    This function extracts temporal profiles from a 3D matrix, where the first two dimensions are assumed to
+    contain data from a single time point (a single image)
+
+    :param image_stack: a YxXxZ numpy matrix, where there are Y rows, X columns, and Z samples.
+    :param coordinates: input as X/Y, these mark locations the locations that will be extracted from all S samples.
+    :param seg_mask: the mask shape that will be used to extract temporal profiles.
+    :param seg_radius: the radius of the mask shape that will be used.
+    :param summary: the method used to summarize the area inside the segmentation radius. Default: "mean",
+                    Options: "mean", "median"
+    :param centroid: precede extraction at each stage with a centroid using a supplied method. Default: None,
+                    Options: "voronoi", "simple"
+
+    :return: an NxM numpy matrix with N cells and M temporal samples of some signal.
+    """
+
 
     if coordinates is None:
         pass # Todo: create coordinates for every position in the image stack.
