@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot, pyplot as plt
 from numpy.polynomial import Polynomial
 
-from ocvl.function.analysis.iORG_profile_analyses import population_iORG
+from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     temporal_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
     norm_temporal_profiles = norm_profiles(temporal_profiles, norm_method="mean")
     stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
-    pop_iORG = population_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=3)
+    pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=3)
 
     plt.plot(dataset.framestamps, pop_iORG)
     plt.show()

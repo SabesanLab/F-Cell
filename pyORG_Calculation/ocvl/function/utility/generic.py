@@ -10,7 +10,8 @@ from ocvl.function.utility.resources import ResourceLoader, load_video, save_vid
 class PipeStages(Enum):
     RAW = 0,
     PROCESSED = 1,
-    PIPELINED = 2
+    PIPELINED = 2,
+    ANALYSIS_READY = 3
 
 class GenericDataset:
     def __init__(self, video_path="", metadata_path=None, coord_path=None, stage=PipeStages.RAW):

@@ -3,10 +3,9 @@ import numpy as np
 
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix
 
-
-def population_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1):
+def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1):
     """
-    Calculates the population iORG of a supplied dataset, using a variety of summary methods published in
+    Calculates the iORG on a supplied dataset, using a variety of power based summary methods published in
     Cooper et. al. 2020, and Cooper et. al. 2017.
 
     :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
@@ -84,3 +83,7 @@ def population_iORG(temporal_profiles, framestamps, summary_method="var", window
             raise Exception("Window size must be less than half of the number of samples")
 
     return iORG
+
+def wavelet_iORG(temporal_profiles, framestamps):
+
+    pass

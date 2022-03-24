@@ -1,4 +1,5 @@
 import glob
+import logging
 import warnings
 
 import cv2
@@ -92,14 +93,41 @@ class MEAODataset():
         self.height = -1
         self.framestamps = np.empty([1])
         self.reference_frame_idx = []
+        self.stimulus_range_frame_stamps = np.empty([1])
 
-        # The data itself.
-        self.video_data = np.empty([1])
-        self.ref_video_data = np.empty([1])
-        self.mask_data = np.empty([1])
+        # The data are roughly grouped by the following:
+        # Base data
         self.coord_data = np.empty([1])
         self.reference_im = np.empty([1])
         self.metadata_data = np.empty([1])
+        # Video data (processed or pipelined)
+        self.video_data = np.empty([1])
+        self.ref_video_data = np.empty([1])
+        self.mask_data = np.empty([1])
+        # Extracted data (temporal profiles
+        self.raw_profile_data = np.empty([1])
+        self.postproc_profile_data = np.empty([1])
+
+    def clear_video_data(self):
+        print("Deleting video data from "+self.video_path)
+        del self.video_data
+        del self.ref_video_data
+        del self.mask_data
+
+    def load_data(self):
+        if self.stage is PipeStages.RAW:
+            self.load_raw_data()
+        elif self.stage is PipeStages.PROCESSED:
+            self.load_processed_data()
+        elif self.stage is PipeStages.PIPELINED:
+            self.load_pipelined_data()
+        elif self.stage is PipeStages.ANALYSIS_READY:
+            self.load_analysis_ready_data()
+
+    def load_analysis_ready_data(self, raw_profiles, postprocessed_profiles=np.empty([1])):
+        if self.stage is PipeStages.ANALYSIS_READY:
+            self.raw_profile_data = raw_profiles
+            self.postproc_profile_data = postprocessed_profiles
 
     def load_pipelined_data(self):
         if self.stage is PipeStages.PIPELINED:
@@ -141,10 +169,11 @@ class MEAODataset():
                 print(self.coord_data)
 
 
+
     def load_unpipelined_data(self, force=False):
 
         # Establish our unpipelined filenames
-        if self.stage is not (PipeStages.RAW or PipeStages.PIPELINED) or force:
+        if self.stage is not PipeStages.RAW or force:
 
             # Load the video data.
             res = load_video(self.video_path)
