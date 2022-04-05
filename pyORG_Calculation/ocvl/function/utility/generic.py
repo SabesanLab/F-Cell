@@ -4,7 +4,7 @@ from enum import Enum
 import numpy as np
 
 
-from ocvl.function.utility.resources import ResourceLoader, load_video, save_video
+from ocvl.function.utility.resources import load_video, save_video
 
 
 class PipeStages(Enum):

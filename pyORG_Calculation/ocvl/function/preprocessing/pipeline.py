@@ -13,11 +13,9 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from enum import Enum
 from itertools import repeat
 from pathlib import Path
 
-import time
 import cv2
 import numpy as np
 import multiprocessing as mp
@@ -29,15 +27,12 @@ from tkinter import filedialog, simpledialog
 from tkinter import ttk
 from scipy.ndimage import binary_dilation
 import pandas as pd
-import scipy
-from matplotlib import pyplot
-from matplotlib.pyplot import imshow
 
-from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, relativize_image_stack, \
-    simple_image_stack_align, general_normxcorr2, optimizer_stack_align
+from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, simple_image_stack_align, \
+    optimizer_stack_align
 from ocvl.function.utility.generic import GenericDataset, PipeStages
 from ocvl.function.utility.meao import MEAODataset
-from ocvl.function.utility.resources import save_video, load_video
+from ocvl.function.utility.resources import save_video
 
 
 def initialize_and_load_meao(file, a_mode, ref_mode):

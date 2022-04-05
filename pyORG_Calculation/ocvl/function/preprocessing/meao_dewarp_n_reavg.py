@@ -1,4 +1,5 @@
 import os
+import pathlib
 from os import walk
 from os.path import splitext
 from tkinter import Tk, filedialog, ttk, HORIZONTAL
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     # Parse out the locations and filenames, store them in a hash table.
     for (dirpath, dirnames, filenames) in walk(pName):
         for fName in filenames:
-            if splitext(fName)[1] == ".avi":
+            if "Confocal" in fName and splitext(fName)[1] == ".avi":
                 splitfName = fName.split("_")
                 acqID = splitfName[5]
 
@@ -74,6 +75,13 @@ if __name__ == "__main__":
                 r += 1
                 continue
 
+            vid_as_path = pathlib.Path(video_path)
+            os.makedirs(os.path.join(vid_as_path.parent, "Dewarped"), exist_ok=True)
+            avg_path = os.path.join(vid_as_path.parent, "Dewarped", vid_as_path.name[0:-11] + "dewarpavg.tif")
+
+            if os.path.exists(avg_path):
+                continue
+
             pb["value"] = r
             pb_label["text"] = "Processing " + os.path.basename(os.path.realpath(video_path)) + "..."
             print("Processing " + os.path.basename(os.path.realpath(video_path)) + "...")
@@ -88,12 +96,21 @@ if __name__ == "__main__":
             width = res.data.shape[1]
             height = res.data.shape[0]
             video_data = res.data
+
+            # Also load other modalities.
+            split_path = video_path.replace("Confocal", "CalculatedSplit")
+            res = load_video(split_path)
+            split_video_data = res.data
+
             # Load our mask data.
             res = load_video(mask_path)
-
             mask_data = res.data / 255
             mask_data[mask_data < 0] = 0
+
+            # Mask our other video data.
             video_data = (video_data * mask_data).astype("uint8")
+            split_video_data = (split_video_data * mask_data).astype("uint8")
+            mask_data = mask_data.astype("uint8")
 
             metadata = pd.read_csv(metadata_path, delimiter=',', encoding="utf-8-sig")
             metadata.columns = metadata.columns.str.strip()
@@ -124,10 +141,30 @@ if __name__ == "__main__":
 
             # Determine the residual error in our dewarping, and obtain the maps
             video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(video_data, yshifts, xshifts)
+            (rows, cols) = video_data.shape[0:2]
+
+            crop_left = np.ceil(np.amax(map_mesh_x[:, 0])).astype("int")+1
+            crop_right = np.floor(np.amin(map_mesh_x[:, -1])).astype("int")-1
+            crop_top = np.ceil(np.amax(map_mesh_y[0, :])).astype("int")+1
+            crop_bottom = np.floor(np.amin(map_mesh_y[-1, :])).astype("int")-1
+
+            if crop_left < 0:
+                crop_left = 0
+            if crop_right > (cols-1):
+                crop_right = (cols-1)
+            if crop_top < 0:
+                crop_top = 0
+            if crop_bottom < (rows-1):
+                crop_bottom = (rows-1)
 
             for f in range(num_frames):
-                mask_data[..., f] = cv2.remap(mask_data[..., f].astype("float64"), map_mesh_x,
+                mask_data[..., f] = cv2.remap(mask_data[..., f], map_mesh_x,
                                               map_mesh_y, interpolation=cv2.INTER_NEAREST)
+                split_video_data[..., f] = cv2.remap(split_video_data[..., f], map_mesh_x,
+                                                     map_mesh_y, interpolation=cv2.INTER_LANCZOS4)
+                # Multiply our data by the new masks.
+                split_video_data[..., f] *= mask_data[..., f]
+                video_data[..., f] *= mask_data[..., f]
 
             # Clamp our values.
             mask_data[mask_data < 0] = 0
@@ -140,19 +177,35 @@ if __name__ == "__main__":
 
             # Determine and remove residual torsion.
             video_data, xforms, inliers = optimizer_stack_align(video_data, mask_data,
-                                                                         reference_idx=reference_frame_idx,
-                                                                         dropthresh=thresh)
+                                                                reference_idx=reference_frame_idx,
+                                                                dropthresh=thresh)
             (rows, cols) = video_data.shape[0:2]
             for f in range(num_frames):
                 if xforms[f] is not None:
                     mask_data[..., f] = cv2.warpAffine(mask_data[..., f], xforms[f],
-                                                            (cols, rows),
-                                                            flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
+                                                       (cols, rows),
+                                                       flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
+                    split_video_data[..., f] = cv2.warpAffine(split_video_data[..., f],  xforms[f],
+                                                              (cols, rows),
+                                                              flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
 
-            avg_path = video_path[0:-11] + "dewarpavg.tif"
+            #overlap_map = weighted_z_projection(mask_data, mask_data)
+
+            # Crop our mapped data to only non-zero areas so we have no black/transparent areas and everything
+            # is squared off.
+            video_data = video_data[crop_top: crop_bottom, crop_left: crop_right, :]
+            mask_data = mask_data[crop_top: crop_bottom, crop_left: crop_right, :]
+            split_video_data = split_video_data[crop_top: crop_bottom, crop_left: crop_right, :]
+
             avg_im, sum_map = weighted_z_projection(video_data, mask_data)
 
             cv2.imwrite(avg_path, avg_im.astype("uint8"))
+
+            splitvid_as_path = pathlib.Path(split_path)
+            avg_split_path = os.path.join(vid_as_path.parent, "Dewarped", splitvid_as_path.name[0:-11] + "dewarpavg.tif")
+            avg_im, sum_map = weighted_z_projection(split_video_data, mask_data)
+
+            cv2.imwrite(avg_split_path, avg_im.astype("uint8"))
 
             r += 1
 

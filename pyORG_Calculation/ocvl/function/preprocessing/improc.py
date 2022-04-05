@@ -1,18 +1,10 @@
-import itertools
-
-
 import cv2
 import numpy as np
 import SimpleITK as sitk
 from matplotlib import pyplot
-from matplotlib.pyplot import imshow
 from scipy.ndimage import binary_erosion
-from scipy.signal import correlate2d, fftconvolve
-from skimage.registration import phase_cross_correlation, optical_flow_tvl1
+from scipy.signal import fftconvolve
 from numpy.polynomial import Polynomial
-from skimage.transform import warp, AffineTransform
-
-from ocvl.function.utility.resources import save_video
 
 
 def flat_field_frame(dataframe, sigma):
@@ -233,7 +225,6 @@ def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial
     imreg_method.SetOptimizerScalesFromPhysicalShift() #This apparently allows parameters to change independently of one another.
                                                       # And is incredibly important.
     # #https://insightsoftwareconsortium.github.io/SimpleITK-Notebooks/Python_html/61_Registration_Introduction_Continued.html#Final-registration
-
     #imreg_method.SetInterpolator(sitk.sitkLanczosWindowedSinc) # Adding this just makes it dog slow.
 
     ref_im = sitk.GetImageFromArray(im_stack[..., reference_idx])
@@ -252,28 +243,23 @@ def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial
         elif transformtype == "affine":
             xForm = sitk.AffineTransform(2)
 
-        xForm.SetCenter(np.array(im_stack[..., reference_idx].shape, dtype="float") / 2)
+        xForm.SetCenter((np.array(im_stack[..., reference_idx].shape, dtype="float")-1) / 2)
         xForm.SetTranslation(initial_shifts[f])
-
 
         imreg_method.SetInitialTransform(xForm)
         imreg_method.SetInterpolator(sitk.sitkLinear)
 
         moving_im = sitk.GetImageFromArray(im_stack[..., f])
-        # moving_im = sitk.Cast(moving_im, sitk.sitkFloat64)
         moving_im = sitk.Normalize(moving_im)
         imreg_method.SetMetricMovingMask(sitk.GetImageFromArray(eroded_mask[..., f], sitk.sitkInt8))
 
-
         outXform = imreg_method.Execute(ref_im, moving_im)
-        # print("starting: " + str(initial_shifts[f]) + " ending: " + str(outXform))
-
-        # print("Metric value for frame: " + str(f) + " to " + str(reference_idx) + ": " + str(imreg_method.GetMetricValue()))
-        # print("Number of iterations for frame: " + str(f) + " to " + str(reference_idx) + ": " + str(imreg_method.GetOptimizerIteration()))
 
         if dropthresh is not None and imreg_method.GetMetricValue() > -dropthresh:
+            # print("Excluded: " + str(imreg_method.GetMetricValue()))
             inliers[f] = False
         else:
+            # print("INCLUDED: " + str(imreg_method.GetMetricValue()))
             inliers[f] = True
 
         if transformtype == "rigid":
@@ -403,11 +389,15 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
 def weighted_z_projection(image_data, weights=None, projection_axis=-1, type="average"):
     num_frames = image_data.shape[-1]
 
-    image_projection = np.nansum(image_data.astype("float64"), axis=projection_axis)
+    origtype = image_data.dtype
 
-    if not weights:
+    if weights is None:
         weights = image_data > 0
 
+    image_data = image_data.astype("float64")
+    weights = weights.astype("float64")
+
+    image_projection = np.nansum(image_data.astype("float64"), axis=projection_axis)
     weight_projection = np.nansum(weights.astype("float64"), axis=projection_axis)
     weight_projection[weight_projection == 0] = np.nan
 
@@ -415,8 +405,7 @@ def weighted_z_projection(image_data, weights=None, projection_axis=-1, type="av
 
     weight_projection[np.isnan(weight_projection)] = 0
 
-    # pyplot.imshow(image_projection.astype("uint8"))
+    # pyplot.imshow(image_projection.astype("uint8"), cmap='gray')
     # pyplot.show()
 
-
-    return image_projection, (weight_projection / np.amax(weight_projection))
+    return image_projection.astype(origtype), (weight_projection / np.amax(weight_projection))

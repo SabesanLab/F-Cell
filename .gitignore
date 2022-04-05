@@ -2,3 +2,4 @@
 *.asv
 ORG_Calculation/.idea/workspace.xml
 *.pyc
+venv

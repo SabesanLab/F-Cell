@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from matplotlib import pyplot, pyplot as plt
+from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
