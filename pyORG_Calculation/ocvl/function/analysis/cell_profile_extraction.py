@@ -1,6 +1,11 @@
 import warnings
 
+import multiprocessing as mp
+from itertools import repeat
+
 import numpy as np
+import scipy as sp
+from sklearn import linear_model
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
@@ -182,6 +187,90 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
 
     return temporal_profiles
 
+def l1_compressive_sensing(temporal_profiles, framestamps, c):
+
+    D = sp.fft.dct(np.eye(framestamps[-1] + 1), norm="ortho", orthogonalize=True)
+    fullrange = np.arange(framestamps[-1] + 1)
+
+    naners = np.isnan(temporal_profiles[c, :])
+    finers = np.isfinite(temporal_profiles[c, :])
+
+    nummissing = (framestamps[-1] + 1) - np.sum(finers)
+
+    # print("Missing " + str(nummissing[c]) + " datapoints.")
+
+    sigmean = np.mean(temporal_profiles[c, finers])
+    sigstd = np.std(temporal_profiles[c, finers])
+
+    A = D[framestamps[finers], :]
+    lasso = linear_model.Lasso(alpha=0.001, max_iter=2000)
+    lasso.fit(A, temporal_profiles[c, finers])
+
+    # plt.figure(0)
+    # plt.subplot(2, 1, 1)
+    reconstruction = sp.fft.idct(lasso.coef_.reshape((len(fullrange),)), axis=0,
+                                       norm="ortho", orthogonalize=True) + sigmean
+
+    return reconstruction
+
+def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
+    """
+    This function reconstructs the missing profile data using compressive sensing techniques.
+
+    :param temporal_profiles:
+    :param framestamps:
+    :param method:
+    :return:
+    """
+
+    fullrange = np.arange(framestamps[-1] + 1)
+
+    reconstruction = np.empty((temporal_profiles.shape[0], len(fullrange)))
+
+    if method == "L1":
+        # D = sp.fft.dct(np.eye(framestamps[-1] + 1), norm="ortho", orthogonalize=True)
+
+        nummissing = np.empty((temporal_profiles.shape[0], 1))
+
+        # Create a pool of threads for processing.
+        with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
+
+            reconst = pool.starmap_async(l1_compressive_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
+                                                                     range(temporal_profiles.shape[0])) )
+
+            reconstruction = np.array(reconst.get())
+
+            # for c in range(temporal_profiles.shape[0]):
+
+                # naners = np.isnan(temporal_profiles[c, :])
+                # finers = np.isfinite(temporal_profiles[c, :])
+                #
+                # nummissing[c] = (framestamps[-1] + 1) - np.sum(finers)
+                #
+                # # print("Missing " + str(nummissing[c]) + " datapoints.")
+                #
+                # sigmean = np.mean(temporal_profiles[c, finers])
+                # sigstd = np.std(temporal_profiles[c, finers])
+                #
+                # A = D[framestamps[finers], :]
+                # lasso = linear_model.Lasso(alpha=0.001, max_iter=2000)
+                # lasso.fit(A, temporal_profiles[c, finers])
+                #
+                # # plt.figure(0)
+                # # plt.subplot(2, 1, 1)
+                # reconstruction[c, :] = sp.fft.idct(lasso.coef_.reshape((len(fullrange), )), axis=0,
+                #                                    norm="ortho", orthogonalize=True) + sigmean
+            # plt.plot(fullrange, reconstruction[c, :] )
+            #
+            #
+            # plt.subplot(2, 1, 2)
+            # plt.plot(dataset.framestamps[finers], temporal_profiles[c, finers])
+            # plt.show()
+
+
+    # print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
+
+    return reconstruction, fullrange, nummissing
 
 if __name__ == "__main__":
     dataset = MEAODataset(
@@ -190,10 +279,12 @@ if __name__ == "__main__":
 
     dataset.load_pipelined_data()
 
-    temporal_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
-    norm_temporal_profiles = norm_profiles(temporal_profiles, norm_method="mean")
+    temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
+    norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
     stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
-    pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=3)
+    stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
 
+
+    pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=1)
     plt.plot(dataset.framestamps, pop_iORG)
     plt.show()
