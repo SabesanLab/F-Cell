@@ -187,6 +187,7 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
 
     return temporal_profiles
 
+
 def l1_compressive_sensing(temporal_profiles, framestamps, c):
 
     D = sp.fft.dct(np.eye(framestamps[-1] + 1), norm="ortho", orthogonalize=True)
@@ -211,7 +212,8 @@ def l1_compressive_sensing(temporal_profiles, framestamps, c):
     reconstruction = sp.fft.idct(lasso.coef_.reshape((len(fullrange),)), axis=0,
                                        norm="ortho", orthogonalize=True) + sigmean
 
-    return reconstruction
+    return reconstruction, nummissing
+
 
 def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
     """
@@ -222,53 +224,25 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
     :param method:
     :return:
     """
-
     fullrange = np.arange(framestamps[-1] + 1)
 
     reconstruction = np.empty((temporal_profiles.shape[0], len(fullrange)))
+    nummissing = np.empty((temporal_profiles.shape[0], 1))
+
 
     if method == "L1":
-        # D = sp.fft.dct(np.eye(framestamps[-1] + 1), norm="ortho", orthogonalize=True)
-
-        nummissing = np.empty((temporal_profiles.shape[0], 1))
-
         # Create a pool of threads for processing.
         with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
             reconst = pool.starmap_async(l1_compressive_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
                                                                      range(temporal_profiles.shape[0])) )
-
-            reconstruction = np.array(reconst.get())
-
-            # for c in range(temporal_profiles.shape[0]):
-
-                # naners = np.isnan(temporal_profiles[c, :])
-                # finers = np.isfinite(temporal_profiles[c, :])
-                #
-                # nummissing[c] = (framestamps[-1] + 1) - np.sum(finers)
-                #
-                # # print("Missing " + str(nummissing[c]) + " datapoints.")
-                #
-                # sigmean = np.mean(temporal_profiles[c, finers])
-                # sigstd = np.std(temporal_profiles[c, finers])
-                #
-                # A = D[framestamps[finers], :]
-                # lasso = linear_model.Lasso(alpha=0.001, max_iter=2000)
-                # lasso.fit(A, temporal_profiles[c, finers])
-                #
-                # # plt.figure(0)
-                # # plt.subplot(2, 1, 1)
-                # reconstruction[c, :] = sp.fft.idct(lasso.coef_.reshape((len(fullrange), )), axis=0,
-                #                                    norm="ortho", orthogonalize=True) + sigmean
-            # plt.plot(fullrange, reconstruction[c, :] )
-            #
-            #
-            # plt.subplot(2, 1, 2)
-            # plt.plot(dataset.framestamps[finers], temporal_profiles[c, finers])
-            # plt.show()
+            res = reconst.get()
+            for c, result in enumerate(res):
+                reconstruction[c, :] = np.array(result[0])
+                nummissing[c] = np.array(result[1])
 
 
-    # print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
+    print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
 
     return reconstruction, fullrange, nummissing
 
