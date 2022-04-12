@@ -1,17 +1,13 @@
 import warnings
 
-import multiprocessing as mp
-from itertools import repeat
-
 import numpy as np
-import scipy as sp
-from sklearn import linear_model
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 
 def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", centroid=None):
@@ -187,78 +183,20 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
 
     return temporal_profiles
 
-
-def l1_compressive_sensing(temporal_profiles, framestamps, c):
-
-    D = sp.fft.dct(np.eye(framestamps[-1] + 1), norm="ortho", orthogonalize=True)
-    fullrange = np.arange(framestamps[-1] + 1)
-
-    naners = np.isnan(temporal_profiles[c, :])
-    finers = np.isfinite(temporal_profiles[c, :])
-
-    nummissing = (framestamps[-1] + 1) - np.sum(finers)
-
-    # print("Missing " + str(nummissing[c]) + " datapoints.")
-
-    sigmean = np.mean(temporal_profiles[c, finers])
-    sigstd = np.std(temporal_profiles[c, finers])
-
-    A = D[framestamps[finers], :]
-    lasso = linear_model.Lasso(alpha=0.001, max_iter=2000)
-    lasso.fit(A, temporal_profiles[c, finers])
-
-    # plt.figure(0)
-    # plt.subplot(2, 1, 1)
-    reconstruction = sp.fft.idct(lasso.coef_.reshape((len(fullrange),)), axis=0,
-                                       norm="ortho", orthogonalize=True) + sigmean
-
-    return reconstruction, nummissing
-
-
-def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
-    """
-    This function reconstructs the missing profile data using compressive sensing techniques.
-
-    :param temporal_profiles:
-    :param framestamps:
-    :param method:
-    :return:
-    """
-    fullrange = np.arange(framestamps[-1] + 1)
-
-    reconstruction = np.empty((temporal_profiles.shape[0], len(fullrange)))
-    nummissing = np.empty((temporal_profiles.shape[0], 1))
-
-
-    if method == "L1":
-        # Create a pool of threads for processing.
-        with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
-
-            reconst = pool.starmap_async(l1_compressive_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
-                                                                     range(temporal_profiles.shape[0])) )
-            res = reconst.get()
-            for c, result in enumerate(res):
-                reconstruction[c, :] = np.array(result[0])
-                nummissing[c] = np.array(result[1])
-
-
-    print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
-
-    return reconstruction, fullrange, nummissing
-
-if __name__ == "__main__":
-    dataset = MEAODataset(
-        "\\\\134.48.93.176\\Raw Study Data\\00-33388\\MEAOSLO1\\20210924\\Functional Processed\\Functional Pipeline\\(-1,-0.2)\\00-33388_20210924_OS_(-1,-0.2)_1x1_939_760nm1_extract_reg_cropped_piped.avi",
-                           analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
-
-    dataset.load_pipelined_data()
-
-    temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
-    norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
-    stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
-    stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
-
-
-    pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=1)
-    plt.plot(dataset.framestamps, pop_iORG)
-    plt.show()
+#
+# if __name__ == "__main__":
+#     dataset = MEAODataset(
+#         "\\\\134.48.93.176\\Raw Study Data\\00-33388\\MEAOSLO1\\20210924\\Functional Processed\\Functional Pipeline\\(-1,-0.2)\\00-33388_20210924_OS_(-1,-0.2)_1x1_939_760nm1_extract_reg_cropped_piped.avi",
+#                            analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
+#
+#     dataset.load_pipelined_data()
+#
+#     temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
+#     norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
+#     stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
+#     stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
+#
+#
+#     pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=0)
+#     plt.plot(dataset.framestamps, pop_iORG)
+#     plt.show()

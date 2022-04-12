@@ -25,6 +25,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     if window_radius != 0:
         # If the window radius isn't 0, then densify the matrix, and pad our profiles
+        # Densify our matrix a bit.
         temporal_profiles = densify_temporal_matrix(temporal_profiles, framestamps)
         temporal_profiles = np.pad(temporal_profiles, ((0, 0), (window_radius, window_radius)), "symmetric")
 
