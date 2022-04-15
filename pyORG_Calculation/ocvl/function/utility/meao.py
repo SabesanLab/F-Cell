@@ -33,7 +33,7 @@ class MEAODataset():
             imname = None
             if stage is PipeStages.PROCESSED:
                 for filename in glob.glob( path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_avg.tif") ):
-                    print(filename)
+                    # print(filename)
                     imname = filename
             elif stage is PipeStages.PIPELINED:
                 # First look for an image associated with this dataset
@@ -43,7 +43,7 @@ class MEAODataset():
                 # If we don't have an image specific to this dataset, search for the all acq avg
                 if not imname:
                     for filename in glob.glob(path.join(p_name,"*"+self.analysis_modality + "_ALL_ACQ_AVG.tif")):
-                        print(filename)
+                        # print(filename)
                         imname = filename
             else:
                 imname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
@@ -59,7 +59,7 @@ class MEAODataset():
             if stage is PipeStages.PROCESSED:
                 for filename in glob.glob(
                         path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_avg_coords.csv")):
-                    print(filename)
+                    # print(filename)
                     coordname = filename
             elif stage is PipeStages.PIPELINED:
                 # First look for an image associated with this dataset
@@ -70,7 +70,7 @@ class MEAODataset():
                 # If we don't have an image specific to this dataset, search for the all acq avg
                 if not coordname:
                     for filename in glob.glob(path.join(p_name, "*" + self.analysis_modality + "_ALL_ACQ_AVG_coords.csv")):
-                        print(filename)
+                        # print(filename)
                         coordname = filename
             else:
                 coordname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg_coords.csv")
@@ -143,14 +143,16 @@ class MEAODataset():
                 self.mask_data[self.mask_data < 0] = 0
                 self.video_data = (self.video_data * self.mask_data).astype("uint8")
             else:
-                warnings.warn("No pipelined mask data detected.")
+                pass
+                # warnings.warn("No pipelined mask data detected.")
 
             # Load the reference video data.
             if os.path.exists(self.ref_video_path):
                 res = load_video(self.ref_video_path)
                 self.ref_video_data = (res.data * self.mask_data).astype("uint8")
             else:
-                warnings.warn("No pipelined reference video data detected.")
+                pass
+                # warnings.warn("No pipelined reference video data detected.")
 
             # Load our text data.
             metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
@@ -164,7 +166,7 @@ class MEAODataset():
 
             if self.coord_path:
                 self.coord_data = pd.read_csv(self.coord_path, delimiter=',', encoding="utf-8-sig").to_numpy()
-                print(self.coord_data)
+                # print(self.coord_data)
 
 
 

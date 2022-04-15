@@ -22,7 +22,7 @@ def load_video(video_path):
 
     framerate = -1
 
-    warnings.warn("Videos are currently only loaded as grayscale.")
+#    warnings.warn("Videos are currently only loaded as grayscale.")
     if vid.isOpened():
         framerate = vid.get(cv2.CAP_PROP_FPS)
         num_frames = int(vid.get(cv2.CAP_PROP_FRAME_COUNT))

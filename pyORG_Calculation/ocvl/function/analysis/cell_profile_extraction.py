@@ -63,10 +63,14 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
             coldims = coordcolumn.shape
             coordcolumn = np.reshape(coordcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
+            # No partial columns allowed. If there are nans in the column, wipe it out entirely.
+            nani = np.any(np.isnan(coordcolumn), axis=0)
+            coordcolumn[:, nani] = np.nan
+            profile_data[i, nani] = np.nan
             if summary == "mean":
-                profile_data[i, :] = np.nanmean(coordcolumn, axis=0)
+                profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
             elif summary == "median":
-                profile_data[i, :] = np.nanmedian(coordcolumn, axis=0)
+                profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
 
     return profile_data
 
@@ -131,14 +135,17 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
             prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
-            thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
-            fitvals = thefit(prestim_frmstmp[goodind]) # The values we'll subtract from the profile
+            if np.sum(goodind) > 5:
+                thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
+                fitvals = thefit(prestim_frmstmp[goodind]) # The values we'll subtract from the profile
 
-            prestim_nofit_mean = np.nanmean(prestim_profile[goodind])
-            prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
-            prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
+                prestim_nofit_mean = np.nanmean(prestim_profile[goodind])
+                prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
+                prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
 
-            temporal_profiles[i, :] = ((temporal_profiles[i, :] - prestim_nofit_mean) / prestim_std)
+                temporal_profiles[i, :] = ((temporal_profiles[i, :] - prestim_nofit_mean) / prestim_std)
+            else:
+                temporal_profiles[i, :] = np.nan
 
     elif method == "linear_vast":
         # Standardize using variable stability, or VAST scaling, preceeded by a linear fit:
@@ -149,15 +156,18 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
             prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
-            thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
-            fitvals = thefit(prestim_frmstmp[goodind]) # The values we'll subtract from the profile
+            if np.sum(goodind) > 5:
+                thefit = Polynomial.fit(prestim_frmstmp[goodind], prestim_profile[goodind], deg=1)
+                fitvals = thefit(prestim_frmstmp[goodind]) # The values we'll subtract from the profile
 
-            prestim_nofit_mean = np.nanmean(prestim_profile[goodind])
-            prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
-            prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
+                prestim_nofit_mean = np.nanmean(prestim_profile[goodind])
+                prestim_mean = np.nanmean(prestim_profile[goodind]-fitvals)
+                prestim_std = np.nanstd(prestim_profile[goodind]-fitvals)
 
-            temporal_profiles[i, :] = ((temporal_profiles[i, :] - prestim_nofit_mean) / prestim_std) / \
-                                      (prestim_std / prestim_nofit_mean)
+                temporal_profiles[i, :] = ((temporal_profiles[i, :] - prestim_nofit_mean) / prestim_std) / \
+                                          (prestim_std / prestim_nofit_mean)
+            else:
+                temporal_profiles[i, :] = np.nan
 
     elif method == "relative_change":
         # Make our output a representation of the relative change of the signal
@@ -178,8 +188,11 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
             prestim_profile = np.squeeze(temporal_profiles[i, prestimulus_idx])
             goodind = np.isfinite(prestim_profile) # Removes nans, infs, etc.
 
-            prestim_mean = np.nanmean(prestim_profile[goodind])
-            temporal_profiles[i, :] -= prestim_mean
+            if np.sum(goodind) > 5:
+                prestim_mean = np.nanmean(prestim_profile[goodind])
+                temporal_profiles[i, :] -= prestim_mean
+            else:
+                temporal_profiles[i, :] = np.nan
 
     return temporal_profiles
 

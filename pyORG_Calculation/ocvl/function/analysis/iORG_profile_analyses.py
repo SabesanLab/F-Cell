@@ -3,6 +3,7 @@ import numpy as np
 
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix
 
+
 def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1):
     """
     Calculates the iORG on a supplied dataset, using a variety of power based summary methods published in
@@ -18,10 +19,13 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
     :return: a 1xM population iORG signal.
     """
 
-    if window_size % 2 < 1:
-        raise Exception("Window size must be an odd integer.")
+    if window_size != 0:
+        if window_size % 2 < 1:
+            raise Exception("Window size must be an odd integer.")
+        else:
+            window_radius = int((window_size-1)/2)
     else:
-        window_radius = int((window_size-1)/2)
+        window_radius = 0
 
     if window_radius != 0:
         # If the window radius isn't 0, then densify the matrix, and pad our profiles
@@ -31,13 +35,16 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     num_signals = temporal_profiles.shape[0]
     num_samples = temporal_profiles.shape[1]
+
+    num_incl = np.zeros((num_samples))
     iORG = np.empty((num_samples))
     iORG[:] = np.nan
 
     if summary_method == "var":
         if window_radius == 0:
-
             iORG = np.nanvar(temporal_profiles, axis=0)
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+
         elif window_size < (num_samples/2):
 
             for i in range(num_samples):
@@ -45,6 +52,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
                 if np.sum(samples[:] != np.nan) > 10:
                     iORG[i] = np.nanvar(samples[:])
+                    num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
         else:
@@ -52,8 +60,9 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     elif summary_method == "std":
         if window_radius == 0:
-
             iORG = np.nanstd(temporal_profiles, axis=0)
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+
         elif window_size < (num_samples/2):
 
             for i in range(num_samples):
@@ -61,6 +70,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
                 if np.sum(samples[:] != np.nan) > 10:
                     iORG[i] = np.nanstd(samples[:])
+                    num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
         else:
@@ -69,6 +79,8 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
     elif summary_method == "rms":
         if window_radius == 0:
             iORG = np.nanvar(temporal_profiles, axis=0)
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+
         elif window_size < (num_samples/2):
 
             temporal_profiles **= 2 # Square first
@@ -78,12 +90,13 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                 if np.sum(samples[:] != np.nan) > 10:
                     iORG[i] = np.nanmean(samples[:]) # Average second
                     iORG[i] = np.sqrt(iORG[i]) # Sqrt last
+                    num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
-    return iORG
+    return iORG, num_incl
 
 def wavelet_iORG(temporal_profiles, framestamps):
 
