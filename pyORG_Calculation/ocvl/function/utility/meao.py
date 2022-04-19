@@ -13,7 +13,7 @@ from ocvl.function.utility.resources import load_video
 
 
 class MEAODataset():
-    def __init__(self, video_path="", image_path=None, coord_path=None,
+    def __init__(self, video_path="", image_path=None, coord_path=None, stimtrain_path=None,
                  analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.RAW):
 
         self.analysis_modality = analysis_modality
@@ -83,6 +83,8 @@ class MEAODataset():
         else:
             self.coord_path = coord_path
 
+        self.stimtrain_path = stimtrain_path
+
         # Information about the dataset
         self.stage = stage
         self.framerate = -1
@@ -91,7 +93,7 @@ class MEAODataset():
         self.height = -1
         self.framestamps = np.empty([1])
         self.reference_frame_idx = []
-        self.stimulus_range_frame_stamps = np.empty([1])
+        self.stimtrain_frame_stamps = np.empty([1])
 
         # The data are roughly grouped by the following:
         # Base data
@@ -165,8 +167,15 @@ class MEAODataset():
                 self.reference_im = cv2.imread(self.image_path)
 
             if self.coord_path:
-                self.coord_data = pd.read_csv(self.coord_path, delimiter=',', encoding="utf-8-sig").to_numpy()
+                self.coord_data = pd.read_csv(self.coord_path, delimiter=',', header=None,
+                                              encoding="utf-8-sig").to_numpy()
                 # print(self.coord_data)
+
+            if self.stimtrain_path:
+                self.stimtrain_frame_stamps = np.cumsum(np.squeeze(pd.read_csv(self.stimtrain_path, delimiter=',', header=None,
+                                                          encoding="utf-8-sig").to_numpy()))
+            else:
+                self.stimtrain_frame_stamps = self.num_frames-1
 
 
 

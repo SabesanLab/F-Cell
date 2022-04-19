@@ -28,6 +28,11 @@ if __name__ == "__main__":
     if not pName:
         quit()
 
+    stimtrain_fName = filedialog.askopenfilename(title="Select the stimulus train file.", parent=root)
+
+    if not stimtrain_fName:
+        quit()
+
     x = root.winfo_screenwidth() / 2 - 128
     y = root.winfo_screenheight() / 2 - 128
     root.geometry(
@@ -72,6 +77,7 @@ if __name__ == "__main__":
         r = 0
         pb["maximum"] = len(allFiles[loc])
 
+        max_frmstamp = 0
         cell_framestamps = []
         cell_profiles = []
         first = True
@@ -83,8 +89,8 @@ if __name__ == "__main__":
                 pb.update()
                 pb_label.update()
 
-                dataset = MEAODataset(os.path.join(loc, file), analysis_modality="760nm", ref_modality="760nm",
-                                      stage=PipeStages.PIPELINED)
+                dataset = MEAODataset(os.path.join(loc, file), stimtrain_path=stimtrain_fName,
+                                      analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
                 # Initialize the dict for individual cells.
@@ -92,11 +98,16 @@ if __name__ == "__main__":
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
                         cell_profiles.append([])
+                        coord_data = dataset.coord_data
+                        framerate = dataset.framerate
+                        stimulus_train = dataset.stimtrain_frame_stamps
+
                     first = False
 
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
+                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
+                                                       method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
 
                 # Put the profile of each cell into its own array
@@ -110,25 +121,51 @@ if __name__ == "__main__":
 
         del dataset, temp_profiles, norm_temporal_profiles, stdize_profiles
 
-        # Make 3D matricies
+        # Rows: Acquisitions
+        # Cols: Framestamps
+        # Depth: Coordinate
+        all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp+1, len(coord_data)))
+        all_cell_iORG[:] = np.nan
+        full_framestamp_range = np.arange(max_frmstamp)
+        cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
+        cell_power_iORG[:] = np.nan
 
-        # Grab all of the
-        # all_iORG = np.empty((len(allFiles[loc]), max_frmstamp+1))
-        # all_iORG[:] = np.nan
-        # all_incl = np.empty((len(allFiles[loc]), max_frmstamp + 1))
-        # all_incl[:] = np.nan
-        # for i, iorg in enumerate(pop_iORG):
-        #     all_incl[i, framestamps[i]] = pop_iORG_num[i]
-        #     all_iORG[i, framestamps[i]] = iorg
-        #
-        # # Pooled variance calc
-        # pooled_var_iORG = np.nansum( (all_incl-1)*all_iORG, axis=0 ) / np.nansum(all_incl-1, axis=0)
-        # pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
-        #
-        # plt.figure(1)
-        # plt.clf()
-        # plt.plot(pooled_stddev_iORG)
-        # plt.show(block=False)
-        # plt.savefig(os.path.join(res_dir, file[0:-4] + "_pooled_pop_iORG.png"))
+        # Make 3D matricies
+        for c in range(len(coord_data)):
+            for i, profile in enumerate(cell_profiles[c]):
+                all_cell_iORG[i, cell_framestamps[c][i], c] = profile
+
+        print("Yay!")
+
+        simple_amp = np.empty((len(coord_data)))
+        simple_amp[:] = np.nan
+        for c in range(len(coord_data)):
+            cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
+                                                      summary_method="std", window_size=1)
+
+            prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
+            poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1]+10)])
+
+            simple_amp[c] = poststim_amp-prestim_amp
+
+            # plt.figure(0)
+            # plt.clf()
+            # plt.hist(simple_amp)
+            # plt.plot(cell_power_iORG[c, :])
+            # plt.plot(stimulus_train[0], poststim_amp, "rD")
+            # plt.show(block=False)
+            # plt.waitforbuttonpress()
+           # plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.png"))
+
+
+
+        plt.figure(1)
+        plt.hist(simple_amp, bins=np.arange(start=-10, stop=100, step=2.5))
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.png"))
+        plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.svg"))
+        plt.clf()
+
         print("Done!")
 
