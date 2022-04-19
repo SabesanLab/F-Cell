@@ -70,6 +70,8 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
+    maxnum_cells = None
+
     for loc in allFiles:
         res_dir = os.path.join(loc, "Results")
         os.makedirs(res_dir, exist_ok=True)
@@ -80,6 +82,8 @@ if __name__ == "__main__":
         pop_iORG_num=[]
         framestamps = []
         max_frmstamp = 0
+        plt.figure(0)
+        plt.clf()
 
         for file in allFiles[loc]:
 
@@ -93,7 +97,14 @@ if __name__ == "__main__":
                                       stimtrain_path=stimtrain_fName, stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=3)
+                if maxnum_cells is not None:
+                    perm = np.random.permutation(len(dataset.coord_data))
+                    perm = perm[0:maxnum_cells]
+                else:
+                    perm = np.arange(len(dataset.coord_data))
+                print("Analyzing " + str(len(perm)) + " cells.")
+
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
@@ -105,10 +116,12 @@ if __name__ == "__main__":
                 plt.figure(0)
                 plt.plot(dataset.framestamps, pop_iORG[r])
                 plt.show(block=False)
-                plt.savefig(os.path.join(res_dir, file[0:-4] + "_pop_iORG.png"))
+
                 r += 1
                 if dataset.framestamps[-1] > max_frmstamp:
                     max_frmstamp = dataset.framestamps[-1]
+
+        plt.savefig(os.path.join(res_dir, file[0:-4] + "_pop_iORG.png"))
 
         del dataset
         # Grab all of the
@@ -129,5 +142,6 @@ if __name__ == "__main__":
         plt.plot(pooled_stddev_iORG)
         plt.show(block=False)
         plt.savefig(os.path.join(res_dir, file[0:-4] + "_pooled_pop_iORG.png"))
+        plt.savefig(os.path.join(res_dir, file[0:-4] + "_pooled_pop_iORG.svg"))
         print("Done!")
 

@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
                     first = False
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=1)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
@@ -126,7 +126,7 @@ if __name__ == "__main__":
         # Depth: Coordinate
         all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp+1, len(coord_data)))
         all_cell_iORG[:] = np.nan
-        full_framestamp_range = np.arange(max_frmstamp)
+        full_framestamp_range = np.arange(max_frmstamp+1)
         cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
 
@@ -148,13 +148,15 @@ if __name__ == "__main__":
 
             simple_amp[c] = poststim_amp-prestim_amp
 
-            # plt.figure(0)
-            # plt.clf()
-            # plt.hist(simple_amp)
-            # plt.plot(cell_power_iORG[c, :])
-            # plt.plot(stimulus_train[0], poststim_amp, "rD")
-            # plt.show(block=False)
-            # plt.waitforbuttonpress()
+            plt.figure(0)
+            plt.clf()
+            for a in range(all_cell_iORG.shape[0]):
+                plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
+                plt.plot(stimulus_train[0], poststim_amp, "rD")
+          # plt.hist(simple_amp)
+          # plt.plot(cell_power_iORG[c, :])
+            plt.show(block=False)
+            plt.waitforbuttonpress()
            # plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.png"))
 
 
