@@ -105,7 +105,7 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=True):
         return np.divide(temporal_profiles, framewise_norm[None, :])
 
 
-def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method="linear_std"):
+def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method="linear_std", display=False):
     """
     This function standardizes each temporal profile (here, the rows of the supplied data) according to the provided
     arguments.
@@ -193,6 +193,15 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
                 temporal_profiles[i, :] -= prestim_mean
             else:
                 temporal_profiles[i, :] = np.nan
+
+    if display:
+        plt.figure(1)
+        for i in range(temporal_profiles.shape[0]):
+            plt.plot(framestamps, temporal_profiles[i, :])
+
+        plt.show(block=False)
+
+        plt.waitforbuttonpress()
 
     return temporal_profiles
 

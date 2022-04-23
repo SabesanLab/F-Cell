@@ -1,10 +1,13 @@
 import os
 from os import walk
 from os.path import splitext
+from pathlib import Path
 from tkinter import Tk, filedialog, ttk, HORIZONTAL
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.colors import Normalize
+from scipy.spatial import Voronoi, voronoi_plot_2d
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
@@ -44,18 +47,18 @@ if __name__ == "__main__":
 
     totFiles = 0
     # Parse out the locations and filenames, store them in a hash table.
-    for (dirpath, dirnames, filenames) in walk(pName):
-        for fName in filenames:
-            if splitext(fName)[1] == ".avi" and "piped" in fName:
-                splitfName = fName.split("_")
+    searchpath = Path(pName)
+    for path in searchpath.rglob("*.avi"):
+        if "piped" in path.name:
+            splitfName = path.name.split("_")
 
-                if dirpath not in allFiles:
-                    allFiles[dirpath] = []
-                    allFiles[dirpath].append(fName)
-                else:
-                    allFiles[dirpath].append(fName)
+            if path.parent not in allFiles:
+                allFiles[path.parent] = []
+                allFiles[path.parent].append(path)
+            else:
+                allFiles[path.parent].append(path)
 
-                totFiles += 1
+            totFiles += 1
 
     pb = ttk.Progressbar(root, orient=HORIZONTAL, length=512)
     pb.grid(column=0, row=0, columnspan=2, padx=3, pady=5)
@@ -71,25 +74,27 @@ if __name__ == "__main__":
     root.update()
 
     for loc in allFiles:
-        res_dir = os.path.join(loc, "Results")
-        os.makedirs(res_dir, exist_ok=True)
+        res_dir = loc.joinpath("Results")
+        res_dir.mkdir(exist_ok=True)
+
+        this_dirname = res_dir.parent.name
 
         r = 0
         pb["maximum"] = len(allFiles[loc])
-
+        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
         max_frmstamp = 0
         cell_framestamps = []
         cell_profiles = []
         first = True
         for file in allFiles[loc]:
 
-            if "ALL_ACQ_AVG" not in file:
+            if "ALL_ACQ_AVG" not in file.name:
                 pb["value"] = r
-                pb_label["text"] = "Processing " + file + "..."
+                pb_label["text"] = "Processing " + file.name + "..."
                 pb.update()
                 pb_label.update()
 
-                dataset = MEAODataset(os.path.join(loc, file), stimtrain_path=stimtrain_fName,
+                dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
                                       analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
@@ -141,33 +146,51 @@ if __name__ == "__main__":
         simple_amp[:] = np.nan
         for c in range(len(coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                      summary_method="std", window_size=1)
+                                                               summary_method="std", window_size=1)
 
             prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
             poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1]+10)])
 
             simple_amp[c] = poststim_amp-prestim_amp
 
-            plt.figure(0)
-            plt.clf()
-            for a in range(all_cell_iORG.shape[0]):
-                plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
-                plt.plot(stimulus_train[0], poststim_amp, "rD")
-          # plt.hist(simple_amp)
+            # plt.figure(0)
+            # plt.clf()
+            # for a in range(all_cell_iORG.shape[0]):
+            #     plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
+            #     plt.plot(stimulus_train[0], poststim_amp, "rD")
+            # plt.hist(simple_amp)
           # plt.plot(cell_power_iORG[c, :])
-            plt.show(block=False)
-            plt.waitforbuttonpress()
-           # plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.png"))
-
-
+          #   plt.show(block=False)
+          #   plt.waitforbuttonpress()
+           # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
 
         plt.figure(1)
-        plt.hist(simple_amp, bins=np.arange(start=-10, stop=100, step=2.5))
+        histbins = np.arange(start=-10, stop=100, step=2.5)
+        plt.hist(simple_amp, bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
-        plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.png"))
-        plt.savefig(os.path.join(res_dir, file[0:-4] + "_allcell_iORG_amp.svg"))
-        plt.clf()
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
+        #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        plt.close(plt.gcf())
+
+        hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
+        hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
+
+        #simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
+
+        plt.figure(2)
+        vor = Voronoi(coord_data)
+        voronoi_plot_2d(vor, show_vertices=False, show_points=False)
+        for c, cell in enumerate(vor.regions[1:]):
+            if not -1 in cell:
+                poly = [vor.vertices[i] for i in cell]
+                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[c]))
+        ax = plt.gca()
+        ax.set_aspect("equal", adjustable="box")
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
+        #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
+        plt.close(plt.gcf())
 
         print("Done!")
 

@@ -1,6 +1,7 @@
 import os
 from os import walk
 from os.path import splitext
+from pathlib import Path
 from tkinter import Tk, filedialog, ttk, HORIZONTAL
 
 from matplotlib import pyplot as plt
@@ -38,18 +39,18 @@ if __name__ == "__main__":
 
     totFiles = 0
     # Parse out the locations and filenames, store them in a hash table.
-    for (dirpath, dirnames, filenames) in walk(pName):
-        for fName in filenames:
-            if splitext(fName)[1] == ".avi" and "piped" in fName:
-                splitfName = fName.split("_")
+    searchpath = Path(pName)
+    for path in searchpath.rglob("*.avi"):
+        if "piped" in path.name:
+            splitfName = path.name.split("_")
 
-                if dirpath not in allFiles:
-                    allFiles[dirpath] = []
-                    allFiles[dirpath].append(fName)
-                else:
-                    allFiles[dirpath].append(fName)
+            if path.parent not in allFiles:
+                allFiles[path.parent] = []
+                allFiles[path.parent].append(path)
+            else:
+                allFiles[path.parent].append(path)
 
-                totFiles += 1
+            totFiles += 1
 
     pb = ttk.Progressbar(root, orient=HORIZONTAL, length=512)
     pb.grid(column=0, row=0, columnspan=2, padx=3, pady=5)
@@ -83,7 +84,8 @@ if __name__ == "__main__":
 
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, 55, method="mean_sub")
+                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
+                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
 
                 pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=0)

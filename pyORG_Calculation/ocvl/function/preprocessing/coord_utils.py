@@ -25,3 +25,5 @@ class Point(object):
                         (self.y - other_coord[1]) * (self.y - other_coord[1]))
         else:
             return None
+
+

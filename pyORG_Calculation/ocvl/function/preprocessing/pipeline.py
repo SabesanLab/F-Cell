@@ -284,8 +284,8 @@ def run_meao_pipeline(pName, tkroot):
             # Crop to the area that X images overlap. (start with all)
             mask_area = weight_proj > 0
             mask_area = np.sum(mask_area.astype("uint8"), axis=-1)
-            mask_area[mask_area < (np.amax(mask_area)-2)] = 0
-            mask_area[mask_area >= (np.amax(mask_area)-2)] = 1
+            mask_area[mask_area < (np.amax(mask_area)-5)] = 0
+            mask_area[mask_area >= (np.amax(mask_area)-5)] = 1
             mask_area = binary_dilation(mask_area, structure=np.ones((3, 3))).astype("uint8")
 
             cropx, cropy, cropw, croph = cv2.boundingRect(mask_area)
