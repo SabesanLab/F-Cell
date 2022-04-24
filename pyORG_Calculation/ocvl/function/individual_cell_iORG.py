@@ -73,7 +73,11 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
-    for loc in allFiles:
+    first = True
+    cell_framestamps = []
+    cell_profiles = []
+
+    for l, loc in enumerate(allFiles):
         res_dir = loc.joinpath("Results")
         res_dir.mkdir(exist_ok=True)
 
@@ -83,9 +87,8 @@ if __name__ == "__main__":
         pb["maximum"] = len(allFiles[loc])
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
         max_frmstamp = 0
-        cell_framestamps = []
-        cell_profiles = []
-        first = True
+
+
         for file in allFiles[loc]:
 
             if "ALL_ACQ_AVG" not in file.name:
@@ -107,6 +110,9 @@ if __name__ == "__main__":
                         framerate = dataset.framerate
                         stimulus_train = dataset.stimtrain_frame_stamps
 
+                        simple_amp = np.empty((len(allFiles), len(coord_data)))
+                        simple_amp[:] = np.nan
+
                     first = False
 
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=1)
@@ -117,7 +123,7 @@ if __name__ == "__main__":
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
-                    cell_framestamps[c].append(dataset.framestamps)
+                    cell_framestamps[c].append(dataset.framestamps) # HERE IS THE PROBLEM, YO
                     cell_profiles[c].append(stdize_profiles[c, :])
                 r += 1
 
@@ -140,18 +146,15 @@ if __name__ == "__main__":
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
-        print("Yay!")
 
-        simple_amp = np.empty((len(coord_data)))
-        simple_amp[:] = np.nan
         for c in range(len(coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                               summary_method="std", window_size=1)
+                                                               summary_method="rms", window_size=1)
 
             prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
             poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1]+10)])
 
-            simple_amp[c] = poststim_amp-prestim_amp
+            simple_amp[l, c] = poststim_amp-prestim_amp
 
             # plt.figure(0)
             # plt.clf()
@@ -165,8 +168,8 @@ if __name__ == "__main__":
            # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
 
         plt.figure(1)
-        histbins = np.arange(start=-10, stop=100, step=2.5)
-        plt.hist(simple_amp, bins=histbins)
+        histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
+        plt.hist(simple_amp[l, :], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
@@ -184,7 +187,7 @@ if __name__ == "__main__":
         for c, cell in enumerate(vor.regions[1:]):
             if not -1 in cell:
                 poly = [vor.vertices[i] for i in cell]
-                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[c]))
+                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[l, c]))
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)

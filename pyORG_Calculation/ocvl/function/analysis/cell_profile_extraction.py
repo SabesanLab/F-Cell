@@ -75,14 +75,14 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     return profile_data
 
 
-def norm_profiles(temporal_profiles, norm_method="mean", rescaled=True):
+def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False):
     """
     This function normalizes the columns of the data (a single sample of all cells) using a method supplied by the user.
 
     :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
     :param norm_method: The normalization method chosen by the user. Default is "mean". Options: "mean", "median"
     :param rescaled: Whether or not to keep the data at the original scale (only modulate the numbers in place). Useful
-                     if you want the data to stay in the same units. Default: True. Options: True/False
+                     if you want the data to stay in the same units. Default: False. Options: True/False
 
     :return: a NxM numpy matrix of normalized temporal profiles.
     """

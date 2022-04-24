@@ -47,7 +47,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
         elif window_size < (num_samples/2):
 
-            for i in range(num_samples):
+            for i in range(window_radius, num_samples-window_radius):
 
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
                 if np.sum(samples[:] != np.nan) > 10:
@@ -65,7 +65,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
         elif window_size < (num_samples/2):
 
-            for i in range(num_samples):
+            for i in range(window_radius, num_samples-window_radius):
 
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
                 if np.sum(samples[:] != np.nan) > 10:
@@ -78,13 +78,16 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     elif summary_method == "rms":
         if window_radius == 0:
-            iORG = np.nanvar(temporal_profiles, axis=0)
+
+            temporal_profiles **= 2 # Square first
+            iORG = np.nanmean(temporal_profiles, axis=0)  # Average second
+            iORG = np.sqrt(iORG)  # Sqrt last
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
 
         elif window_size < (num_samples/2):
 
             temporal_profiles **= 2 # Square first
-            for i in range(window_radius, num_samples):
+            for i in range(window_radius, num_samples-window_radius):
 
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
                 if np.sum(samples[:] != np.nan) > 10:

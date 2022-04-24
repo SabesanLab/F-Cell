@@ -84,9 +84,7 @@ if __name__ == "__main__":
         r = 0
         pb["maximum"] = len(allFiles[loc])
         pop_iORG = []
-        pop_iORG_amp = np.empty((len(allFiles[loc])-skipnum+1))
-        pop_iORG_amp[:] = np.nan
-        pop_iORG_num = []
+        pop_iORG_num=[]
         framestamps = []
         max_frmstamp = 0
         plt.figure(0)
@@ -113,7 +111,7 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
@@ -121,24 +119,9 @@ if __name__ == "__main__":
                 #plt.savefig(os.path.join(res_dir, file[0:-4] + "_all_std_profiles.svg"))
 
                 framestamps.append(dataset.framestamps)
-                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
-
-                prestim_amp = np.nanmedian(tmp_iorg[0:dataset.stimtrain_frame_stamps[0]])
-                poststim = tmp_iorg[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
-                if poststim.size == 0:
-                    poststim_amp = 0
-                    prestim_amp = 0
-                else:
-                    poststim_amp = np.amax(poststim)
-
-                    pop_iORG.append(tmp_iorg)
-                    pop_iORG_num.append(tmp_incl)
-
-                pop_iORG_amp[r] = (poststim_amp - prestim_amp)
-
-                print("iORG Simple Amplitude: " + str(pop_iORG_amp[r]) + " (prestim: "+str(prestim_amp) +
-                                                                          " poststim: " + str(poststim_amp) +")")
-
+                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="var", window_size=1)
+                pop_iORG.append(tmp_iorg)
+                pop_iORG_num.append(tmp_incl)
                 plt.figure(0)
                 plt.plot(dataset.framestamps, pop_iORG[r-skipnum], color=mapper.to_rgba(r-skipnum, norm=False), label=file.name)
                 plt.show(block=False)
@@ -148,10 +131,9 @@ if __name__ == "__main__":
 
             r += 1
         #plt.legend()
-        plt.savefig(res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
 
-
+        del dataset
         # Grab all of the
         all_iORG = np.empty((len(pop_iORG), max_frmstamp+1))
         all_iORG[:] = np.nan
@@ -162,31 +144,16 @@ if __name__ == "__main__":
             all_iORG[i, framestamps[i]] = iorg
 
         # Pooled variance calc
-        pooled_iORG = np.nansum( all_incl*all_iORG, axis=0 ) / np.nansum(all_incl, axis=0)
-        #pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
-
-        prestim_amp = np.nanmedian(pooled_iORG[0:dataset.stimtrain_frame_stamps[0]])
-        poststim = pooled_iORG[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
-        if poststim.size == 0:
-            poststim_amp = 0
-        else:
-            poststim_amp = np.amax(poststim)
-
-        pop_iORG_amp[r] = (poststim_amp - prestim_amp)
-
-        print("iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " (prestim: " + str(prestim_amp) +
-              " poststim: " + str(poststim_amp) + ")")
+        pooled_var_iORG = np.nansum( (all_incl-1)*all_iORG, axis=0 ) / np.nansum(all_incl-1, axis=0)
+        pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
 
         pop_dFrame = pd.DataFrame(np.concatenate((all_iORG,
-                                                  np.reshape(pooled_iORG, (1, len(pooled_iORG)))), axis=0))
+                                                  np.reshape(pooled_stddev_iORG, (1, len(pooled_stddev_iORG)))), axis=0))
         pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG.csv"), header=False)
-
-        pop_amp_dFrame = pd.DataFrame(pop_iORG_amp)
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_amp.csv"), header=False)
 
         plt.figure(1)
         plt.clf()
-        plt.plot(pooled_iORG)
+        plt.plot(pooled_stddev_iORG)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.png"))
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.svg"))
