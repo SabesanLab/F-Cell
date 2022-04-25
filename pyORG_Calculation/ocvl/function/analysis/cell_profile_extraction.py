@@ -201,7 +201,7 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
 
         plt.show(block=False)
 
-        plt.waitforbuttonpress()
+        #plt.waitforbuttonpress()
 
     return temporal_profiles
 

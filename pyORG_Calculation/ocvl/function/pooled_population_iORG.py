@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
-                #plt.savefig(os.path.join(res_dir, file[0:-4] + "_all_std_profiles.svg"))
+                #plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
 
                 framestamps.append(dataset.framestamps)
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
             r += 1
         #plt.legend()
-        plt.savefig(res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
+        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
 
 
