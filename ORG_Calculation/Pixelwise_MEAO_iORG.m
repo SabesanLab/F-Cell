@@ -25,9 +25,13 @@ wbh = waitbar(0,['Loading dataset: ' strrep(fName,'_','\_')]);
 
 % Standardize the temporal profiles to their *pre stimulus* behavior
 % (frames: 1-58), 29.4Hz
-[stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps', [1 58], 29.4,'Method', 'linear_vast', 'ProgBarHandle', wbh);
+[stdz_temporal_profiles]=standardize_temporal_profiles(norm_temporal_profiles, framestamps', [1 58], 29.4,'Method', 'mean_sub', 'ProgBarHandle', wbh);
+
+
+
+Population_iORG(stdz_temporal_profiles, [], 'WindowSize', 1)
 
 % Take a block of profiles, and output them to a video.
-profiles_to_video(stdz_temporal_profiles, size(temporal_data), fullfile(pName,[fName(1:end-4) '_pixelwise.avi']));
+profiles_to_video((stdz_temporal_profiles).^2, size(temporal_data), fullfile(pName,[fName(1:end-4) '_pixelwise.avi']));
 
 close(wbh) 

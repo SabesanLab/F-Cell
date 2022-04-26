@@ -7,11 +7,13 @@ from tkinter import Tk, filedialog, ttk, HORIZONTAL
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib.colors import Normalize
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.resources import save_video
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 if __name__ == "__main__":
@@ -72,7 +74,7 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
-    maxnum_cells = None
+    first = True
     skipnum = 0
 
     for loc in allFiles:
@@ -84,6 +86,7 @@ if __name__ == "__main__":
         r = 0
         pb["maximum"] = len(allFiles[loc])
         pop_iORG = []
+        profile_data = []
         pop_iORG_amp = np.empty((len(allFiles[loc])-skipnum+1))
         pop_iORG_amp[:] = np.nan
         pop_iORG_num = []
@@ -106,19 +109,26 @@ if __name__ == "__main__":
                                       stimtrain_path=stimtrain_fName, stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
-                if maxnum_cells is not None:
-                    perm = np.random.permutation(len(dataset.coord_data))
-                    perm = perm[0:maxnum_cells]
-                else:
-                    perm = np.arange(len(dataset.coord_data))
-                print("Analyzing " + str(len(perm)) + " cells.")
+                if first:
+                    width = dataset.video_data.shape[1]
+                    height = dataset.video_data.shape[0]
+                    y = np.arange(0, dataset.video_data.shape[0])
+                    x = np.arange(0, dataset.video_data.shape[1])
+                    xv, yv =np.meshgrid(x, y)
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2)
+                    xv = np.reshape(xv, (xv.size, 1))
+                    yv = np.reshape(yv, (yv.size, 1))
+
+                    coord_data = np.hstack((xv, yv))
+                    del x, y, xv, yv
+                    first = False
+
+                temp_profiles = extract_profiles(dataset.video_data, coord_data , seg_radius=1)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
-                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub", display=True)
+                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
-                plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
+                #plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
 
 
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
@@ -133,6 +143,7 @@ if __name__ == "__main__":
                     poststim_amp = np.amax(poststim)
                     pop_iORG_amp[r] = (poststim_amp - prestim_amp)
 
+                    profile_data.append(stdize_profiles)
                     framestamps.append(dataset.framestamps)
                     pop_iORG.append(tmp_iorg)
                     pop_iORG_num.append(tmp_incl)
@@ -151,8 +162,10 @@ if __name__ == "__main__":
                     max_frmstamp = dataset.framestamps[-1]
 
         #plt.legend()
-        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
-        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
+        plt.savefig( res_dir.joinpath(this_dirname + "_pixelpop_iORG.svg"))
+        plt.savefig( res_dir.joinpath(this_dirname + "_pixelpop_iORG.png") )
+
+
 
 
         # Grab all of the
@@ -160,11 +173,37 @@ if __name__ == "__main__":
         all_iORG[:] = np.nan
         all_incl = np.empty((len(pop_iORG), max_frmstamp + 1))
         all_incl[:] = np.nan
+        num_profiles = np.zeros((1, max_frmstamp + 1))
+        all_profiles = np.zeros((len(coord_data), max_frmstamp + 1))
+
         for i, iorg in enumerate(pop_iORG):
             all_incl[i, framestamps[i]] = pop_iORG_num[i]
             all_iORG[i, framestamps[i]] = iorg
+            profile_data[i][np.isnan(profile_data[i])] = 0
+            all_profiles[:, framestamps[i]] += profile_data[i] * profile_data[i]
+            num_profiles[0, framestamps[i]] += 1
+
+        all_profiles /= num_profiles
+        all_profiles = np.sqrt(all_profiles)
+        video_profiles = np.reshape(all_profiles, (height, width, max_frmstamp+1))
+
+        hist_normie = Normalize(vmin=0, vmax=4)
+        hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
+
+        print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 5)))
+        print("Video 99th percentile: " + str(np.nanpercentile(video_profiles[:], 99)))
+        #video_profiles -= np.nanpercentile(video_profiles[:], 5)
+        # video_profiles /= 3.8 #np.nanpercentile(video_profiles[:], 99)
+        #
+        # video_profiles[video_profiles < 0] = 0
+        # video_profiles[video_profiles > 1] = 1
+        # video_profiles *= 255
+
+        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.avi").as_posix(), video_profiles, 29.4,
+                                    scalar_mapper=hist_mapper)
 
         # Pooled variance calc
+
         pooled_iORG = np.nansum( all_incl*all_iORG, axis=0 ) / np.nansum(all_incl, axis=0)
         #pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
 
@@ -182,16 +221,16 @@ if __name__ == "__main__":
 
         pop_dFrame = pd.DataFrame(np.concatenate((all_iORG,
                                                   np.reshape(pooled_iORG, (1, len(pooled_iORG)))), axis=0))
-        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG.csv"), header=False)
+        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pixelpop_iORG.csv"), header=False)
 
         pop_amp_dFrame = pd.DataFrame(pop_iORG_amp)
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_amp.csv"), header=False)
+        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pixelpop_iORG_amp.csv"), header=False)
 
         plt.figure(1)
         plt.clf()
         plt.plot(pooled_iORG)
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.svg"))
         print("Done!")
 
