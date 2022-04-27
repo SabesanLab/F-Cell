@@ -125,7 +125,7 @@ def run_meao_pipeline(pName, tkroot):
     # Parse out the locations and filenames, store them in a hash table.
     for (dirpath, dirnames, filenames) in walk(pName):
         for fName in filenames:
-            if a_mode in fName and splitext(fName)[1] == ".avi" or splitext(fName)[1] == ".tif":
+            if a_mode in fName and splitext(fName)[1] == ".avi":
                 splitfName = fName.split("_")
 
                 if splitfName[3][0] == "(" and splitfName[3][-1] == ")":
@@ -239,7 +239,7 @@ def run_meao_pipeline(pName, tkroot):
             ref_im_proj, ref_xforms, inliers = optimizer_stack_align(ref_im_proj.astype("uint8"),
                                                                 (weight_proj > 0).astype("uint8"),
                                                                 dist_ref_idx, determine_initial_shifts=True,
-                                                                dropthresh=0.0)
+                                                                dropthresh=0.1)
 
             # Use the xforms from each type (reference/analysis) to do the alignment.
             # Inliers will be determined by the reference modality.
@@ -284,8 +284,8 @@ def run_meao_pipeline(pName, tkroot):
             # Crop to the area that X images overlap. (start with all)
             mask_area = weight_proj > 0
             mask_area = np.sum(mask_area.astype("uint8"), axis=-1)
-            mask_area[mask_area < (np.amax(mask_area)-5)] = 0
-            mask_area[mask_area >= (np.amax(mask_area)-5)] = 1
+            mask_area[mask_area < int(np.amax(mask_area)/2)] = 0
+            mask_area[mask_area >= int(np.amax(mask_area)/2)] = 1
             mask_area = binary_dilation(mask_area, structure=np.ones((3, 3))).astype("uint8")
 
             cropx, cropy, cropw, croph = cv2.boundingRect(mask_area)

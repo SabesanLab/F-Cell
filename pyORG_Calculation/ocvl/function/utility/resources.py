@@ -69,14 +69,14 @@ def save_video(video_path, video_data, framerate, scalar_mapper=None):
 
             vidout.release()
     else:
-        vidout = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*"DIVX"), framerate,
+        vidout = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*"FFV1"), framerate,
                                  (video_data.shape[1], video_data.shape[0]), isColor=True)
 
         if vidout.isOpened():
             i = 0
             while (True):
                 frm = scalar_mapper.to_rgba(video_data[..., i]) * 255
-                vidout.write(cv2.cvtColor(frm[:, :, 0:2].astype("uint8"), cv2.COLOR_RGB2BGR))
+                vidout.write(cv2.cvtColor(frm[..., 0:3].astype("uint8"), cv2.COLOR_RGB2BGR))
 
                 i += 1
 

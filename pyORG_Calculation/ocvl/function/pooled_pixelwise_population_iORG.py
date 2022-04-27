@@ -187,20 +187,24 @@ if __name__ == "__main__":
         all_profiles = np.sqrt(all_profiles)
         video_profiles = np.reshape(all_profiles, (height, width, max_frmstamp+1))
 
-        hist_normie = Normalize(vmin=0, vmax=4)
-        hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
+        hist_normie = Normalize(vmin=0, vmax=np.nanpercentile(video_profiles[:], 99))
+        hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("inferno"), norm=hist_normie)
+
+        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.avi").as_posix(), video_profiles, 29.4,
+                   scalar_mapper=hist_mapper)
 
         print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 5)))
         print("Video 99th percentile: " + str(np.nanpercentile(video_profiles[:], 99)))
-        #video_profiles -= np.nanpercentile(video_profiles[:], 5)
-        # video_profiles /= 3.8 #np.nanpercentile(video_profiles[:], 99)
-        #
-        # video_profiles[video_profiles < 0] = 0
-        # video_profiles[video_profiles > 1] = 1
-        # video_profiles *= 255
+        # video_profiles -= np.nanpercentile(video_profiles[:], 5)
+        video_profiles /= hist_normie.vmax
 
-        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.avi").as_posix(), video_profiles, 29.4,
-                                    scalar_mapper=hist_mapper)
+        video_profiles[video_profiles < 0] = 0
+        video_profiles[video_profiles > 1] = 1
+        video_profiles *= 255
+        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_gray.avi").as_posix(),
+                   video_profiles, 29.4)
+
+
 
         # Pooled variance calc
 
