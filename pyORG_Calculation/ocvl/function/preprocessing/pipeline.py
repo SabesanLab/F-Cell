@@ -239,7 +239,7 @@ def run_meao_pipeline(pName, tkroot):
             ref_im_proj, ref_xforms, inliers = optimizer_stack_align(ref_im_proj.astype("uint8"),
                                                                 (weight_proj > 0).astype("uint8"),
                                                                 dist_ref_idx, determine_initial_shifts=True,
-                                                                dropthresh=0.1)
+                                                                dropthresh=0.0)
 
             # Use the xforms from each type (reference/analysis) to do the alignment.
             # Inliers will be determined by the reference modality.

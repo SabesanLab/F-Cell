@@ -9,15 +9,15 @@ clear;
 % tbDeployToolboxes('registered',{'isetbio', 'BrainardLabToolbox','Psychtoolbox-3','SilentSubstitutionToolbox'})
 
 units = 'trolands';
-stim_lambda = 790; % in nm
-stim_irradiance =  111; % in uW
+stim_lambda = 554; % in nm
+stim_irradiance =  16.5; % in uW
 
+num_acquisitions = 10;
+single_trial_train = [0 1  0;
+                      2 2.066  10.066];
 % num_acquisitions = 13;
-% single_trial_train = [0 1  0;
-%                       4 5  18];
-num_acquisitions = 13;
-single_trial_train = [1 ;
-                      18];
+% single_trial_train = [1 ;
+%                       18];
 
 trial_train = zeros(2, size(single_trial_train,2).*num_acquisitions);
 for n=1:num_acquisitions
