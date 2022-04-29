@@ -84,7 +84,11 @@ if __name__ == "__main__":
         r = 0
         pb["maximum"] = len(allFiles[loc])
         pop_iORG = []
-        pop_iORG_amp = np.empty((len(allFiles[loc])-skipnum+1))
+        pop_iORG_implicit = np.empty((len(allFiles[loc])-skipnum+1))
+        pop_iORG_implicit[:] = np.nan
+        pop_iORG_recover = np.empty((len(allFiles[loc]) - skipnum + 1))
+        pop_iORG_recover[:] = np.nan
+        pop_iORG_amp = np.empty((len(allFiles[loc]) - skipnum + 1))
         pop_iORG_amp[:] = np.nan
         pop_iORG_num = []
         framestamps = []
@@ -126,20 +130,28 @@ if __name__ == "__main__":
 
                 prestim_amp = np.nanmedian(tmp_iorg[0:dataset.stimtrain_frame_stamps[0]])
                 poststim = tmp_iorg[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
+
                 if poststim.size == 0:
                     poststim_amp = 0
                     prestim_amp = 0
                     pop_iORG_amp[r] = 0
+                    pop_iORG_implicit[r] = 0
+                    pop_iORG_recover[r] = 0
                 else:
+
                     poststim_amp = np.amax(poststim)
+                    max_frmstmp = np.argmax(poststim)
+                    final_val = np.mean(poststim[-5:])
+                    pop_iORG_implicit[r] = 1000*max_frmstmp / dataset.framerate
                     pop_iORG_amp[r] = (poststim_amp - prestim_amp)
+                    pop_iORG_recover[r] = 1-((final_val-prestim_amp) / pop_iORG_amp[r])
 
                     framestamps.append(dataset.framestamps)
                     pop_iORG.append(tmp_iorg)
                     pop_iORG_num.append(tmp_incl)
 
-                    print("iORG Simple Amplitude: " + str(pop_iORG_amp[r]) + " (prestim: " + str(prestim_amp) +
-                          " poststim: " + str(poststim_amp) + ")")
+                    print("iORG Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
+                          " Recovery fraction: " + str(pop_iORG_recover[r]))
 
                     plt.figure(0)
                     plt.plot(dataset.framestamps, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
@@ -173,20 +185,31 @@ if __name__ == "__main__":
         poststim = pooled_iORG[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
         if poststim.size == 0:
             poststim_amp = 0
+            prestim_amp = 0
+            pop_iORG_amp[r] = -1
+            pop_iORG_implicit[r] = -1
+            pop_iORG_recover[r] = -1
         else:
             poststim_amp = np.amax(poststim)
+            pop_iORG_amp[r] = (poststim_amp - prestim_amp)
+            max_frmstmp = np.argmax(poststim)
+            final_val = np.mean(poststim[-5:])
+            pop_iORG_implicit[r] = max_frmstmp / dataset.framerate
+            pop_iORG_amp[r] = (poststim_amp - prestim_amp)
+            pop_iORG_recover[r] = 1-((final_val-prestim_amp) / pop_iORG_amp[r])
 
-        pop_iORG_amp[r] = (poststim_amp - prestim_amp)
-
-        print("iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " (prestim: " + str(prestim_amp) +
-              " poststim: " + str(poststim_amp) + ")")
+        print("Pooled iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
+              " Recovery fraction: " + str(pop_iORG_recover[r]))
 
         pop_dFrame = pd.DataFrame(np.concatenate((all_iORG,
                                                   np.reshape(pooled_iORG, (1, len(pooled_iORG)))), axis=0))
         pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG.csv"), header=False)
 
-        pop_amp_dFrame = pd.DataFrame(pop_iORG_amp)
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_amp.csv"), header=False)
+        pop_amp_dFrame = pd.DataFrame( np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
+                                                       np.array(pop_iORG_implicit, ndmin=2).transpose(),
+                                                       np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
+                                       columns=["Amplitude", "Implicit time", "Recovery %"] )
+        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats.csv"))
 
         plt.figure(1)
         plt.clf()
