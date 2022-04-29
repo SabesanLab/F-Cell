@@ -117,7 +117,7 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2, display=False)
               #  plt.savefig(res_dir.joinpath(this_dirname + "_all_raw_profiles.svg"))
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
@@ -128,20 +128,25 @@ if __name__ == "__main__":
 
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
 
-                prestim_amp = np.nanmedian(tmp_iorg[0:dataset.stimtrain_frame_stamps[0]])
-                poststim = tmp_iorg[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
+                prestim_ind = dataset.framestamps < dataset.stimtrain_frame_stamps[0]
+                poststim_ind = np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[0],
+                                                   dataset.framestamps < (dataset.stimtrain_frame_stamps[0] + 20))
+                poststim_loc = dataset.framestamps[poststim_ind]
+                prestim_amp = np.nanmedian(tmp_iorg[prestim_ind])
+                poststim = tmp_iorg[poststim_ind]
 
                 if poststim.size == 0:
-                    poststim_amp = 0
-                    prestim_amp = 0
-                    pop_iORG_amp[r] = 0
-                    pop_iORG_implicit[r] = 0
-                    pop_iORG_recover[r] = 0
+                    poststim_amp = np.NaN
+                    prestim_amp = np.NaN
+                    pop_iORG_amp[r] = np.NaN
+                    pop_iORG_implicit[r] = np.NaN
+                    pop_iORG_recover[r] = np.NaN
                 else:
 
-                    poststim_amp = np.amax(poststim)
-                    max_frmstmp = np.argmax(poststim)
-                    final_val = np.mean(poststim[-5:])
+                    poststim_amp = np.nanmax(poststim)
+                    max_frmstmp = poststim_loc[np.argmax(poststim)] - dataset.stimtrain_frame_stamps[0]
+                    print(str(max_frmstmp))
+                    final_val = np.mean(tmp_iorg[-5:])
                     pop_iORG_implicit[r] = 1000*max_frmstmp / dataset.framerate
                     pop_iORG_amp[r] = (poststim_amp - prestim_amp)
                     pop_iORG_recover[r] = 1-((final_val-prestim_amp) / pop_iORG_amp[r])
@@ -180,23 +185,29 @@ if __name__ == "__main__":
         # Pooled variance calc
         pooled_iORG = np.nansum( all_incl*all_iORG, axis=0 ) / np.nansum(all_incl, axis=0)
         #pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
+        all_frmstamps = np.arange(max_frmstamp+1)
 
-        prestim_amp = np.nanmedian(pooled_iORG[0:dataset.stimtrain_frame_stamps[0]])
-        poststim = pooled_iORG[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
+        prestim_ind = all_frmstamps < dataset.stimtrain_frame_stamps[0]
+        poststim_ind = np.logical_and(all_frmstamps >= dataset.stimtrain_frame_stamps[0],
+                                      all_frmstamps < (dataset.stimtrain_frame_stamps[0] + 20))
+        poststim_loc = all_frmstamps[poststim_ind]
+        prestim_amp = np.nanmedian(pooled_iORG[prestim_ind])
+        poststim = pooled_iORG[poststim_ind]
+
         if poststim.size == 0:
-            poststim_amp = 0
-            prestim_amp = 0
-            pop_iORG_amp[r] = -1
-            pop_iORG_implicit[r] = -1
-            pop_iORG_recover[r] = -1
+            poststim_amp = np.NaN
+            prestim_amp = np.NaN
+            pop_iORG_amp[r] = np.NaN
+            pop_iORG_implicit[r] = np.NaN
+            pop_iORG_recover[r] = np.NaN
         else:
-            poststim_amp = np.amax(poststim)
+            poststim_amp = np.nanmax(poststim)
+            max_frmstmp = poststim_loc[np.argmax(poststim)] - dataset.stimtrain_frame_stamps[0]
+
+            final_val = np.mean(pooled_iORG[-5:])
+            pop_iORG_implicit[r] = 1000 * max_frmstmp / dataset.framerate
             pop_iORG_amp[r] = (poststim_amp - prestim_amp)
-            max_frmstmp = np.argmax(poststim)
-            final_val = np.mean(poststim[-5:])
-            pop_iORG_implicit[r] = max_frmstmp / dataset.framerate
-            pop_iORG_amp[r] = (poststim_amp - prestim_amp)
-            pop_iORG_recover[r] = 1-((final_val-prestim_amp) / pop_iORG_amp[r])
+            pop_iORG_recover[r] = 1 - ((final_val - prestim_amp) / pop_iORG_amp[r])
 
         print("Pooled iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
               " Recovery fraction: " + str(pop_iORG_recover[r]))
