@@ -10,7 +10,7 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 
-def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", centroid=None):
+def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", centroid=None, display=False):
     """
     This function extracts temporal profiles from a 3D matrix, where the first two dimensions are assumed to
     contain data from a single time point (a single image)
@@ -71,6 +71,13 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                 profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
             elif summary == "median":
                 profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
+
+    if display:
+        plt.figure(1)
+        for i in range(profile_data.shape[0]):
+            plt.plot(profile_data[i, :]-profile_data[i, 0])
+
+        plt.show(block=False)
 
     return profile_data
 

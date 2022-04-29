@@ -113,7 +113,8 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
+              #  plt.savefig(res_dir.joinpath(this_dirname + "_all_raw_profiles.svg"))
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
