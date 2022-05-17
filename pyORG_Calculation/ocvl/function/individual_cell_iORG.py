@@ -77,6 +77,7 @@ if __name__ == "__main__":
     cell_framestamps = []
     cell_profiles = []
 
+    # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
     for l, loc in enumerate(allFiles):
         res_dir = loc.joinpath("Results")
         res_dir.mkdir(exist_ok=True)
@@ -87,7 +88,6 @@ if __name__ == "__main__":
         pb["maximum"] = len(allFiles[loc])
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
         max_frmstamp = 0
-
 
         for file in allFiles[loc]:
 
@@ -103,15 +103,15 @@ if __name__ == "__main__":
 
                 # Initialize the dict for individual cells.
                 if first:
+                    coord_data = dataset.coord_data
+                    framerate = dataset.framerate
+                    stimulus_train = dataset.stimtrain_frame_stamps
+                    simple_amp = np.empty((len(allFiles), len(coord_data)))
+                    simple_amp[:] = np.nan
+
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
                         cell_profiles.append([])
-                        coord_data = dataset.coord_data
-                        framerate = dataset.framerate
-                        stimulus_train = dataset.stimtrain_frame_stamps
-
-                        simple_amp = np.empty((len(allFiles), len(coord_data)))
-                        simple_amp[:] = np.nan
 
                     first = False
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
-                    cell_framestamps[c].append(dataset.framestamps) # HERE IS THE PROBLEM, YO
+                    cell_framestamps[c].append(dataset.framestamps) # HERE IS THE PROBLEM, YO - appends extra things to the same cell, despite not being long enough
                     cell_profiles[c].append(stdize_profiles[c, :])
                 r += 1
 
@@ -137,6 +137,7 @@ if __name__ == "__main__":
         # Depth: Coordinate
         all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp+1, len(coord_data)))
         all_cell_iORG[:] = np.nan
+
         full_framestamp_range = np.arange(max_frmstamp+1)
         cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
@@ -145,6 +146,9 @@ if __name__ == "__main__":
         for c in range(len(coord_data)):
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
+
+            cell_profiles[c] = []
+            cell_framestamps[c] = []
 
 
         for c in range(len(coord_data)):
