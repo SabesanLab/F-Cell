@@ -74,13 +74,16 @@ if __name__ == "__main__":
     root.update()
 
     first = True
+    outputcsv = True
     cell_framestamps = []
     cell_profiles = []
 
     # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
+    # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
-        res_dir = loc.joinpath("Results")
-        res_dir.mkdir(exist_ok=True)
+        first = True
+        res_dir = loc.joinpath("Results") # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
+        res_dir.mkdir(exist_ok=True) # actually makes the directory if it doesn't exist. if it exists it does nothing.
 
         this_dirname = res_dir.parent.name
 
@@ -89,14 +92,18 @@ if __name__ == "__main__":
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
         max_frmstamp = 0
 
+        # Loops through all the files within this location
         for file in allFiles[loc]:
 
+            # Ignores the All_ACQ_AVG tif while running through the files in this location
             if "ALL_ACQ_AVG" not in file.name:
+                # Waitbar stuff
                 pb["value"] = r
                 pb_label["text"] = "Processing " + file.name + "..."
                 pb.update()
                 pb_label.update()
 
+                # Loading in the pipelined data (calls the load_pipelined_data() fxn
                 dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
                                       analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
@@ -199,5 +206,17 @@ if __name__ == "__main__":
         #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
+        # output cell_power_iORG to csv (optional)
+        if outputcsv:
+            import csv
+            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
+            print(csv_dir)
+            f = open(csv_dir, 'w',newline="")
+            writer = csv.writer(f, delimiter=',')
+            writer.writerows(cell_power_iORG)
+            f.close
+
+
         print("Done!")
+        print(stimulus_train)
 
