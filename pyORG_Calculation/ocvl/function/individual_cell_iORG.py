@@ -15,6 +15,7 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
+
 if __name__ == "__main__":
     root = Tk()
     root.lift()
@@ -167,6 +168,9 @@ if __name__ == "__main__":
 
             simple_amp[l, c] = poststim_amp-prestim_amp
 
+
+
+
             # plt.figure(0)
             # plt.clf()
             # for a in range(all_cell_iORG.shape[0]):
@@ -177,6 +181,17 @@ if __name__ == "__main__":
           #   plt.show(block=False)
           #   plt.waitforbuttonpress()
            # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
+
+        # find the cells with the min, med, and max amplitude
+        min_amp = np.min(simple_amp[0, :])
+        [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
+        # print('min_amp ',min_amp)
+        med_amp = np.median(simple_amp[0, :])
+        [med_amp_row, med_amp_col] = np.where(simple_amp == med_amp)
+        # print('med_amp ', med_amp)
+        max_amp = np.max(simple_amp[0, :])
+        [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
+        # print('max_amp ', max_amp)
 
         plt.figure(1)
         histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
@@ -205,6 +220,16 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
         #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
+
+        # plotting the cells with the min/med/max amplitude
+        plt.figure(300)
+        plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
+        # should really be the cell_framestamps that correspond to the cells on the x axis
+        # need to fix the bug with the framstamps being empty first though
+        #plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
+        plt.show(block=False)
+
+        print(cell_power_iORG[min_amp_col,:])
 
         # output cell_power_iORG to csv (optional)
         if outputcsv:
