@@ -243,9 +243,10 @@ if __name__ == "__main__":
         # should really be the cell_framestamps that correspond to the cells on the x axis
         # need to fix the bug with the framstamps being empty first though
         #plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
+        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones.png"))
         plt.show(block=False)
+        plt.close(plt.gcf())
 
-        print(cell_power_iORG[min_amp_col,:])
 
         # output cell_power_iORG to csv (optional)
         if outputcsv:
