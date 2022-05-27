@@ -15,6 +15,11 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
 
 if __name__ == "__main__":
     root = Tk()
@@ -187,7 +192,9 @@ if __name__ == "__main__":
         [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
         # print('min_amp ',min_amp)
         med_amp = np.median(simple_amp[0, :])
-        [med_amp_row, med_amp_col] = np.where(simple_amp == med_amp)
+        near_med_amp = find_nearest(simple_amp[0,:], med_amp)
+        [med_amp_row, med_amp_col] = np.where(simple_amp == near_med_amp)
+
         # print('med_amp ', med_amp)
         max_amp = np.max(simple_amp[0, :])
         [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
@@ -223,7 +230,16 @@ if __name__ == "__main__":
 
         # plotting the cells with the min/med/max amplitude
         plt.figure(300)
-        plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
+        #plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+                 np.transpose(cell_power_iORG[min_amp_col, :]))
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+                 np.transpose(cell_power_iORG[med_amp_col, :]))
+        plt.plot(np.reshape(full_framestamp_range,(176,1)).astype('float64'),np.transpose(cell_power_iORG[max_amp_col,:]))
+        # This also works...
+        #plt.plot(full_framestamp_range.astype('float64'),
+        #         np.ravel(cell_power_iORG[min_amp_col, :]))
+
         # should really be the cell_framestamps that correspond to the cells on the x axis
         # need to fix the bug with the framstamps being empty first though
         #plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
