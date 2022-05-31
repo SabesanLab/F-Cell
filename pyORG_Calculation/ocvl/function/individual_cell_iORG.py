@@ -15,6 +15,12 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+
 if __name__ == "__main__":
     root = Tk()
     root.lift()
@@ -74,12 +80,16 @@ if __name__ == "__main__":
     root.update()
 
     first = True
+    outputcsv = True
     cell_framestamps = []
     cell_profiles = []
 
+    # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
+    # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
-        res_dir = loc.joinpath("Results")
-        res_dir.mkdir(exist_ok=True)
+        first = True
+        res_dir = loc.joinpath("Results") # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
+        res_dir.mkdir(exist_ok=True) # actually makes the directory if it doesn't exist. if it exists it does nothing.
 
         this_dirname = res_dir.parent.name
 
@@ -88,30 +98,33 @@ if __name__ == "__main__":
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
         max_frmstamp = 0
 
-
+        # Loops through all the files within this location
         for file in allFiles[loc]:
 
+            # Ignores the All_ACQ_AVG tif while running through the files in this location
             if "ALL_ACQ_AVG" not in file.name:
+                # Waitbar stuff
                 pb["value"] = r
                 pb_label["text"] = "Processing " + file.name + "..."
                 pb.update()
                 pb_label.update()
 
+                # Loading in the pipelined data (calls the load_pipelined_data() fxn
                 dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
                                       analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
                 # Initialize the dict for individual cells.
                 if first:
+                    coord_data = dataset.coord_data
+                    framerate = dataset.framerate
+                    stimulus_train = dataset.stimtrain_frame_stamps
+                    simple_amp = np.empty((len(allFiles), len(coord_data)))
+                    simple_amp[:] = np.nan
+
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
                         cell_profiles.append([])
-                        coord_data = dataset.coord_data
-                        framerate = dataset.framerate
-                        stimulus_train = dataset.stimtrain_frame_stamps
-
-                        simple_amp = np.empty((len(allFiles), len(coord_data)))
-                        simple_amp[:] = np.nan
 
                     first = False
 
@@ -123,7 +136,7 @@ if __name__ == "__main__":
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
-                    cell_framestamps[c].append(dataset.framestamps) # HERE IS THE PROBLEM, YO
+                    cell_framestamps[c].append(dataset.framestamps) # HERE IS THE PROBLEM, YO - appends extra things to the same cell, despite not being long enough
                     cell_profiles[c].append(stdize_profiles[c, :])
                 r += 1
 
@@ -137,6 +150,7 @@ if __name__ == "__main__":
         # Depth: Coordinate
         all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp+1, len(coord_data)))
         all_cell_iORG[:] = np.nan
+
         full_framestamp_range = np.arange(max_frmstamp+1)
         cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
@@ -145,6 +159,9 @@ if __name__ == "__main__":
         for c in range(len(coord_data)):
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
+
+            cell_profiles[c] = []
+            cell_framestamps[c] = []
 
 
         for c in range(len(coord_data)):
@@ -156,6 +173,9 @@ if __name__ == "__main__":
 
             simple_amp[l, c] = poststim_amp-prestim_amp
 
+
+
+
             # plt.figure(0)
             # plt.clf()
             # for a in range(all_cell_iORG.shape[0]):
@@ -166,6 +186,19 @@ if __name__ == "__main__":
           #   plt.show(block=False)
           #   plt.waitforbuttonpress()
            # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
+
+        # find the cells with the min, med, and max amplitude
+        min_amp = np.min(simple_amp[0, :])
+        [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
+        # print('min_amp ',min_amp)
+        med_amp = np.median(simple_amp[0, :])
+        near_med_amp = find_nearest(simple_amp[0,:], med_amp)
+        [med_amp_row, med_amp_col] = np.where(simple_amp == near_med_amp)
+
+        # print('med_amp ', med_amp)
+        max_amp = np.max(simple_amp[0, :])
+        [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
+        # print('max_amp ', max_amp)
 
         plt.figure(1)
         histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
@@ -195,5 +228,37 @@ if __name__ == "__main__":
         #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
+        # plotting the cells with the min/med/max amplitude
+        plt.figure(300)
+        #plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+                 np.transpose(cell_power_iORG[min_amp_col, :]))
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+                 np.transpose(cell_power_iORG[med_amp_col, :]))
+        plt.plot(np.reshape(full_framestamp_range,(176,1)).astype('float64'),np.transpose(cell_power_iORG[max_amp_col,:]))
+        # This also works...
+        #plt.plot(full_framestamp_range.astype('float64'),
+        #         np.ravel(cell_power_iORG[min_amp_col, :]))
+
+        # should really be the cell_framestamps that correspond to the cells on the x axis
+        # need to fix the bug with the framstamps being empty first though
+        #plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
+        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones.png"))
+        plt.show(block=False)
+        plt.close(plt.gcf())
+
+
+        # output cell_power_iORG to csv (optional)
+        if outputcsv:
+            import csv
+            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
+            print(csv_dir)
+            f = open(csv_dir, 'w',newline="")
+            writer = csv.writer(f, delimiter=',')
+            writer.writerows(cell_power_iORG)
+            f.close
+
+
         print("Done!")
+        print(stimulus_train)
 

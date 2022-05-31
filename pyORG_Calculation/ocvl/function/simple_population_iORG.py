@@ -13,7 +13,7 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 if __name__ == "__main__":
-    root = Tk()
+    root = Tk() #If you use this outside of main, shit goes sideways...
     root.lift()
     w = 1
     h = 1
@@ -28,6 +28,11 @@ if __name__ == "__main__":
     if not pName:
         quit()
 
+    stimtrain_fName = filedialog.askopenfilename(title="Select the stimulus train file.", parent=root)
+
+    if not stimtrain_fName:
+        quit()
+
     x = root.winfo_screenwidth() / 2 - 128
     y = root.winfo_screenheight() / 2 - 128
     root.geometry(
@@ -35,7 +40,7 @@ if __name__ == "__main__":
             w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
     root.update()
 
-    allFiles = dict()
+    allFiles = dict()  # Is a "relational database" or a "hash table" AKA- key : value
 
     totFiles = 0
     # Parse out the locations and filenames, store them in a hash table.
@@ -57,6 +62,7 @@ if __name__ == "__main__":
     pb_label = ttk.Label(root, text="Initializing setup...")
     pb_label.grid(column=0, row=1, columnspan=2)
     pb.start()
+
     # Resize our root to show our progress bar.
     w = 512
     h = 64
@@ -66,32 +72,36 @@ if __name__ == "__main__":
     root.update()
 
     for loc in allFiles:
-        res_dir = os.path.join(loc, "Results")
-        os.makedirs(res_dir, exist_ok=True)
+        res_dir = loc.joinpath("Results")
+        res_dir.mkdir(exist_ok=True)
+
+        this_dirname = res_dir.parent.name
 
         r = 0
-        pb["maximum"] = len(allFiles[loc])
+        pb["maximum"] = len(allFiles[loc]) # Updates the max for the progressbar- sets top value for this location
         for file in allFiles[loc]:
-            if "ALL_ACQ_AVG" not in file:
+            if "ALL_ACQ_AVG" not in file.name: # If the file isn't our average of all videos tif file, then process it
+                # More progressbar shit
                 pb["value"] = r
-                pb_label["text"] = "Processing " + file + "..."
+                pb_label["text"] = "Processing " + file.name + "..."
                 pb.update()
                 pb_label.update()
 
-                dataset = MEAODataset(os.path.join(loc, file), analysis_modality="760nm", ref_modality="760nm",
-                                      stage=PipeStages.PIPELINED)
-                dataset.load_pipelined_data()
+                dataset = MEAODataset(file.as_posix(), analysis_modality="760nm", ref_modality="760nm",
+                                      stimtrain_path=stimtrain_fName, stage=PipeStages.PIPELINED) # To handle loading of datasets (of difference stages)
+                dataset.load_data()
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data)
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data) # Extracts temporal profiles from data
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean") # Normalizes the temporal profiles
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
-                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub")
-                #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
+                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub") # Standardizes the temporal profiles
+                #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps) # Reconstruct via compressive sensing
 
-                pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=0)
+                pop_iORG, num_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=0)
+
                 plt.figure(0)
                 plt.clf()
                 plt.plot(dataset.framestamps, pop_iORG)
                 plt.show(block=False)
-                plt.savefig(os.path.join(res_dir, file[0:-4] + "_pop_iORG.png"))
+                plt.savefig(res_dir.joinpath(this_dirname + "_pop_iORG.png"))
                 r += 1

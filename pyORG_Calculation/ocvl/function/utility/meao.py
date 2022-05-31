@@ -12,7 +12,7 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.resources import load_video
 
 
-class MEAODataset():
+class MEAODataset:
     def __init__(self, video_path="", image_path=None, coord_path=None, stimtrain_path=None,
                  analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.RAW):
 
@@ -171,7 +171,7 @@ class MEAODataset():
                                               encoding="utf-8-sig").to_numpy()
                 # print(self.coord_data)
 
-            if self.stimtrain_path:
+            if self.stimtrain_path: # [ 58 2 106 ] (176?) -> [ 58 60 176 ]
                 self.stimtrain_frame_stamps = np.cumsum(np.squeeze(pd.read_csv(self.stimtrain_path, delimiter=',', header=None,
                                                           encoding="utf-8-sig").to_numpy()))
             else:

@@ -121,7 +121,6 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
     if method == "L1":
 
         # l1_compressed_sensing( temporal_profiles, framestamps, 0)
-
         # Create a pool of threads for processing.
         with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
