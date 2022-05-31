@@ -1,5 +1,7 @@
 
 import numpy as np
+from scipy import signal
+from ssqueezepy import wavelets, p2up, cwt
 
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix
 
@@ -101,6 +103,13 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     return iORG, num_incl
 
-def wavelet_iORG(temporal_profiles, framestamps):
+def wavelet_iORG(temporal_profiles, framestamps, fps):
+
+    wavelet = "gmw"
+    padtype = "reflect"
+
+    morse = wavelets.Wavelet((wavelet, {"beta": 10}))
+
+    cwt(temporal_profiles, wavelet=morse, t=framestamps/fps)
 
     pass
