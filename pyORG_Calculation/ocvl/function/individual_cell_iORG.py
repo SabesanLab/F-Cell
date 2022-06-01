@@ -188,15 +188,15 @@ if __name__ == "__main__":
            # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
 
         # find the cells with the min, med, and max amplitude
-        min_amp = np.min(simple_amp[0, :])
+        min_amp = np.nanmin(simple_amp[0, :])
         [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
         # print('min_amp ',min_amp)
-        med_amp = np.median(simple_amp[0, :])
+        med_amp = np.nanmedian(simple_amp[0, :])
         near_med_amp = find_nearest(simple_amp[0,:], med_amp)
         [med_amp_row, med_amp_col] = np.where(simple_amp == near_med_amp)
 
         # print('med_amp ', med_amp)
-        max_amp = np.max(simple_amp[0, :])
+        max_amp = np.nanmax(simple_amp[0, :])
         [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
         # print('max_amp ', max_amp)
 
