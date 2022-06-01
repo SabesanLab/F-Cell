@@ -263,7 +263,7 @@ class MEAODataset:
                                                                          reference_idx=self.reference_frame_idx,
                                                                          dropthresh=0.0)
 
-            print( "Keeping " +str(np.sum(inliers))+ " of " +str(self.num_frames)+"...")
+            print( "Keeping " + str(np.sum(inliers)) + " of " + str(self.num_frames)+"...")
 
             # Update everything with what's an inlier now.
             self.ref_video_data = self.ref_video_data[..., inliers]

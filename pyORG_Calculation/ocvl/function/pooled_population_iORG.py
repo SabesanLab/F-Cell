@@ -118,13 +118,14 @@ if __name__ == "__main__":
                 print("Analyzing " + str(len(perm)) + " cells.")
 
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2, display=False)
-              #  plt.savefig(res_dir.joinpath(this_dirname + "_all_raw_profiles.svg"))
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
-                #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
-               #plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
 
+
+                # indiv_resp = pd.DataFrame(np.concatenate((np.reshape(dataset.framestamps/dataset.framerate, (1, len(dataset.framestamps))),
+                #                                          stdize_profiles), axis=0))
+                # indiv_resp.to_csv(res_dir.joinpath(file.name + "_cell_profiles.csv"), header=False, index=False)
 
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
 
