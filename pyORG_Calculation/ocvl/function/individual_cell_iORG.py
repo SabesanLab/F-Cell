@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
             simple_amp[l, c] = poststim_amp-prestim_amp
 
-
+        # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
 
 
             # plt.figure(0)
