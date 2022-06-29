@@ -10,7 +10,7 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 
-def pycoordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
+def coordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
     """
     Original matlab fxn by Robert Cooper
     Adaptation by Mina Gaffney
@@ -34,4 +34,33 @@ def pycoordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
         raise Exception("No coordinates were given! Can't run pycoordclip.")
 
     # Determine image size based on coordinates
-    imsizecol = np.max(coordinates)
+    # (find the max row and col coord value)
+    imsizecol = np.max(coordinates[:, 1])
+    imsizerow = np.max(coordinates[:, 0])
+
+    immincol = np.min(coordinates[:, 1])
+    imminrow = np.min(coordinates[:, 0])
+    print(['max col ', imsizecol])
+    print(['max row', imsizerow])
+    print(['min col ', immincol])
+    print(['min row', imminrow])
+
+
+    # Finding approx center coordinate based on max coord dimensions
+    aprxcntrcol = imsizecol/2
+    aprxcntrrow = imsizerow/2
+    print(['approx c col ', aprxcntrcol])
+    print(['approx c row ', aprxcntrrow])
+
+    # calculating
+
+
+    # Defining threshold variables
+    minRthresh = thresholdr
+    maxRthresh = thresholdr
+    minCthresh = thresholdc
+    maxCthresh = thresholdc
+
+
+
+    return []
