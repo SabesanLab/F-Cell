@@ -10,7 +10,7 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 
-def coordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
+def coordclip(coordinates, numconesbound):
     """
     Original matlab fxn by Robert Cooper
     Adaptation by Mina Gaffney
@@ -31,7 +31,11 @@ def coordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
 
     # Check that coordinates are present
     if coordinates == []:
-        raise Exception("No coordinates were given! Can't run pycoordclip.")
+        raise Exception("Error: No coordinates were given! Can't run pycoordclip.")
+
+    # check to ensure coords only contain x y info
+    if np.size(coordinates, 1) != 2:
+        raise Exception("Error: Coordinate list has more than 2 columns. Please only load in X,Y coordinates.")
 
     # Determine image size based on coordinates
     # (find the max row and col coord value)
@@ -47,19 +51,21 @@ def coordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
 
 
     # Finding approx center coordinate based on max coord dimensions
-    aprxcntrcol = (imsizecol-immincol)/2
-    aprxcntrrow = (imsizerow-imminrow)/2
+    aprxcntrcol = round((imsizecol-immincol)/2)
+    aprxcntrrow = round((imsizerow-imminrow)/2)
     print(['approx c col ', aprxcntrcol])
     print(['approx c row ', aprxcntrrow])
 
-    
+    # Testing if the number of coordinates is smaller than numconesbound
+    if numconesbound > np.size(coordinates,0):
+        numconesbound = np.size(coordinates,0)
+        print(['Num bound cones:', numconesbound])
+
+    # growing the ROI from the center
 
 
-    # Defining threshold variables
-    minRthresh = thresholdr
-    maxRthresh = thresholdr
-    minCthresh = thresholdc
-    maxCthresh = thresholdc
+
+
 
 
 
