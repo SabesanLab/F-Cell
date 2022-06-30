@@ -10,7 +10,7 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 
-def coordclip(coordinates, numconesbound):
+def coordclip(coordinates, upper_bound):
     """
     Original matlab fxn by Robert Cooper
     Adaptation by Mina Gaffney
@@ -57,11 +57,22 @@ def coordclip(coordinates, numconesbound):
     print(['approx c row ', aprxcntrrow])
 
     # Testing if the number of coordinates is smaller than numconesbound
-    if numconesbound > np.size(coordinates,0):
-        numconesbound = np.size(coordinates,0)
-        print(['Num bound cones:', numconesbound])
+    if upper_bound > np.size(coordinates,0):
+        upper_bound = np.size(coordinates,0)
+        print(['Num bound cones:', upper_bound])
 
-    # growing the ROI from the center
+    # Shrinking the ROI from the edges
+    thiswindowsize = 1
+    numbound = 0
+    clipped_coords = []
+    for c in range(0, np.size(coordinates, 0)):
+        while numbound < upper_bound:
+            thiswindowsize = thiswindowsize+1
+
+            rowborders = np.array([coordinates(c, 1) - (thiswindowsize / 2), coordindates(c, 1) + (thiswindowsize / 2)])
+            colborders = np.array([coordinates(c, 0) - (thiswindowsize / 2), coordinates(c, 0) + (thiswindowsize / 2)])
+            print(rowborders)
+            print(colborders)
 
 
 
