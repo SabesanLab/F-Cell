@@ -47,12 +47,12 @@ def coordclip(coordinates, thresholdr, thresholdc, inoutorxor='i'):
 
 
     # Finding approx center coordinate based on max coord dimensions
-    aprxcntrcol = imsizecol/2
-    aprxcntrrow = imsizerow/2
+    aprxcntrcol = (imsizecol-immincol)/2
+    aprxcntrrow = (imsizerow-imminrow)/2
     print(['approx c col ', aprxcntrcol])
     print(['approx c row ', aprxcntrrow])
 
-    # calculating
+    
 
 
     # Defining threshold variables
