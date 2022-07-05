@@ -167,7 +167,7 @@ for k=1:length(video_fname)
     i=1;
     while hasFrame(confocal_vidobj)
 
-        confocal_vid{i} = readFrame(confocal_vidobj);
+        confocal_vid{i} = im2gray(readFrame(confocal_vidobj));
         confocal_f_mean(i) = mean(double(confocal_vid{i}(confocal_vid{i}~=0)));
         if loadsplit
             split_vid{i} = readFrame(split_vidobj);
@@ -215,9 +215,9 @@ for k=1:length(video_fname)
 
     confocal_mean(isnan(confocal_mean)) = 0;
     
-    contenders = false(1,length(frame_nums));
+    contenders = true(1,length(frame_nums));
     for n=1:length(frame_nums)        
-        contenders(n) =  (confocal_f_mean(n) > confocal_mean-2*confocal_dev);
+        contenders(n) =  (confocal_f_mean(n) > confocal_mean-3*confocal_dev);
     end
 
     % Remove frames from contention.
@@ -288,7 +288,7 @@ for k=1:length(video_fname)
 
 %         imagesc( imclose(confocal_vid{n}>0, ones(5)) ); colormap gray;
         % Remove components that aren't more than mu-2std dev pixels in area    
-        big_enough_comps = cc_areas{n} > mean_cc_area-std_cc_area;
+        big_enough_comps = cc_areas{n} > mean_cc_area-2*std_cc_area;
 
         % Put these in a list to track if we have to we can use them, but
         % dropping the smaller of the two components
@@ -342,11 +342,15 @@ for k=1:length(video_fname)
     % imagesc(sum_map); axis image;
 
     max_frm_mask = sum_map >= ( max(sum_map(:))*0.8 );
-    [C, h, w, max_largest_rect] =FindLargestRectangles(max_frm_mask,[1 1 0], [300 150]);
-    cropregion = regionprops(max_largest_rect,'BoundingBox');
-    cropregion = floor(cropregion.BoundingBox);
+    if (max(max_frm_mask(:)) - min(max_frm_mask(:))) == 1
+        [C, h, w, max_largest_rect] =FindLargestRectangles(max_frm_mask,[1 1 0], [300 150]);
+        cropregion = regionprops(max_largest_rect,'BoundingBox');
+        cropregion = floor(cropregion.BoundingBox);
     
-    maxcropregion = [cropregion(1:2), cropregion(1)+cropregion(3), cropregion(2)+cropregion(4)];
+        maxcropregion = [cropregion(1:2), cropregion(1)+cropregion(3), cropregion(2)+cropregion(4)];
+    else
+        maxcropregion = [0 0 1e10 1e10]; % Make it huge so the lines below correct it.
+    end
     
     % Bound our crop region to where the sum_map actually exists
     maxcropregion(maxcropregion<1) = 1;
