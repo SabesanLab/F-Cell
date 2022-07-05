@@ -131,6 +131,8 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
 
+    plt.hist(nummissing, len(fullrange))
+    plt.show(block=False)
 
     print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
 

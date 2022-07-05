@@ -96,7 +96,7 @@ if __name__ == "__main__":
         plt.figure(0)
         plt.clf()
 
-        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
+        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])))
 
         for file in allFiles[loc]:
 

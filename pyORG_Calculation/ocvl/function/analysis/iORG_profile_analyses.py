@@ -1,9 +1,10 @@
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy import signal
 from ssqueezepy import wavelets, p2up, cwt
 
-from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix
+from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
 def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1):
@@ -113,8 +114,21 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     wavelet = "gmw"
     padtype = "reflect"
 
+    #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
+
     morse = wavelets.Wavelet((wavelet, {"beta": 10}))
 
-    cwt(temporal_profiles, wavelet=morse, t=framestamps/fps)
+    #allWx =
+    mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
+    plt.figure(11)
+    ax=plt.gca()
+    for r in range(temporal_profiles.shape[0]):
+        ax.subplot(2, 2, 1)
+        plt.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
+        Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
 
-    pass
+        ax.subplot(2, 2, 2)
+        plt.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+
+
+
