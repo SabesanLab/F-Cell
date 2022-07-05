@@ -57,6 +57,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
+            num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
@@ -75,6 +76,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
+            num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
@@ -92,12 +94,15 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             for i in range(window_radius, num_samples-window_radius):
 
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
-                if np.sum(samples[:] != np.nan) > 10:
+                if samples[:].size != 0 and np.sum(samples[:] != np.nan) > 10:
                     iORG[i] = np.nanmean(samples[:]) # Average second
                     iORG[i] = np.sqrt(iORG[i]) # Sqrt last
-                    num_incl[i] = np.sum(samples[:] != np.nan)
+                   # num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
+            #num_incl = num_incl[framestamps]
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+            num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
