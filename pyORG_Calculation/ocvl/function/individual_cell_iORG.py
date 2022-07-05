@@ -13,6 +13,7 @@ from ocvl.function.analysis.cell_profile_extraction import extract_profiles, nor
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 def find_nearest(array, value):
@@ -173,8 +174,8 @@ if __name__ == "__main__":
 
             simple_amp[l, c] = poststim_amp-prestim_amp
 
-
-
+        # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
+        clippedcoords = coordclip(coord_data, 10, 100, 'i')
 
             # plt.figure(0)
             # plt.clf()
