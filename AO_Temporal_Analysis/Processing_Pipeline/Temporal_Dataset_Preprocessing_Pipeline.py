@@ -23,7 +23,7 @@ except:
     options['title'] = 'Please select your [MATLABROOT]\extern\engines\python folder to link to MATLAB.'
     matlab_folder_path = filedialog.askdirectory(**options)
 
-    ctypes.windll.shell32.ShellExecuteW(None, u"runas",  "C:\\Python37\\python.exe", u"setup.py install", matlab_folder_path, 1)
+    ctypes.windll.shell32.ShellExecuteW(None, u"runas",  "C:\\Program Files\\Python39\\python.exe", u"setup.py install", matlab_folder_path, 1)
 
     try:
         import matlab.engine
@@ -70,8 +70,8 @@ options['initialdir'] = dmp_folder_path
 
 image_folder_path = filedialog.askdirectory(**options)
 
-stimend = 90
-stimbegin = 72
+stimend = 48
+stimbegin = 32
 
 # progo = ttk.Progressbar(root, length=len(os.listdir(dmp_folder_path)))
 # progo.pack()

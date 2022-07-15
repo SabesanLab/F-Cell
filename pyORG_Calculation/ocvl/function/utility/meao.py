@@ -1,5 +1,6 @@
 import glob
 import warnings
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -49,7 +50,7 @@ class MEAODataset:
                 imname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
 
         if not imname:
-            warnings.warn("Unable to detect viable average image file. Dataset functionality may be limited.")
+            #warnings.warn("Unable to detect viable average image file. Dataset functionality may be limited.")
             self.image_path = None
         else:
             self.image_path = path.join(p_name, imname)
@@ -69,14 +70,14 @@ class MEAODataset:
 
                 # If we don't have an image specific to this dataset, search for the all acq avg
                 if not coordname:
-                    for filename in glob.glob(path.join(p_name, "*" + self.analysis_modality + "_ALL_ACQ_AVG_coords.csv")):
+                    for filename in glob.glob(path.join(p_name, "*_ALL_ACQ_AVG_coords.csv")):
                         # print(filename)
                         coordname = filename
             else:
                 coordname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg_coords.csv")
 
             if not coordname:
-                warnings.warn("Unable to detect viable coordinate file. Dataset functionality may be limited.")
+                #warnings.warn("Unable to detect viable coordinate file. Dataset functionality may be limited.")
                 self.coord_path = None
             else:
                 self.coord_path = path.join(p_name, coordname)
@@ -156,12 +157,18 @@ class MEAODataset:
                 pass
                 # warnings.warn("No pipelined reference video data detected.")
 
-            # Load our text data.
-            metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
-            metadata.columns = metadata.columns.str.strip()
+            # Load our text data, if we can.
+            if Path(self.metadata_path).is_file():
+                metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
+                metadata.columns = metadata.columns.str.strip()
 
-            self.framestamps = metadata["FrameStamps"].to_numpy()-1 # Subtract one, because they're stored where 1 is the first index.
-            #self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__) # Should probably carry this forward
+                self.framestamps = metadata["FrameStamps"].to_numpy()-1 # Subtract one, because they're stored where 1 is the first index.
+                #self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__) # Should probably carry this forward
+            elif Path(self.metadata_path[0:-4]+"_acceptable_frames.csv").is_file():
+                self.framestamps = np.squeeze(pd.read_csv(self.metadata_path[0:-4]+"_acceptable_frames.csv", delimiter=',', header=None,
+                                              encoding="utf-8-sig").to_numpy())
+            else:
+                self.framestamps = np.arange(0, self.num_frames)
 
             if self.image_path:
                 self.reference_im = cv2.imread(self.image_path)

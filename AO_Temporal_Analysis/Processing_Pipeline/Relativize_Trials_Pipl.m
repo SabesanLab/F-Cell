@@ -44,10 +44,25 @@ monooptimizer.GradientMagnitudeTolerance = 1e-5;
 tforms = cell(length(trial_im),length(trial_im));
 
 % Find the transform from each image to every other
+distmat = zeros(length(trial_im),length(trial_im));
+for i=1:length(trial_im)
+    parfor j=1:length(trial_im)
+        if i~=j
+		    [xcorr_map , ~] = normxcorr2_general(trial_im{j}, trial_im{i}, prod(mean([imsize(j,:);imsize(i,:)])/2) );
+            
+            [~, ncc_ind] = max(xcorr_map(:));
+            [roff, coff]= ind2sub(size(xcorr_map), ncc_ind );
+            roff = roff-size(trial_im{j},1);
+            coff = coff-size(trial_im{j},2);
+            distmat(i, j) = sqrt(roff*roff+coff*coff);
+		end
+	end
+end
+	
+avgdist = mean(distmat,2);
+%thearea = prod(imsize,2);
 
-thearea = prod(imsize,2);
-
-[~, ref_im] = max(thearea);
+[~, ref_im] = min(avgdist);
 confocal_fname{ref_im}
 
 i=ref_im;
@@ -113,7 +128,7 @@ end
 % matchexp = '_n\d*_';
 % avgname = regexprep(avgname,matchexp,'_');
 
-imwrite(uint8(sum(double(reg_ims),3)./sum_map), fullfile(pathname,[confocal_fname{i}(1:end-8) '_ALL_TRIALS.tif']));
+imwrite(uint8(sum(double(reg_ims),3)./sum_map), fullfile(pathname,[confocal_fname{i}(1:end-8) '_ALL_ACQ_AVG.tif']));
 
 %% Split Relativized stack
 split_name_in = fullfile(pathname, strrep(confocal_fname{ref_im}, 'confocal', 'split_det'));
@@ -157,7 +172,7 @@ if exist(split_name_in,'file')
     % matchexp = '_n\d*_';
     % avgname = regexprep(avgname,matchexp,'_');
 
-    imwrite(uint8(sum(double(split_reg_ims),3)./sum_map), fullfile(pathname, [strrep(confocal_fname{ref_im}(1:end-8), 'confocal', 'split_det') '_ALL_TRIALS.tif']) );
+    imwrite(uint8(sum(double(split_reg_ims),3)./sum_map), fullfile(pathname, [strrep(confocal_fname{ref_im}(1:end-8), 'confocal', 'split_det') '_ALL_ACQ_AVG.tif']) );
 end
 
 %% Transform all of the videos associated with each avg image

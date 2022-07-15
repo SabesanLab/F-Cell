@@ -10,9 +10,10 @@ from matplotlib.colors import Normalize
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles
-from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
+from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 def find_nearest(array, value):
@@ -121,6 +122,7 @@ if __name__ == "__main__":
                     stimulus_train = dataset.stimtrain_frame_stamps
                     simple_amp = np.empty((len(allFiles), len(coord_data)))
                     simple_amp[:] = np.nan
+                    ref_im = dataset.reference_im
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
@@ -132,7 +134,7 @@ if __name__ == "__main__":
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
-                #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
+                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
@@ -155,11 +157,22 @@ if __name__ == "__main__":
         cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
 
-        # Make 3D matricies
+        # Make 3D matricies, where:
+        # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
+        # The second dimension (columns) is time
+        # The third dimension is each tracked coordinate
         for c in range(len(coord_data)):
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
+            plt.figure(11)
+            plt.clf()
+            plt.subplot(2, 2, (1, 2))
+            plt.imshow(ref_im)
+            plt.plot(coord_data[c][0], coord_data[c][1], "r*")
+
+            wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate)
+            plt.show(block=False)
             cell_profiles[c] = []
             cell_framestamps[c] = []
 
@@ -173,8 +186,8 @@ if __name__ == "__main__":
 
             simple_amp[l, c] = poststim_amp-prestim_amp
 
-
-
+        # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
+        clippedcoords = coordclip(coord_data, 10, 100, 'i')
 
             # plt.figure(0)
             # plt.clf()

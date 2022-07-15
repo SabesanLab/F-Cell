@@ -1,9 +1,10 @@
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy import signal
 from ssqueezepy import wavelets, p2up, cwt
 
-from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix
+from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
 def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1):
@@ -57,6 +58,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
+            num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
@@ -75,6 +77,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
+            num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
@@ -92,12 +95,15 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             for i in range(window_radius, num_samples-window_radius):
 
                 samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
-                if np.sum(samples[:] != np.nan) > 10:
+                if samples[:].size != 0 and np.sum(samples[:] != np.nan) > 10:
                     iORG[i] = np.nanmean(samples[:]) # Average second
                     iORG[i] = np.sqrt(iORG[i]) # Sqrt last
-                    num_incl[i] = np.sum(samples[:] != np.nan)
+                   # num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[framestamps]
+            #num_incl = num_incl[framestamps]
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+            num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
 
@@ -108,8 +114,23 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     wavelet = "gmw"
     padtype = "reflect"
 
+    #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
+
     morse = wavelets.Wavelet((wavelet, {"beta": 10}))
 
-    cwt(temporal_profiles, wavelet=morse, t=framestamps/fps)
+    #allWx =
+    mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
+    plt.figure(11)
+    signal = plt.subplot(2, 2, 3)
+    wavelet = plt.subplot(2, 2, 4)
 
-    pass
+    for r in range(temporal_profiles.shape[0]):
+
+        signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
+        Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
+
+        wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+        plt.waitforbuttonpress()
+
+
+

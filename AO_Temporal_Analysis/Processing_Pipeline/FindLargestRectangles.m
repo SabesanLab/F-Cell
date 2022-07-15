@@ -22,7 +22,7 @@ p = crit;
 [nR nC] = size(I);
 if (minSize(1)<1), minSize(1)= floor(minSize(1)*nR); end
 if (minSize(2)<1), minSize(2)= floor(minSize(2)*nC); end
-if (max(I(:)) - min(I(:))==1),
+if (max(I(:)) - min(I(:))==1)
   S = FindLargestSquares(I);
 else
   S = I;
