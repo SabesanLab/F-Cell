@@ -5,6 +5,7 @@ from pathlib import Path
 from tkinter import Tk, filedialog, ttk, HORIZONTAL
 
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.spatial import Voronoi, voronoi_plot_2d
@@ -173,6 +174,9 @@ if __name__ == "__main__":
 
             wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate)
             plt.show(block=False)
+            #indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
+            #indiv_resp.to_csv(res_dir.joinpath(file.name + "_cell_profiles.csv"), header=False, index=False)
+
             cell_profiles[c] = []
             cell_framestamps[c] = []
 

@@ -1,5 +1,6 @@
 
 import numpy as np
+import pywt
 from matplotlib import pyplot as plt
 from scipy import signal
 from ssqueezepy import wavelets, p2up, cwt
@@ -111,12 +112,13 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
 def wavelet_iORG(temporal_profiles, framestamps, fps):
 
-    wavelet = "gmw"
-    padtype = "reflect"
+    #wavelet = "gmw"
+    #padtype = "reflect"
 
     #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
 
-    morse = wavelets.Wavelet((wavelet, {"beta": 10}))
+    #morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 3}))
+    biorwav = pywt.Wavelet("bior1.3")
 
     #allWx =
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
@@ -127,9 +129,11 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     for r in range(temporal_profiles.shape[0]):
 
         signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
-        Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
-
-        wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+        #Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
+        coeffs = pywt.wavedec(temporal_profiles[r, :], "bior1.3", level=4)
+        a4, d4, d3, d2, d1 = coeffs
+        print(d4[5])
+        #wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
         plt.waitforbuttonpress()
 
 
