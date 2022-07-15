@@ -121,14 +121,16 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     #allWx =
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
     plt.figure(11)
-    ax=plt.gca()
+    signal = plt.subplot(2, 2, 3)
+    wavelet = plt.subplot(2, 2, 4)
+
     for r in range(temporal_profiles.shape[0]):
-        ax.subplot(2, 2, 1)
-        plt.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
+
+        signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
         Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
 
-        ax.subplot(2, 2, 2)
-        plt.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+        wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+        plt.waitforbuttonpress()
 
 
 

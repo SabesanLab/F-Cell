@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
             plt.figure(11)
             plt.clf()
-            plt.subplot(1, 2, 1)
+            plt.subplot(2, 2, (1, 2))
             plt.imshow(ref_im)
             plt.plot(coord_data[c][0], coord_data[c][1], "r*")
 
