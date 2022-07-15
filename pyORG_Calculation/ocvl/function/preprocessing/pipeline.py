@@ -48,7 +48,7 @@ def initialize_and_load_meao(file, a_mode, ref_mode):
     return dataset, imp, wp, ref_imp[0]
 
 
-def run_ff_pipeline(pName, tkroot):
+def run_generic_pipeline(pName, tkroot):
     root = tkroot
     pb = ttk.Progressbar(root, orient=HORIZONTAL, length=512)
     pb.grid(column=0, row=0, columnspan=2, padx=3, pady=5)
@@ -99,6 +99,43 @@ def run_ff_pipeline(pName, tkroot):
 
             dataset.save_data("_ff")
             r += 1
+
+def run_demotion_pipeline(pName, tkroot):
+    root = tkroot
+    pb = ttk.Progressbar(root, orient=HORIZONTAL, length=512)
+    pb.grid(column=0, row=0, columnspan=2, padx=3, pady=5)
+    pb_label = ttk.Label(root, text="Initializing setup...")
+    pb_label.grid(column=0, row=1, columnspan=2)
+    pb.start()
+
+    # Resize our root to show our progress bar.
+    w = 512
+    h = 64
+    x = root.winfo_screenwidth() / 2 - 256
+    y = root.winfo_screenheight() / 2 - 64
+    root.geometry('%dx%d+%d+%d' % (w, h, x, y))
+    root.update()
+
+    allFiles = dict()
+
+    # Parse out the locations and filenames, store them in a hash table.
+    for (dirpath, dirnames, filenames) in walk(pName):
+        for fName in filenames:
+            if splitext(fName)[1] == ".avi":
+                splitfName = fName.split("_")
+
+                loc = splitfName[5]
+                print("Found location "+loc)
+                if loc not in allFiles:
+                    allFiles[loc] = []
+                    allFiles[loc].append(os.path.join(pName, fName))
+                else:
+                    allFiles[loc].append(os.path.join(pName, fName))
+
+        break # Break after the first run so we don't go recursive.
+
+
+
 
 def run_meao_pipeline(pName, tkroot):
     root = tkroot

@@ -121,7 +121,7 @@ class GenericDataset:
             self.height = resource.data.shape[0]
             self.num_frames = resource.data.shape[-1]
 
-            self.ref_video_data, xforms, inliers = optimizer_stack_align(self.video_data,
+            self.video_data, xforms, inliers = optimizer_stack_align(self.video_data,
                                                                          reference_idx=self.reference_frame_idx,
                                                                          dropthresh=0.0)
 
