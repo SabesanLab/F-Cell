@@ -348,7 +348,7 @@ def run_meao_pipeline(pName, tkroot):
                 # Save the pipelined dataset.
                 metadata = pd.DataFrame(data.framestamps, columns=["FrameStamps"])
                 metadata.to_csv(os.path.join(writepath, data.filename[:-4] + "_piped.csv"), index=False)
-                save_video(os.path.join(writepath, data.filename[:-4] + "_piped.avi"), data.video_data, 29.4)
+                save_video(os.path.join(writepath, data.filename[:-4] + "_piped.avi"), data.video_data, data.framerate)
 
             weight_proj = weight_proj[cropy:(cropy+croph), cropx:(cropx+cropw), :]
             a_im_proj = a_im_proj[cropy:(cropy+croph), cropx:(cropx+cropw), :]

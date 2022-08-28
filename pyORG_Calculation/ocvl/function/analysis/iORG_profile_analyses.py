@@ -118,7 +118,9 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
 
     #morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 3}))
-    biorwav = pywt.Wavelet("bior1.3")
+    #biorwav = pywt.Wavelet("bior1.3")
+
+    fifth = np.empty(temporal_profiles.shape[0])
 
     #allWx =
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
@@ -130,11 +132,15 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
 
         signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
         #Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
-        coeffs = pywt.wavedec(temporal_profiles[r, :], "bior1.3", level=4)
-        a4, d4, d3, d2, d1 = coeffs
-        print(d4[5])
-        #wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+        a4, d4, d3, d2, d1 = pywt.swt(temporal_profiles[r, :], "bior1.3", level=4, trim_approx=True)
+        wavelet.plot(d4)
         plt.waitforbuttonpress()
+        signal.cla()
+
+        #wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+
+    wavelet.hist(fifth, bins=10)
+    plt.waitforbuttonpress()
 
 
 

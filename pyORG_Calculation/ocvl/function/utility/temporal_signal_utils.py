@@ -125,7 +125,7 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
         with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
             reconst = pool.starmap_async(l1_compressed_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
-                                                                    range(temporal_profiles.shape[0]), repeat(0.25)))
+                                                                    range(temporal_profiles.shape[0]), repeat(0.5)))
             res = reconst.get()
             for c, result in enumerate(res):
                 reconstruction[c, :] = np.array(result[0])
