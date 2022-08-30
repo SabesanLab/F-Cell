@@ -117,7 +117,7 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2, display=False)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
@@ -160,7 +160,9 @@ if __name__ == "__main__":
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
                     plt.figure(0)
-                    plt.plot(dataset.framestamps, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
+                    plt.xlabel("Time (seconds)")
+                    plt.ylabel("Response")
+                    plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
                              label=file.name)
                     plt.show(block=False)
 
@@ -169,6 +171,9 @@ if __name__ == "__main__":
                 if dataset.framestamps[-1] > max_frmstamp:
                     max_frmstamp = dataset.framestamps[-1]
 
+        plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
+        plt.xlim([0,  max_frmstamp/dataset.framerate])
+        plt.ylim([0, 0.9])
         #plt.legend()
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
@@ -225,8 +230,12 @@ if __name__ == "__main__":
 
         plt.figure(1)
         plt.clf()
-        plt.plot(pooled_iORG)
+        plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
+        plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
+        plt.xlim([0, max_frmstamp / dataset.framerate])
         plt.ylim([0, 0.9])
+        plt.xlabel("Time (seconds)")
+        plt.ylabel("Response")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.png"))
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.svg"))
