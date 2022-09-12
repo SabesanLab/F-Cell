@@ -1,3 +1,4 @@
+import math
 
 import numpy as np
 import pywt
@@ -120,8 +121,6 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     #morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 3}))
     #biorwav = pywt.Wavelet("bior1.3")
 
-    fifth = np.empty(temporal_profiles.shape[0])
-
     #allWx =
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
     plt.figure(11)
@@ -129,17 +128,17 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     wavelet = plt.subplot(2, 2, 4)
 
     for r in range(temporal_profiles.shape[0]):
+        nextpowdiff = 2**math.ceil(math.log2(temporal_profiles[r, :].shape[0])) - temporal_profiles[r, :].shape[0]
 
         signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
-        #Wx, scales = cwt(temporal_profiles[r, :], wavelet=morse, t=framestamps/fps, padtype=padtype)
-        a4, d4, d3, d2, d1 = pywt.swt(temporal_profiles[r, :], "bior1.3", level=4, trim_approx=True)
-        wavelet.plot(d4)
-        plt.waitforbuttonpress()
-        signal.cla()
-
+        a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
+                                      "haar", level=4, trim_approx=True, norm=True)
+        wavelet.plot(framestamps/fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
+        #plt.waitforbuttonpress()
+        #signal.cla()
         #wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
 
-    wavelet.hist(fifth, bins=10)
+    #wavelet.hist(fifth, bins=10)
     plt.waitforbuttonpress()
 
 

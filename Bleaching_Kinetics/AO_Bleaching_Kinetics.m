@@ -10,7 +10,7 @@ clear;
 
 units = 'trolands';
 stim_lambda = 554; % in nm
-stim_irradiance =  16.5; % in uW
+stim_irradiance =  3.78; % in uW
 
 num_acquisitions = 10;
 single_trial_train = [0 1  0;
@@ -39,7 +39,7 @@ end
 
 switch (units)
     case 'trolands'
-        I_0 = 10^4.3; % in Td %Stimulus intensity that bleaches at the rate of 1/N
+        I_0 = 20000; % in Td %Stimulus intensity that bleaches at the rate of 1/N
                       % 73.7 Td for rods, 20000 Td for cones
         N = 120; % Scaling factor, where 400=rhodopsin, 120=L/M cones.
     case 'isomerizations'

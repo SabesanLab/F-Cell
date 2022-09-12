@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
                     first = False
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=1)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
@@ -174,8 +174,9 @@ if __name__ == "__main__":
 
             wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate)
             plt.show(block=False)
-            #indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
-            #indiv_resp.to_csv(res_dir.joinpath(file.name + "_cell_profiles.csv"), header=False, index=False)
+            indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
+            indiv_resp.to_csv(res_dir.joinpath(file.name + "cell_" + str(c) + "_cell_profiles.csv"),
+                              header=False, index=False)
 
             cell_profiles[c] = []
             cell_framestamps[c] = []
@@ -191,7 +192,7 @@ if __name__ == "__main__":
             simple_amp[l, c] = poststim_amp-prestim_amp
 
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
-        clippedcoords = coordclip(coord_data, 10, 100, 'i')
+        #clippedcoords = coordclip(coord_data, 10, 100, 'i')
 
             # plt.figure(0)
             # plt.clf()

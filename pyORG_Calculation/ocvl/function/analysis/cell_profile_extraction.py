@@ -204,11 +204,13 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
     if display:
         plt.figure(1)
         for i in range(temporal_profiles.shape[0]):
+            plt.clf()
             plt.plot(framestamps, temporal_profiles[i, :])
+            plt.waitforbuttonpress()
 
         plt.show(block=False)
 
-        #plt.waitforbuttonpress()
+
 
     return temporal_profiles
 

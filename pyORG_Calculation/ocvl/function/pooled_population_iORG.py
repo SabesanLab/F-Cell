@@ -160,12 +160,13 @@ if __name__ == "__main__":
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
                     plt.figure(0)
+                    plt.clf()
                     plt.xlabel("Time (seconds)")
                     plt.ylabel("Response")
                     plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
                              label=file.name)
                     plt.show(block=False)
-
+                    plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
                     r += 1
 
                 if dataset.framestamps[-1] > max_frmstamp:
