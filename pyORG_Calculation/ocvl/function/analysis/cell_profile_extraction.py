@@ -1,5 +1,6 @@
 import warnings
 
+import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
@@ -8,6 +9,89 @@ from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+
+def refine_coord(ref_image, coordinates, search_radius=2):
+
+    im_size = ref_image.shape
+
+    # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
+    pluscoord = coordinates + search_radius
+    excludelist = pluscoord[:, 0] < im_size[1]
+    excludelist |= pluscoord[:, 1] < im_size[0]
+    del pluscoord
+
+    minuscoord = coordinates - search_radius
+    excludelist |= minuscoord[:, 0] > 0
+    excludelist |= minuscoord[:, 1] > 0
+    del minuscoord
+
+    coordinates = np.round(coordinates[excludelist, :]).astype("int")
+
+    for i in range(coordinates.shape[0]):
+        coord = coordinates[i, :]
+
+        ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
+                                 (coord[0] - search_radius):(coord[0] + search_radius + 1)]
+
+        minV, maxV, minL, maxL = cv2.minMaxLoc(ref_template)
+
+        maxL = np.array(maxL)-search_radius # Make relative to the center.
+        coordinates[i, :] = coord + maxL
+
+    return coordinates
+
+
+def refine_coord_to_stack(image_stack, ref_image, im_range, coordinates, search_radius=3):
+    ref_image = ref_image.astype("uint8")
+    image_stack = image_stack.astype("uint8")
+    #image_stack[image_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
+
+    im_size = image_stack.shape
+
+    search_region = 2*search_radius # Include extra region for edge effects
+
+    # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
+    pluscoord = coordinates + search_region
+    excludelist = pluscoord[:, 0] < im_size[1]
+    excludelist |= pluscoord[:, 1] < im_size[0]
+    del pluscoord
+
+    minuscoord = coordinates - search_region
+    excludelist |= minuscoord[:, 0] > 0
+    excludelist |= minuscoord[:, 1] > 0
+    del minuscoord
+
+    coordinates = np.round(coordinates[excludelist, :]).astype("int")
+
+    #search_mask = np.zeros(2*search_region)
+    #search_mask[(coord[1] - search_radius):(coord[1] + search_radius + 1),
+                #(coord[0] - search_radius):(coord[0] + search_radius + 1)]
+
+    for i in range(coordinates.shape[0]):
+        coord = coordinates[i, :]
+
+        stack_data = image_stack[(coord[1] - search_region):(coord[1] + search_region + 1),
+                                 (coord[0] - search_region):(coord[0] + search_region + 1),
+                                  :]
+        stack_im = np.nanmean(stack_data, axis=-1).astype("uint8")
+        ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
+                                   (coord[0] - search_radius):(coord[0] + search_radius + 1)]
+
+
+
+        match_reg = cv2.matchTemplate(stack_im, ref_template, cv2.TM_CCOEFF_NORMED)
+        minV, maxV, minL, maxL = cv2.minMaxLoc(match_reg)
+        maxL = np.array(maxL) - search_radius  # Make relative to the center.
+        # print(coord)
+        coordinates[i, :] = coord + maxL
+        # print(coordinates[i, :])
+        # plt.figure(10)
+        # plt.imshow(stack_im)
+        # plt.figure(11)
+        # plt.imshow(match_reg)
+        # plt.show(block=False)
+        # print(maxL)
+    return coordinates
 
 
 def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", centroid=None, display=False):
@@ -22,18 +106,13 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     :param summary: the method used to summarize the area inside the segmentation radius. Default: "mean",
                     Options: "mean", "median"
     :param centroid: precede extraction at each stage with a centroid using a supplied method. Default: None,
-                    Options: "voronoi", "simple"
+                    Options: "voronoi", "simple", "xcorr"
 
     :return: an NxM numpy matrix with N cells and M temporal samples of some signal.
     """
 
-
     if coordinates is None:
         pass # Todo: create coordinates for every position in the image stack.
-
-    if centroid:
-        if centroid == "voronoi":
-            pass
 
     image_stack = image_stack.astype("float64")
     image_stack[image_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
@@ -53,24 +132,34 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
     coordinates = np.round(coordinates[excludelist, :]).astype("int")
 
-    profile_data = np.empty((coordinates.shape[0], image_stack.shape[-1]))
+    if summary != "none":
+        profile_data = np.empty((coordinates.shape[0], image_stack.shape[-1]))
+    else:
+        profile_data = np.empty((seg_radius*2 + 1, seg_radius*2 + 1,
+                                 image_stack.shape[-1], coordinates.shape[0]))
 
     if seg_mask == "box": # Handle more in the future...
         for i in range(coordinates.shape[0]):
+
             coord = coordinates[i, :]
-            coordcolumn = image_stack[(coord[1]-seg_radius):(coord[1]+seg_radius+1),
+            fullcolumn = image_stack[(coord[1]-seg_radius):(coord[1]+seg_radius+1),
                                       (coord[0]-seg_radius):(coord[0]+seg_radius+1), :]
 
-            coldims = coordcolumn.shape
-            coordcolumn = np.reshape(coordcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
+            coldims = fullcolumn.shape
+            coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
             # No partial columns allowed. If there are nans in the column, wipe it out entirely.
             nani = np.any(np.isnan(coordcolumn), axis=0)
             coordcolumn[:, nani] = np.nan
-            profile_data[i, nani] = np.nan
+
             if summary == "mean":
+                profile_data[i, nani] = np.nan
                 profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
             elif summary == "median":
+                profile_data[i, nani] = np.nan
                 profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
+            elif summary == "none":
+                profile_data[:, :, nani] = 0
+                profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
 
     if display:
         plt.figure(1)
@@ -80,7 +169,6 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
         plt.show(block=False)
 
     return profile_data
-
 
 def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False):
     """
