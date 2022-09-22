@@ -124,16 +124,20 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
     #allWx =
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
     plt.figure(11)
-    signal = plt.subplot(2, 2, 3)
-    wavelet = plt.subplot(2, 2, 4)
+
+    signal = plt.subplot(2, 2, 2)
+    waveletd3 = plt.subplot(2, 2, 3)
+    waveletd4 = plt.subplot(2, 2, 4)
 
     for r in range(temporal_profiles.shape[0]):
         nextpowdiff = 2**math.ceil(math.log2(temporal_profiles[r, :].shape[0])) - temporal_profiles[r, :].shape[0]
 
         signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
         a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
-                                      "haar", level=4, trim_approx=True, norm=True)
-        wavelet.plot(framestamps/fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
+                                      "bior1.5", level=4, trim_approx=True, norm=False)
+        waveletd3.plot(framestamps / fps, d3[0:176], color=mapper.to_rgba(r, norm=False))
+        waveletd4.plot(framestamps / fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
+        print(np.nansum(temporal_profiles[r, :]**2))
         #plt.waitforbuttonpress()
         #signal.cla()
         #wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))

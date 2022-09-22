@@ -52,9 +52,17 @@ def load_video(video_path):
 
     return Resource(dattype=ResourceType.IMAGE3D, name=os.path.basename(video_path), data=video_data, metadict=meta)
 
-def save_video(video_path, video_data, framerate, scalar_mapper=None):
+def save_tiff_stack(stack_path, stack_data, scalar_mapper=None):
+
+    framelist = np.empty((stack_data.shape[2], stack_data.shape[0], stack_data.shape[1]))
+    for f in range(stack_data.shape[-1]):
+        framelist[f, :, :] = stack_data[..., f].astype("uint8")
+
+    cv2.imwritemulti(str(stack_path), framelist)
+
+def save_video(video_path, video_data, framerate = 30, scalar_mapper=None):
     if scalar_mapper is None:
-        vidout = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*"Y800"), framerate,
+        vidout = cv2.VideoWriter(str(video_path), cv2.VideoWriter_fourcc(*"Y800"), framerate,
                                  (video_data.shape[1], video_data.shape[0]), isColor=False )
 
         if vidout.isOpened():

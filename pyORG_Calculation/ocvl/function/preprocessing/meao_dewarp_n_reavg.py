@@ -71,7 +71,7 @@ if __name__ == "__main__":
     pb["maximum"] = totFiles
     for fid in allFiles:
         for video_path in allFiles[fid]:
-            if "_mask" in video_path:
+            if "_mask" in video_path or "coarse" in video_path:
                 r += 1
                 continue
 

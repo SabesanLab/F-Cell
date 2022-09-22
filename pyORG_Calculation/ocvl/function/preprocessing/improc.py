@@ -63,11 +63,11 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
     for f in range(num_frames):
         # Fit across rows, in order to capture all strips for a given dataset
         finite = np.isfinite(col_shifts[f, :])
-        col_strip_fit = Polynomial.fit(substrip[finite], col_shifts[f, finite], deg=8)
+        col_strip_fit = Polynomial.fit(substrip[finite], col_shifts[f, finite], deg=12)
         indiv_colshift[f, :] = col_strip_fit(allrows)
         # Fit across rows, in order to capture all strips for a given dataset
         finite = np.isfinite(row_shifts[f, :])
-        row_strip_fit = Polynomial.fit(substrip[finite], row_shifts[f, finite], deg=8)
+        row_strip_fit = Polynomial.fit(substrip[finite], row_shifts[f, finite], deg=12)
         indiv_rowshift[f, :] = row_strip_fit(allrows)
 
     if method == "median":
