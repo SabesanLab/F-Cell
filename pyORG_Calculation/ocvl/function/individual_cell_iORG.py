@@ -10,11 +10,13 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles
+from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
+    refine_coord, refine_coord_to_stack
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.pycoordclip import coordclip
+from ocvl.function.utility.resources import save_video, save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 def find_nearest(array, value):
@@ -123,7 +125,10 @@ if __name__ == "__main__":
                     stimulus_train = dataset.stimtrain_frame_stamps
                     simple_amp = np.empty((len(allFiles), len(coord_data)))
                     simple_amp[:] = np.nan
-                    ref_im = dataset.reference_im
+                    ref_im = dataset.reference_im[:,:,0]
+                    full_profiles = []
+
+                    coord_data = refine_coord(ref_im, dataset.coord_data)
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
@@ -131,7 +136,11 @@ if __name__ == "__main__":
 
                     first = False
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2)
+                coord_data = refine_coord_to_stack(dataset.video_data, ref_im, (0, stimulus_train[0]), coord_data)
+
+                full_profiles.append(extract_profiles(dataset.video_data, coord_data, seg_radius=5, summary="none"))
+
+                temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=2, summary="median")
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
@@ -166,17 +175,20 @@ if __name__ == "__main__":
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
+             #   save_tiff_stack(res_dir.joinpath(file.name[0:-4] + "cell(" + str(coord_data[c][0]) +","+
+              #                                   str(coord_data[c][1]) + ")_vid_" + str(i) + ".tif"), full_profiles[i][:, :, :, c])
+
             plt.figure(11)
             plt.clf()
-            plt.subplot(2, 2, (1, 2))
+            plt.subplot(2, 2, 1)
             plt.imshow(ref_im)
             plt.plot(coord_data[c][0], coord_data[c][1], "r*")
 
             wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate)
             plt.show(block=False)
-            indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
-            indiv_resp.to_csv(res_dir.joinpath(file.name + "cell_" + str(c) + "_cell_profiles.csv"),
-                              header=False, index=False)
+            #indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
+            #indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
+                              #header=False, index=False)
 
             cell_profiles[c] = []
             cell_framestamps[c] = []
