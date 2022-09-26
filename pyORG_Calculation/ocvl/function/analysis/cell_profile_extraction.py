@@ -41,7 +41,7 @@ def refine_coord(ref_image, coordinates, search_radius=2):
     return coordinates
 
 
-def refine_coord_to_stack(image_stack, ref_image, im_range, coordinates, search_radius=3):
+def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=3):
     ref_image = ref_image.astype("uint8")
     image_stack = image_stack.astype("uint8")
     #image_stack[image_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
@@ -147,6 +147,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
             coldims = fullcolumn.shape
             coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
+
             # No partial columns allowed. If there are nans in the column, wipe it out entirely.
             nani = np.any(np.isnan(coordcolumn), axis=0)
             coordcolumn[:, nani] = np.nan
@@ -154,9 +155,11 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
             if summary == "mean":
                 profile_data[i, nani] = np.nan
                 profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
+
             elif summary == "median":
                 profile_data[i, nani] = np.nan
                 profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
+
             elif summary == "none":
                 profile_data[:, :, nani] = 0
                 profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
@@ -166,9 +169,35 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
         for i in range(profile_data.shape[0]):
             plt.plot(profile_data[i, :]-profile_data[i, 0])
 
-        plt.show(block=False)
-
     return profile_data
+
+def exclude_profiles(temporal_profiles, framestamps,
+                     critical_region=None, critical_fraction=0.5):
+    """
+    A bit of code used to remove cells that don't have enough data in the critical region of a signal. This is typically
+    surrounding a stimulus.
+
+    :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
+    :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_profiles.
+    :param critical_region: A set of values containing the critical region of a signal- if a cell doesn't have data here,
+                            then drop its entire signal from consideration.
+    :param critical_fraction: The percentage of real values required to consider the signal valid.
+    :return: a NxM numpy matrix of pared-down profiles, where profiles that don't fit the criterion are dropped.
+    """
+
+    if critical_region is not None:
+
+        crit_inds = np.where(np.isin(framestamps, critical_region))[0]
+        crit_remove = 0
+        for i in range(temporal_profiles.shape[0]):
+            if np.sum(~np.isnan(temporal_profiles[i, crit_inds])) / len(critical_region) < critical_fraction:
+                crit_remove += 1
+                temporal_profiles[i, :] = np.nan
+
+    if critical_region is not None:
+        print(str(crit_remove) + " cells were removed due to missing data at stimulus delivery")
+
+    return temporal_profiles
 
 def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False):
     """

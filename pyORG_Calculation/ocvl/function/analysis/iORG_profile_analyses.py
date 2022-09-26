@@ -111,15 +111,17 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     return iORG, num_incl
 
-def wavelet_iORG(temporal_profiles, framestamps, fps):
+def wavelet_iORG(temporal_profiles, framestamps, fps, titles):
 
-    #wavelet = "gmw"
-    #padtype = "reflect"
-
+    wavelet = "gmw"
+    padtype = "reflect"
     #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
 
-    #morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 3}))
-    #biorwav = pywt.Wavelet("bior1.3")
+    morelet = wavelets.Wavelet(('morlet', {'mu': 3}))
+    morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 1}))
+    morse_diff = wavelets.Wavelet((wavelet, {"gamma": 2, "beta": 1}))
+    bump = wavelets.Wavelet(('bump'))
+    #biorwav = wavelets.Wavelet("bior1.3")
 
     #allWx =
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
@@ -131,19 +133,25 @@ def wavelet_iORG(temporal_profiles, framestamps, fps):
 
     for r in range(temporal_profiles.shape[0]):
         nextpowdiff = 2**math.ceil(math.log2(temporal_profiles[r, :].shape[0])) - temporal_profiles[r, :].shape[0]
+        signal.cla()
+        signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
+        # a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
+        #                               "bior1.3", level=4, trim_approx=True, norm=False)
+        #waveletd3.plot(framestamps / fps, d3[0:176], color=mapper.to_rgba(r, norm=False))
+        #waveletd4.plot(framestamps / fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
+        #print(np.nansum(temporal_profiles[r, :]**2))
 
-        signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False))
-        a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
-                                      "bior1.5", level=4, trim_approx=True, norm=False)
-        waveletd3.plot(framestamps / fps, d3[0:176], color=mapper.to_rgba(r, norm=False))
-        waveletd4.plot(framestamps / fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
-        print(np.nansum(temporal_profiles[r, :]**2))
-        #plt.waitforbuttonpress()
-        #signal.cla()
-        #wavelet.imshow(np.abs(Wx), extent=(0, framestamps[-1], scales[0], scales[-1]))
+        Wx, scales = cwt(temporal_profiles[r, 0:150], wavelet=morse, t=framestamps[0:150]/fps, padtype=padtype, scales="log-piecewise")
+        waveletd3.imshow(np.abs(Wx))#, extent=(0, framestamps[150], scales[0], scales[-1]))
+        Wx, scales = cwt(temporal_profiles[r, 0:150], wavelet=morse_diff, t=framestamps[0:150] / fps, padtype=padtype,
+                         scales="log-piecewise")
+        waveletd4.imshow(np.abs(Wx))
+        plt.title(titles[r].name)
+        plt.show(block=False)
+        plt.waitforbuttonpress()
 
     #wavelet.hist(fifth, bins=10)
-    plt.waitforbuttonpress()
+    #plt.waitforbuttonpress()
 
 
 
