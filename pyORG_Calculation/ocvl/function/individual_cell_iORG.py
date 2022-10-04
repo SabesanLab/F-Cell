@@ -19,6 +19,7 @@ from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.resources import save_video, save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
+
 def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
@@ -92,8 +93,9 @@ if __name__ == "__main__":
     # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
         first = True
-        res_dir = loc.joinpath("Results") # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
-        res_dir.mkdir(exist_ok=True) # actually makes the directory if it doesn't exist. if it exists it does nothing.
+        res_dir = loc.joinpath(
+            "Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
+        res_dir.mkdir(exist_ok=True)  # actually makes the directory if it doesn't exist. if it exists it does nothing.
 
         this_dirname = res_dir.parent.name
 
@@ -139,26 +141,25 @@ if __name__ == "__main__":
                 coord_data = refine_coord_to_stack(dataset.video_data, ref_im, coord_data)
 
                 full_profiles.append(extract_profiles(dataset.video_data, coord_data, seg_radius=5, summary="none"))
-
                 temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=2, summary="mean")
 
-                print(str((stimulus_train[0] - int(0.15 * framerate)) / framerate) + " to " + str(
-                    (stimulus_train[1] + int(0.2 * framerate)) / framerate))
+                # print(str((stimulus_train[0] - int(0.15 * framerate)) / framerate) + " to " + str(
+                #    (stimulus_train[1] + int(0.2 * framerate)) / framerate))
                 temp_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
-                                                critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
-                                                                          stimulus_train[1] + int(0.2 * framerate)),
-                                                critical_fraction=0.6)
-
-
+                                                 critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
+                                                                           stimulus_train[1] + int(0.2 * framerate)),
+                                                 critical_fraction=0.4)
 
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
-                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
+               # stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
+               #                                                                        dataset.framestamps)
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
-                    cell_framestamps[c].append(dataset.framestamps) # HERE IS THE PROBLEM, YO - appends extra things to the same cell, despite not being long enough
+                    cell_framestamps[c].append(
+                        dataset.framestamps)  # HERE IS THE PROBLEM, YO - appends extra things to the same cell, despite not being long enough
                     cell_profiles[c].append(stdize_profiles[c, :])
                 r += 1
 
@@ -170,10 +171,10 @@ if __name__ == "__main__":
         # Rows: Acquisitions
         # Cols: Framestamps
         # Depth: Coordinate
-        all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp+1, len(coord_data)))
+        all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp + 1, len(coord_data)))
         all_cell_iORG[:] = np.nan
 
-        full_framestamp_range = np.arange(max_frmstamp+1)
+        full_framestamp_range = np.arange(max_frmstamp + 1)
         cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
 
@@ -185,8 +186,8 @@ if __name__ == "__main__":
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
-                #save_tiff_stack(res_dir.joinpath(file.name[0:-4] + "cell(" + str(coord_data[c][0]) +","+
-                #                                str(coord_data[c][1]) + ")_vid_" + str(i) + ".tif"), full_profiles[i][:, :, :, c])
+                save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(coord_data[c][0]) +","+
+                                               str(coord_data[c][1]) + ")_vid_" + str(i) + ".tif"), full_profiles[i][:, :, :, c])
 
             plt.figure(11)
             plt.clf()
@@ -196,43 +197,42 @@ if __name__ == "__main__":
 
             wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate, allFiles[loc])
             plt.show(block=False)
-            #indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
-            #indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
-                              #header=False, index=False)
+            # indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
+            # indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
+            # header=False, index=False)
 
             cell_profiles[c] = []
             cell_framestamps[c] = []
-
 
         for c in range(len(coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
             prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
-            poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1]+10)])
+            poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1] + 10)])
 
-            simple_amp[l, c] = poststim_amp-prestim_amp
+            simple_amp[l, c] = poststim_amp - prestim_amp
 
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
-        #clippedcoords = coordclip(coord_data, 10, 100, 'i')
+        # clippedcoords = coordclip(coord_data, 10, 100, 'i')
 
-            # plt.figure(0)
-            # plt.clf()
-            # for a in range(all_cell_iORG.shape[0]):
-            #     plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
-            #     plt.plot(stimulus_train[0], poststim_amp, "rD")
-            # plt.hist(simple_amp)
-          # plt.plot(cell_power_iORG[c, :])
-          #   plt.show(block=False)
-          #   plt.waitforbuttonpress()
-           # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
+        # plt.figure(0)
+        # plt.clf()
+        # for a in range(all_cell_iORG.shape[0]):
+        #     plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
+        #     plt.plot(stimulus_train[0], poststim_amp, "rD")
+        # plt.hist(simple_amp)
+        # plt.plot(cell_power_iORG[c, :])
+        #   plt.show(block=False)
+        #   plt.waitforbuttonpress()
+        # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
 
         # find the cells with the min, med, and max amplitude
         min_amp = np.nanmin(simple_amp[0, :])
         [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
         # print('min_amp ',min_amp)
         med_amp = np.nanmedian(simple_amp[0, :])
-        near_med_amp = find_nearest(simple_amp[0,:], med_amp)
+        near_med_amp = find_nearest(simple_amp[0, :], med_amp)
         [med_amp_row, med_amp_col] = np.where(simple_amp == near_med_amp)
 
         # print('med_amp ', med_amp)
@@ -246,13 +246,13 @@ if __name__ == "__main__":
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
-        #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
 
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
-        #simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
+        # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
 
         plt.figure(2)
         vor = Voronoi(coord_data)
@@ -265,40 +265,39 @@ if __name__ == "__main__":
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
-        #plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
         # plotting the cells with the min/med/max amplitude
         plt.figure(300)
-        #plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
+        # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
         plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[min_amp_col, :]))
         plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[med_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range,(176,1)).astype('float64'),np.transpose(cell_power_iORG[max_amp_col,:]))
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+                 np.transpose(cell_power_iORG[max_amp_col, :]))
         # This also works...
-        #plt.plot(full_framestamp_range.astype('float64'),
+        # plt.plot(full_framestamp_range.astype('float64'),
         #         np.ravel(cell_power_iORG[min_amp_col, :]))
 
         # should really be the cell_framestamps that correspond to the cells on the x axis
         # need to fix the bug with the framstamps being empty first though
-        #plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
+        # plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
         plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones.png"))
         plt.show(block=False)
         plt.close(plt.gcf())
 
-
         # output cell_power_iORG to csv (optional)
         if outputcsv:
             import csv
+
             csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
             print(csv_dir)
-            f = open(csv_dir, 'w',newline="")
+            f = open(csv_dir, 'w', newline="")
             writer = csv.writer(f, delimiter=',')
             writer.writerows(cell_power_iORG)
             f.close
 
-
         print("Done!")
         print(stimulus_train)
-

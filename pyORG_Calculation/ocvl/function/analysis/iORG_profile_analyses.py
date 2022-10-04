@@ -133,7 +133,7 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, titles):
 
     for r in range(temporal_profiles.shape[0]):
         nextpowdiff = 2**math.ceil(math.log2(temporal_profiles[r, :].shape[0])) - temporal_profiles[r, :].shape[0]
-        signal.cla()
+        #signal.cla()
         signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
         # a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
         #                               "bior1.3", level=4, trim_approx=True, norm=False)
