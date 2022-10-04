@@ -82,25 +82,30 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
     centered_col_shifts = col_base + np.tile(centered_col_shifts[:, np.newaxis], [1, width]).astype("float32")
     centered_row_shifts = row_base + np.tile(centered_row_shifts[:, np.newaxis], [1, width]).astype("float32")
 
-    for f in range(num_frames):
-        dewarped[..., f] = cv2.remap(image_data[..., f].astype("float64") / 255, centered_col_shifts,
-                                     centered_row_shifts,
-                                     interpolation=cv2.INTER_LANCZOS4)
-
-        # cv2.imshow("diff warped", (image_data[..., f].astype("float64")/255)-dewarped[..., f])
-        # cv2.imshow("dewarped", dewarped[..., f])
-        # c = cv2.waitKey(1000)
-        # if c == 27:
-        #     break
-
-    # Clamp our values.
-    dewarped[dewarped < 0] = 0
-    dewarped[dewarped > 1] = 1
-
     if image_data.dtype == np.uint8:
+        for f in range(num_frames):
+            dewarped[..., f] = cv2.remap(image_data[..., f].astype("float32") / 255, centered_col_shifts,
+                                         centered_row_shifts,
+                                         interpolation=cv2.INTER_LANCZOS4)
+
+        # Clamp our values.
+        dewarped[dewarped < 0] = 0
+        dewarped[dewarped > 1] = 1
+
         return (dewarped * 255).astype("uint8"), centered_col_shifts, centered_row_shifts
     else:
-        return dewarped, centered_col_shifts, centered_row_shifts
+        datmax = np.amax(image_data[:])
+        for f in range(num_frames):
+            dewarped[..., f] = cv2.remap(image_data[..., f] / datmax,
+                                         centered_col_shifts,
+                                         centered_row_shifts,
+                                         interpolation=cv2.INTER_LANCZOS4)
+
+        # Clamp our values.
+        dewarped[dewarped < 0] = 0
+        dewarped[dewarped > 1] = 1
+
+        return dewarped*datmax, centered_col_shifts, centered_row_shifts
 
     # save_video("C:\\Users\\rober\\Documents\\temp\\test.avi", (dewarped*255).astype("uint8"), 30)
 
@@ -128,8 +133,8 @@ def general_normxcorr2(template_im, reference_im, template_mask=None, reference_
     temp_size = template_im.shape
     ref_size = reference_im.shape
 
-    template = template_im.astype("float64")
-    reference = reference_im.astype("float64")
+    template = template_im.astype("float32")
+    reference = reference_im.astype("float32")
 
     if template_mask is None:
         template_mask = np.ones(temp_size)
@@ -222,6 +227,7 @@ def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial
     imreg_method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.0625, minStep=1e-5,
                                                           numberOfIterations=500,
                                                           relaxationFactor=0.6, gradientMagnitudeTolerance=1e-5)
+    #imreg_method.SetOptimizerAsConjugateGradientLineSearch()
     imreg_method.SetOptimizerScalesFromPhysicalShift() #This apparently allows parameters to change independently of one another.
                                                       # And is incredibly important.
     # #https://insightsoftwareconsortium.github.io/SimpleITK-Notebooks/Python_html/61_Registration_Introduction_Continued.html#Final-registration
@@ -394,18 +400,21 @@ def weighted_z_projection(image_data, weights=None, projection_axis=-1, type="av
     if weights is None:
         weights = image_data > 0
 
-    image_data = image_data.astype("float64")
-    weights = weights.astype("float64")
+    image_data = image_data.astype("float32")
+    weights = weights.astype("float32")
 
-    image_projection = np.nansum(image_data.astype("float64"), axis=projection_axis)
-    weight_projection = np.nansum(weights.astype("float64"), axis=projection_axis)
+    image_projection = image_data * weights
+    image_projection = np.nansum(image_projection, axis=projection_axis)
+    weight_projection = np.nansum(weights, axis=projection_axis)
     weight_projection[weight_projection == 0] = np.nan
 
     image_projection /= weight_projection
 
     weight_projection[np.isnan(weight_projection)] = 0
 
-    # pyplot.imshow(image_projection.astype("uint8"), cmap='gray')
-    # pyplot.show()
+    image_projection[image_projection < 0] = 0
+    image_projection[image_projection >= 1] = 1
+    #pyplot.imshow(image_projection, cmap='gray')
+    #pyplot.show()
 
     return image_projection.astype(origtype), (weight_projection / np.amax(weight_projection))
