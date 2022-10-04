@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ocvl.function.preprocessing.improc import dewarp_2D_data, optimizer_stack_align, weighted_z_projection
-from ocvl.function.utility.resources import load_video
+from ocvl.function.utility.resources import load_video, save_tiff_stack
 
 if __name__ == "__main__":
 
@@ -79,8 +79,8 @@ if __name__ == "__main__":
             os.makedirs(os.path.join(vid_as_path.parent, "Dewarped"), exist_ok=True)
             avg_path = os.path.join(vid_as_path.parent, "Dewarped", vid_as_path.name[0:-11] + "dewarpavg.tif")
 
-            if os.path.exists(avg_path):
-                continue
+            #if os.path.exists(avg_path):
+            #    continue
 
             pb["value"] = r
             pb_label["text"] = "Processing " + os.path.basename(os.path.realpath(video_path)) + "..."
@@ -95,22 +95,16 @@ if __name__ == "__main__":
             num_frames = res.data.shape[-1]
             width = res.data.shape[1]
             height = res.data.shape[0]
-            video_data = res.data
+            video_data = res.data.astype("float32") / 255
 
             # Also load other modalities.
             split_path = video_path.replace("Confocal", "CalculatedSplit")
             res = load_video(split_path)
-            split_video_data = res.data
+            split_video_data = res.data.astype("float32") / 255
 
             # Load our mask data.
             res = load_video(mask_path)
-            mask_data = res.data / 255
-            mask_data[mask_data < 0] = 0
-
-            # Mask our other video data.
-            video_data = (video_data * mask_data).astype("uint8")
-            split_video_data = (split_video_data * mask_data).astype("uint8")
-            mask_data = mask_data.astype("uint8")
+            mask_data = res.data.astype("float32") / 255
 
             metadata = pd.read_csv(metadata_path, delimiter=',', encoding="utf-8-sig")
             metadata.columns = metadata.columns.str.strip()
@@ -143,6 +137,20 @@ if __name__ == "__main__":
             video_data, map_mesh_x, map_mesh_y = dewarp_2D_data(video_data, yshifts, xshifts)
             (rows, cols) = video_data.shape[0:2]
 
+            for f in range(num_frames):
+                mask_data[..., f] = cv2.remap(mask_data[..., f], map_mesh_x,
+                                              map_mesh_y, interpolation=cv2.INTER_LANCZOS4)
+                split_video_data[..., f] = cv2.remap(split_video_data[..., f], map_mesh_x,
+                                                     map_mesh_y, interpolation=cv2.INTER_LANCZOS4)
+
+            # Clamp our data.
+            mask_data[mask_data < 0] = 0
+            mask_data[mask_data >= 1] = 1
+            split_video_data[split_video_data < 0] = 0
+            split_video_data[split_video_data >= 1] = 1
+
+           # avg_im, sum_map = weighted_z_projection(split_video_data, mask_data)
+
             crop_left = np.ceil(np.amax(map_mesh_x[:, 0])).astype("int")+1
             crop_right = np.floor(np.amin(map_mesh_x[:, -1])).astype("int")-1
             crop_top = np.ceil(np.amax(map_mesh_y[0, :])).astype("int")+1
@@ -157,19 +165,6 @@ if __name__ == "__main__":
             if crop_bottom < (rows-1):
                 crop_bottom = (rows-1)
 
-            for f in range(num_frames):
-                mask_data[..., f] = cv2.remap(mask_data[..., f], map_mesh_x,
-                                              map_mesh_y, interpolation=cv2.INTER_NEAREST)
-                split_video_data[..., f] = cv2.remap(split_video_data[..., f], map_mesh_x,
-                                                     map_mesh_y, interpolation=cv2.INTER_LANCZOS4)
-                # Multiply our data by the new masks.
-                split_video_data[..., f] *= mask_data[..., f]
-                video_data[..., f] *= mask_data[..., f]
-
-            # Clamp our values.
-            mask_data[mask_data < 0] = 0
-            mask_data[mask_data >= 1] = 1
-
             if "760nm" in video_path:
                 thresh = 0
             else:
@@ -179,15 +174,22 @@ if __name__ == "__main__":
             video_data, xforms, inliers = optimizer_stack_align(video_data, mask_data,
                                                                 reference_idx=reference_frame_idx,
                                                                 dropthresh=thresh)
+
             (rows, cols) = video_data.shape[0:2]
             for f in range(num_frames):
                 if xforms[f] is not None:
                     mask_data[..., f] = cv2.warpAffine(mask_data[..., f], xforms[f],
                                                        (cols, rows),
-                                                       flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
+                                                       flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
                     split_video_data[..., f] = cv2.warpAffine(split_video_data[..., f],  xforms[f],
                                                               (cols, rows),
                                                               flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+
+            # Clamp our data.
+            mask_data[mask_data < 0] = 0
+            mask_data[mask_data >= 1] = 1
+            split_video_data[split_video_data < 0] = 0
+            split_video_data[split_video_data >= 1] = 1
 
             #overlap_map = weighted_z_projection(mask_data, mask_data)
 
@@ -199,13 +201,13 @@ if __name__ == "__main__":
 
             avg_im, sum_map = weighted_z_projection(video_data, mask_data)
 
-            cv2.imwrite(avg_path, avg_im.astype("uint8"))
+            cv2.imwrite(avg_path, (avg_im*255).astype("uint8"))
 
             splitvid_as_path = pathlib.Path(split_path)
             avg_split_path = os.path.join(vid_as_path.parent, "Dewarped", splitvid_as_path.name[0:-11] + "dewarpavg.tif")
             avg_im, sum_map = weighted_z_projection(split_video_data, mask_data)
 
-            cv2.imwrite(avg_split_path, avg_im.astype("uint8"))
+            cv2.imwrite(avg_split_path, (avg_im*255).astype("uint8"))
 
             r += 1
 
