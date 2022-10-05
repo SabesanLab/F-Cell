@@ -86,7 +86,7 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
         for f in range(num_frames):
             dewarped[..., f] = cv2.remap(image_data[..., f].astype("float32") / 255, centered_col_shifts,
                                          centered_row_shifts,
-                                         interpolation=cv2.INTER_LANCZOS4)
+                                         interpolation=cv2.INTER_CUBIC)
 
         # Clamp our values.
         dewarped[dewarped < 0] = 0
@@ -99,7 +99,7 @@ def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
             dewarped[..., f] = cv2.remap(image_data[..., f] / datmax,
                                          centered_col_shifts,
                                          centered_row_shifts,
-                                         interpolation=cv2.INTER_LANCZOS4)
+                                         interpolation=cv2.INTER_CUBIC)
 
         # Clamp our values.
         dewarped[dewarped < 0] = 0

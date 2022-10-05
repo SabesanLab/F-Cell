@@ -7,6 +7,7 @@ from tkinter import Tk, filedialog, ttk, HORIZONTAL
 import cv2
 import numpy as np
 import pandas as pd
+from PIL import Image, ImageDraw, ImageFilter
 
 from ocvl.function.preprocessing.improc import dewarp_2D_data, optimizer_stack_align, weighted_z_projection
 from ocvl.function.utility.resources import load_video, save_tiff_stack
@@ -77,7 +78,7 @@ if __name__ == "__main__":
 
             vid_as_path = pathlib.Path(video_path)
             os.makedirs(os.path.join(vid_as_path.parent, "Dewarped"), exist_ok=True)
-            avg_path = os.path.join(vid_as_path.parent, "Dewarped", vid_as_path.name[0:-11] + "dewarpavg.tif")
+            avg_path = os.path.join(vid_as_path.parent, "Dewarped", vid_as_path.name[0:-11] + "dewarpavg.png")
 
             #if os.path.exists(avg_path):
             #    continue
@@ -139,9 +140,9 @@ if __name__ == "__main__":
 
             for f in range(num_frames):
                 mask_data[..., f] = cv2.remap(mask_data[..., f], map_mesh_x,
-                                              map_mesh_y, interpolation=cv2.INTER_LANCZOS4)
+                                              map_mesh_y, interpolation=cv2.INTER_NEAREST)
                 split_video_data[..., f] = cv2.remap(split_video_data[..., f], map_mesh_x,
-                                                     map_mesh_y, interpolation=cv2.INTER_LANCZOS4)
+                                                     map_mesh_y, interpolation=cv2.INTER_CUBIC)
 
             # Clamp our data.
             mask_data[mask_data < 0] = 0
@@ -180,10 +181,10 @@ if __name__ == "__main__":
                 if xforms[f] is not None:
                     mask_data[..., f] = cv2.warpAffine(mask_data[..., f], xforms[f],
                                                        (cols, rows),
-                                                       flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                       flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
                     split_video_data[..., f] = cv2.warpAffine(split_video_data[..., f],  xforms[f],
                                                               (cols, rows),
-                                                              flags=cv2.INTER_LANCZOS4 | cv2.WARP_INVERSE_MAP)
+                                                              flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
 
             # Clamp our data.
             mask_data[mask_data < 0] = 0
@@ -191,23 +192,29 @@ if __name__ == "__main__":
             split_video_data[split_video_data < 0] = 0
             split_video_data[split_video_data >= 1] = 1
 
-            #overlap_map = weighted_z_projection(mask_data, mask_data)
 
             # Crop our mapped data to only non-zero areas so we have no black/transparent areas and everything
             # is squared off.
-            video_data = video_data[crop_top: crop_bottom, crop_left: crop_right, :]
-            mask_data = mask_data[crop_top: crop_bottom, crop_left: crop_right, :]
-            split_video_data = split_video_data[crop_top: crop_bottom, crop_left: crop_right, :]
+            # video_data = video_data[crop_top: crop_bottom, crop_left: crop_right, :]
+            # mask_data = mask_data[crop_top: crop_bottom, crop_left: crop_right, :]
+            # split_video_data = split_video_data[crop_top: crop_bottom, crop_left: crop_right, :]
 
+            overlap_map, sum_map = weighted_z_projection(mask_data, mask_data)
             avg_im, sum_map = weighted_z_projection(video_data, mask_data)
 
-            cv2.imwrite(avg_path, (avg_im*255).astype("uint8"))
+            #cv2.imwrite(avg_path, (avg_im*255).astype("uint8"))
+            im_conf = Image.fromarray((avg_im * 255).astype("uint8"), "L")
+            im_conf.putalpha(Image.fromarray((overlap_map * 255).astype("uint8"), "L"))
+            im_conf.save(avg_path)
 
             splitvid_as_path = pathlib.Path(split_path)
-            avg_split_path = os.path.join(vid_as_path.parent, "Dewarped", splitvid_as_path.name[0:-11] + "dewarpavg.tif")
-            avg_im, sum_map = weighted_z_projection(split_video_data, mask_data)
+            avg_split_path = os.path.join(vid_as_path.parent, "Dewarped", splitvid_as_path.name[0:-11] + "dewarpavg.png")
+            avg_split_im, sum_map = weighted_z_projection(split_video_data, mask_data)
 
-            cv2.imwrite(avg_split_path, (avg_im*255).astype("uint8"))
+            #cv2.imwrite(avg_split_path, (avg_split_im*255).astype("uint8"))
+            im_split = Image.fromarray((avg_split_im * 255).astype("uint8"), "L")
+            im_split.putalpha(Image.fromarray((overlap_map * 255).astype("uint8"), "L"))
+            im_split.save(avg_split_path)
 
             r += 1
 
