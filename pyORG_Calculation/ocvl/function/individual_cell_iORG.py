@@ -114,6 +114,7 @@ if __name__ == "__main__":
                 pb_label["text"] = "Processing " + file.name + "..."
                 pb.update()
                 pb_label.update()
+                print("Processing " + file.name + "...")
 
                 # Loading in the pipelined data (calls the load_pipelined_data() fxn
                 dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
@@ -122,15 +123,15 @@ if __name__ == "__main__":
 
                 # Initialize the dict for individual cells.
                 if first:
-                    coord_data = dataset.coord_data
+                    reference_coord_data = dataset.coord_data
                     framerate = dataset.framerate
                     stimulus_train = dataset.stimtrain_frame_stamps
-                    simple_amp = np.empty((len(allFiles), len(coord_data)))
+                    simple_amp = np.empty((len(allFiles), len(reference_coord_data)))
                     simple_amp[:] = np.nan
                     ref_im = dataset.reference_im[:, :, 0]
                     full_profiles = []
 
-                    coord_data = refine_coord(ref_im, dataset.coord_data)
+                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
@@ -138,23 +139,23 @@ if __name__ == "__main__":
 
                     first = False
 
-                coord_data = refine_coord_to_stack(dataset.video_data, ref_im, coord_data)
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
-                full_profiles.append(extract_profiles(dataset.video_data, coord_data, seg_radius=5, summary="none"))
-                temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=2, summary="mean")
+                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=5, summary="none"))
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=1, summary="mean")
 
                 # print(str((stimulus_train[0] - int(0.15 * framerate)) / framerate) + " to " + str(
                 #    (stimulus_train[1] + int(0.2 * framerate)) / framerate))
-                temp_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
+                temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
                                                                            stimulus_train[1] + int(0.2 * framerate)),
                                                  critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
-               # stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
-               #                                                                        dataset.framestamps)
+                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
+                                                                                       dataset.framestamps)
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
@@ -171,29 +172,29 @@ if __name__ == "__main__":
         # Rows: Acquisitions
         # Cols: Framestamps
         # Depth: Coordinate
-        all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp + 1, len(coord_data)))
+        all_cell_iORG = np.empty((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)))
         all_cell_iORG[:] = np.nan
 
         full_framestamp_range = np.arange(max_frmstamp + 1)
-        cell_power_iORG = np.empty((len(coord_data), max_frmstamp + 1))
+        cell_power_iORG = np.empty((len(reference_coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
 
         # Make 3D matricies, where:
         # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
         # The second dimension (columns) is time
         # The third dimension is each tracked coordinate
-        for c in range(len(coord_data)):
+        for c in range(len(reference_coord_data)):
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
-                save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(coord_data[c][0]) +","+
-                                               str(coord_data[c][1]) + ")_vid_" + str(i) + ".tif"), full_profiles[i][:, :, :, c])
+                save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
+                                                 str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"), full_profiles[i][:, :, :, c])
 
             plt.figure(11)
             plt.clf()
             plt.subplot(2, 2, 1)
             plt.imshow(ref_im)
-            plt.plot(coord_data[c][0], coord_data[c][1], "r*")
+            plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
 
             wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate, allFiles[loc])
             plt.show(block=False)
@@ -204,7 +205,7 @@ if __name__ == "__main__":
             cell_profiles[c] = []
             cell_framestamps[c] = []
 
-        for c in range(len(coord_data)):
+        for c in range(len(reference_coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
@@ -255,7 +256,7 @@ if __name__ == "__main__":
         # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
 
         plt.figure(2)
-        vor = Voronoi(coord_data)
+        vor = Voronoi(reference_coord_data)
         voronoi_plot_2d(vor, show_vertices=False, show_points=False)
         for c, cell in enumerate(vor.regions[1:]):
             if not -1 in cell:

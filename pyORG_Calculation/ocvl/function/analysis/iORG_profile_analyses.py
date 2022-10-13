@@ -147,8 +147,9 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, titles):
                          scales="log-piecewise")
         waveletd4.imshow(np.abs(Wx))
         plt.title(titles[r].name)
-        plt.show(block=False)
-        plt.waitforbuttonpress()
+        if np.all(~(temporal_profiles[r, 0:150] == 0)):
+            plt.show(block=False)
+            plt.waitforbuttonpress()
 
     #wavelet.hist(fifth, bins=10)
     #plt.waitforbuttonpress()

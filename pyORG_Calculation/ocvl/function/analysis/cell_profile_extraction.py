@@ -14,18 +14,18 @@ def refine_coord(ref_image, coordinates, search_radius=2):
 
     im_size = ref_image.shape
 
-    # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
+    # Generate an inclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
     pluscoord = coordinates + search_radius
-    excludelist = pluscoord[:, 0] < im_size[1]
-    excludelist |= pluscoord[:, 1] < im_size[0]
+    includelist = pluscoord[:, 0] < im_size[1]
+    includelist &= pluscoord[:, 1] < im_size[0]
     del pluscoord
 
     minuscoord = coordinates - search_radius
-    excludelist |= minuscoord[:, 0] > 0
-    excludelist |= minuscoord[:, 1] > 0
+    includelist &= minuscoord[:, 0] > 0
+    includelist &= minuscoord[:, 1] > 0
     del minuscoord
 
-    coordinates = np.round(coordinates[excludelist, :]).astype("int")
+    coordinates = np.round(coordinates[includelist, :]).astype("int")
 
     for i in range(coordinates.shape[0]):
         coord = coordinates[i, :]
@@ -50,47 +50,48 @@ def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=3):
 
     search_region = 2*search_radius # Include extra region for edge effects
 
-    # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
+    # Generate an inclusion list for our coordinates- those that are unanalyzable should be excluded from refinement.
     pluscoord = coordinates + search_region
-    excludelist = pluscoord[:, 0] < im_size[1]
-    excludelist |= pluscoord[:, 1] < im_size[0]
+    includelist = pluscoord[:, 0] < im_size[1]
+    includelist &= pluscoord[:, 1] < im_size[0]
     del pluscoord
 
     minuscoord = coordinates - search_region
-    excludelist |= minuscoord[:, 0] > 0
-    excludelist |= minuscoord[:, 1] > 0
+    includelist &= minuscoord[:, 0] >= 0
+    includelist &= minuscoord[:, 1] >= 0
     del minuscoord
 
-    coordinates = np.round(coordinates[excludelist, :]).astype("int")
+    coordinates = np.round(coordinates).astype("int")
 
     #search_mask = np.zeros(2*search_region)
     #search_mask[(coord[1] - search_radius):(coord[1] + search_radius + 1),
                 #(coord[0] - search_radius):(coord[0] + search_radius + 1)]
 
     for i in range(coordinates.shape[0]):
-        coord = coordinates[i, :]
+        if includelist[i]:
+            coord = coordinates[i, :]
 
-        stack_data = image_stack[(coord[1] - search_region):(coord[1] + search_region + 1),
-                                 (coord[0] - search_region):(coord[0] + search_region + 1),
-                                  :]
-        stack_im = np.nanmean(stack_data, axis=-1).astype("uint8")
-        ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
-                                   (coord[0] - search_radius):(coord[0] + search_radius + 1)]
+            stack_data = image_stack[(coord[1] - search_region):(coord[1] + search_region + 1),
+                                     (coord[0] - search_region):(coord[0] + search_region + 1),
+                                      :]
+            stack_im = np.nanmean(stack_data, axis=-1).astype("uint8")
+            ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
+                                       (coord[0] - search_radius):(coord[0] + search_radius + 1)]
 
 
 
-        match_reg = cv2.matchTemplate(stack_im, ref_template, cv2.TM_CCOEFF_NORMED)
-        minV, maxV, minL, maxL = cv2.minMaxLoc(match_reg)
-        maxL = np.array(maxL) - search_radius  # Make relative to the center.
-        # print(coord)
-        coordinates[i, :] = coord + maxL
-        # print(coordinates[i, :])
-        # plt.figure(10)
-        # plt.imshow(stack_im)
-        # plt.figure(11)
-        # plt.imshow(match_reg)
-        # plt.show(block=False)
-        # print(maxL)
+            match_reg = cv2.matchTemplate(stack_im, ref_template, cv2.TM_CCOEFF_NORMED)
+            minV, maxV, minL, maxL = cv2.minMaxLoc(match_reg)
+            maxL = np.array(maxL) - search_radius  # Make relative to the center.
+            # print(coord)
+            coordinates[i, :] = coord + maxL
+            # print(coordinates[i, :])
+            # plt.figure(10)
+            # plt.imshow(stack_im)
+            # plt.figure(11)
+            # plt.imshow(match_reg)
+            # plt.show(block=False)
+            # print(maxL)
     return coordinates
 
 
@@ -121,16 +122,16 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
     # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
     pluscoord = coordinates + seg_radius
-    excludelist = pluscoord[:, 0] < im_size[1]
-    excludelist |= pluscoord[:, 1] < im_size[0]
+    includelist = pluscoord[:, 0] < im_size[1]
+    includelist &= pluscoord[:, 1] < im_size[0]
     del pluscoord
 
     minuscoord = coordinates - seg_radius
-    excludelist |= minuscoord[:, 0] > 0
-    excludelist |= minuscoord[:, 1] > 0
+    includelist &= minuscoord[:, 0] >= 0
+    includelist &= minuscoord[:, 1] >= 0
     del minuscoord
 
-    coordinates = np.round(coordinates[excludelist, :]).astype("int")
+    coordinates = np.round(coordinates[includelist, :]).astype("int")
 
     if summary != "none":
         profile_data = np.empty((coordinates.shape[0], image_stack.shape[-1]))
@@ -140,29 +141,29 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
     if seg_mask == "box": # Handle more in the future...
         for i in range(coordinates.shape[0]):
+            if includelist[i]:
+                coord = coordinates[i, :]
+                fullcolumn = image_stack[(coord[1]-seg_radius):(coord[1]+seg_radius+1),
+                                          (coord[0]-seg_radius):(coord[0]+seg_radius+1), :]
 
-            coord = coordinates[i, :]
-            fullcolumn = image_stack[(coord[1]-seg_radius):(coord[1]+seg_radius+1),
-                                      (coord[0]-seg_radius):(coord[0]+seg_radius+1), :]
+                coldims = fullcolumn.shape
+                coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
 
-            coldims = fullcolumn.shape
-            coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
+                # No partial columns allowed. If there are nans in the column, wipe it out entirely.
+                nani = np.any(np.isnan(coordcolumn), axis=0)
+                coordcolumn[:, nani] = np.nan
 
-            # No partial columns allowed. If there are nans in the column, wipe it out entirely.
-            nani = np.any(np.isnan(coordcolumn), axis=0)
-            coordcolumn[:, nani] = np.nan
+                if summary == "mean":
+                    profile_data[i, nani] = np.nan
+                    profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
 
-            if summary == "mean":
-                profile_data[i, nani] = np.nan
-                profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
+                elif summary == "median":
+                    profile_data[i, nani] = np.nan
+                    profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
 
-            elif summary == "median":
-                profile_data[i, nani] = np.nan
-                profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
-
-            elif summary == "none":
-                profile_data[:, :, nani] = 0
-                profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
+                elif summary == "none":
+                    profile_data[:, :, nani, i] = 0
+                    profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
 
     if display:
         plt.figure(1)
@@ -190,16 +191,18 @@ def exclude_profiles(temporal_profiles, framestamps,
         crit_inds = np.where(np.isin(framestamps, critical_region))[0]
         crit_remove = 0
         for i in range(temporal_profiles.shape[0]):
-            if np.sum(~np.isnan(temporal_profiles[i, crit_inds])) / len(critical_region) < critical_fraction:
+            this_fraction = np.sum(~np.isnan(temporal_profiles[i, crit_inds])) / len(critical_region)
+
+            if this_fraction < critical_fraction:
                 crit_remove += 1
                 temporal_profiles[i, :] = np.nan
 
     if critical_region is not None:
         print(str(crit_remove) + " cells were removed due to missing data at stimulus delivery")
 
-    return temporal_profiles
+    return temporal_profiles, crit_remove
 
-def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False):
+def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_ref=None):
     """
     This function normalizes the columns of the data (a single sample of all cells) using a method supplied by the user.
 
@@ -207,19 +210,44 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False):
     :param norm_method: The normalization method chosen by the user. Default is "mean". Options: "mean", "median"
     :param rescaled: Whether or not to keep the data at the original scale (only modulate the numbers in place). Useful
                      if you want the data to stay in the same units. Default: False. Options: True/False
+    :param video_ref: A video reference (WxHxM) that can be used for normalization instead of the profile values.
 
     :return: a NxM numpy matrix of normalized temporal profiles.
     """
 
     if norm_method == "mean":
         all_norm = np.nanmean(temporal_profiles[:])
-        framewise_norm = np.nanmean(temporal_profiles, axis=0)
+        if video_ref is None:
+            framewise_norm = np.nanmean(temporal_profiles, axis=0)
+        else:
+            # Determine each frame's mean.
+            framewise_norm = np.empty([video_ref.shape[-1]])
+            for f in range(video_ref.shape[-1]):
+                frm = video_ref[:, :, f].flatten().astype("float32")
+                frm[frm == 0] = np.nan
+                framewise_norm[f] = np.nanmean(frm)
     elif norm_method == "median":
         all_norm = np.nanmedian(temporal_profiles[:])
-        framewise_norm = np.nanmedian(temporal_profiles, axis=0)
+        if video_ref is None:
+            framewise_norm = np.nanmedian(temporal_profiles, axis=0)
+        else:
+            # Determine each frame's mean.
+            framewise_norm = np.empty([video_ref.shape[-1]])
+            for f in range(video_ref.shape[-1]):
+                frm = video_ref[:, :, f].flatten().astype("float32")
+                frm[frm == 0] = np.nan
+                framewise_norm[f] = np.nanmedian(frm)
     else:
         all_norm = np.nanmean(temporal_profiles[:])
-        framewise_norm = np.nanmean(temporal_profiles, axis=0)
+        if video_ref is None:
+            framewise_norm = np.nanmean(temporal_profiles, axis=0)
+        else:
+            # Determine each frame's mean.
+            framewise_norm = np.empty([video_ref.shape[-1]])
+            for f in range(video_ref.shape[-1]):
+                frm = video_ref[:, :, f].flatten().astype("float32")
+                frm[frm == 0] = np.nan
+                framewise_norm[f] = np.nanmean(frm)
         warnings.warn("The \"" + norm_method + "\" normalization type is not recognized. Defaulting to mean.")
 
     if rescaled: # Provide the option to simply scale the data, instead of keeping it in relative terms
