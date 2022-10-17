@@ -397,6 +397,13 @@ def weighted_z_projection(image_data, weights=None, projection_axis=-1, type="av
 
     origtype = image_data.dtype
 
+    if origtype == np.float32 or origtype == np.float64:
+        minpossval = 0
+        maxpossval = 1
+    else:
+        minpossval = np.iinfo(origtype).min
+        maxpossval = np.iinfo(origtype).max
+
     if weights is None:
         weights = image_data > 0
 
@@ -410,10 +417,10 @@ def weighted_z_projection(image_data, weights=None, projection_axis=-1, type="av
 
     image_projection /= weight_projection
 
-    weight_projection[np.isnan(weight_projection)] = 0
+    weight_projection[np.isnan(weight_projection)] = minpossval
 
-    image_projection[image_projection < 0] = 0
-    image_projection[image_projection >= 1] = 1
+    image_projection[image_projection < minpossval] = minpossval
+    image_projection[image_projection >= maxpossval] = maxpossval
     #pyplot.imshow(image_projection, cmap='gray')
     #pyplot.show()
 

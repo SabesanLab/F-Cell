@@ -209,9 +209,11 @@ class MEAODataset:
                 warnings.warn("No processed mask data detected.")
 
             # Load the reference video data.
-            if os.path.exists(self.ref_video_path):
+            if os.path.exists(self.ref_video_path) and self.ref_video_path != self.mask_path:
                 res = load_video(self.ref_video_path)
                 self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+            elif self.ref_video_path == self.video_path:
+                self.ref_video_data = self.video_data
             else:
                 warnings.warn("No processed reference video data detected.")
 
@@ -256,7 +258,7 @@ class MEAODataset:
 
                 ref_vid[..., f] = cv2.remap(self.ref_video_data[..., f].astype("float64") / 255,
                                             map_mesh_x, map_mesh_y,
-                                            interpolation=cv2.INTER_LANCZOS4)
+                                            interpolation=cv2.INTER_CUBIC)
             # Clamp our values.
             warp_mask[warp_mask < 0] = 0
             warp_mask[warp_mask >= 1] = 1
@@ -273,7 +275,7 @@ class MEAODataset:
             print( "Keeping " + str(np.sum(inliers)) + " of " + str(self.num_frames)+"...")
 
             # Update everything with what's an inlier now.
-            self.ref_video_data = self.ref_video_data[..., inliers]
+            self.ref_video_data = self.ref_video_data[..., inliers].astype("uint8")
             self.framestamps = self.framestamps[inliers]
             self.video_data = self.video_data[..., inliers]
             self.mask_data = self.mask_data[..., inliers]
@@ -288,6 +290,9 @@ class MEAODataset:
                     self.mask_data[..., f] = cv2.warpAffine(self.mask_data[..., f], xforms[f],
                                                             (cols, rows),
                                                             flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP)
+
+            self.video_data = self.video_data.astype("uint8")
+            self.ref_video_data = self.ref_video_data.astype("uint8")
 
             self.num_frames = self.video_data.shape[-1]
             # save_video("//134.48.93.176/Raw Study Data/00-64774/MEAOSLO1/20210824/Processed/Functional Pipeline/", dataset[f].video_data, 29.4)

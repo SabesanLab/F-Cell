@@ -355,8 +355,8 @@ def run_meao_pipeline(pName, tkroot):
             ref_im_proj = ref_im_proj[cropy:(cropy+croph), cropx:(cropx+cropw), :]
 
             # Z Project each of our image types
-            ref_zproj, weight_zproj = weighted_z_projection(ref_im_proj.astype("float64") * weight_proj, weight_proj)
-            analysis_zproj, weight_zproj = weighted_z_projection(a_im_proj.astype("float64") * weight_proj, weight_proj)
+            ref_zproj, weight_zproj = weighted_z_projection(ref_im_proj, weight_proj)
+            analysis_zproj, weight_zproj = weighted_z_projection(a_im_proj, weight_proj)
 
             # After we z-project everything, dump it to disk.
 
