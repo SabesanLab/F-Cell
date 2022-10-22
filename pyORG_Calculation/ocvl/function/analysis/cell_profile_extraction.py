@@ -131,7 +131,8 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     includelist &= minuscoord[:, 1] >= 0
     del minuscoord
 
-    coordinates = np.round(coordinates[includelist, :]).astype("int")
+    # coordinates = np.round(coordinates[includelist, :]).astype("int")
+    # Removed by MG 2022/10/19 to temporarily fix iORG script bug
 
     if summary != "none":
         profile_data = np.empty((coordinates.shape[0], image_stack.shape[-1]))
