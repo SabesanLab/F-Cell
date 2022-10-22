@@ -171,7 +171,7 @@ class MEAODataset:
                 self.framestamps = np.arange(0, self.num_frames)
 
             if self.image_path:
-                self.reference_im = cv2.imread(self.image_path)
+                self.reference_im = cv2.imread(self.image_path, cv2.IMREAD_GRAYSCALE)
 
             if self.coord_path:
                 self.coord_data = pd.read_csv(self.coord_path, delimiter=',', header=None,

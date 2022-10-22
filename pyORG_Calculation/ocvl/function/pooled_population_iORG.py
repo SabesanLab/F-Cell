@@ -8,10 +8,12 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles
+from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
+    refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
 if __name__ == "__main__":
@@ -72,6 +74,8 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
+    first = True
+    reference_coord_data = None
     maxnum_cells = None
     skipnum = 0
 
@@ -110,6 +114,11 @@ if __name__ == "__main__":
                                       stimtrain_path=stimtrain_fName, stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
+                if first:
+                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data)
+                    full_profiles = []
+                    first = False
+
                 if maxnum_cells is not None:
                     perm = np.random.permutation(len(dataset.coord_data))
                     perm = perm[0:maxnum_cells]
@@ -117,7 +126,23 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+
+                full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=3, summary="none")
+
+                # for c in range(len(dataset.coord_data)):
+                #      save_tiff_stack(
+                #          res_dir.joinpath(file.name[0:-4] + "cell(" + str(dataset.coord_data[c][0]) + "," +
+                #                           str(dataset.coord_data[c][1]) + ".tif"), full_profiles[:, :, :, c])
+
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2, display=False)
+
+                temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
+                                                              critical_region=np.arange(
+                                                                  dataset.stimtrain_frame_stamps[0] - int(0.1 * dataset.framerate),
+                                                                  dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
+                                                              critical_fraction=0.4)
+
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
@@ -160,7 +185,7 @@ if __name__ == "__main__":
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
                     plt.figure(0)
-                    plt.clf()
+
                     plt.xlabel("Time (seconds)")
                     plt.ylabel("Response")
                     plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
