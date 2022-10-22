@@ -218,6 +218,9 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
 
     if norm_method == "mean":
         all_norm = np.nanmean(temporal_profiles[:])
+        # plt.figure()
+        # tmp = np.nanmean(temporal_profiles, axis=0)
+        # plt.plot(tmp/np.amax(tmp))
         if video_ref is None:
             framewise_norm = np.nanmean(temporal_profiles, axis=0)
         else:
@@ -227,6 +230,8 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
                 frm = video_ref[:, :, f].flatten().astype("float32")
                 frm[frm == 0] = np.nan
                 framewise_norm[f] = np.nanmean(frm)
+            # plt.plot(framewise_norm/np.amax(framewise_norm))
+            # plt.show()
     elif norm_method == "median":
         all_norm = np.nanmedian(temporal_profiles[:])
         if video_ref is None:

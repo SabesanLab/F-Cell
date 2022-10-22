@@ -119,6 +119,8 @@ if __name__ == "__main__":
                     full_profiles = []
                     first = False
 
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+                
                 if maxnum_cells is not None:
                     perm = np.random.permutation(len(dataset.coord_data))
                     perm = perm[0:maxnum_cells]
@@ -126,16 +128,14 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
-
-                full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=3, summary="none")
+                # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=3, summary="none")
 
                 # for c in range(len(dataset.coord_data)):
                 #      save_tiff_stack(
                 #          res_dir.joinpath(file.name[0:-4] + "cell(" + str(dataset.coord_data[c][0]) + "," +
                 #                           str(dataset.coord_data[c][1]) + ".tif"), full_profiles[:, :, :, c])
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2, display=False)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
 
                 temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
                                                               critical_region=np.arange(
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                                                                   dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
                                                               critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
 
@@ -154,9 +154,12 @@ if __name__ == "__main__":
 
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
 
-                prestim_ind = dataset.framestamps < dataset.stimtrain_frame_stamps[0]
-                poststim_ind = np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[0],
-                                                   dataset.framestamps < (dataset.stimtrain_frame_stamps[0] + 20))
+                prestim_ind = np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
+                                             dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
+                                                 1 * dataset.framerate)))
+                poststim_ind = np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
+                                              dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(
+                                                  0.5 * dataset.framerate)))
                 poststim_loc = dataset.framestamps[poststim_ind]
                 prestim_amp = np.nanmedian(tmp_iorg[prestim_ind])
                 poststim = tmp_iorg[poststim_ind]
@@ -168,8 +171,7 @@ if __name__ == "__main__":
                     pop_iORG_implicit[r] = np.NaN
                     pop_iORG_recover[r] = np.NaN
                 else:
-
-                    poststim_amp = np.nanmax(poststim)
+                    poststim_amp = np.quantile(poststim, [0.95])
                     max_frmstmp = poststim_loc[np.argmax(poststim)] - dataset.stimtrain_frame_stamps[0]
                     print(str(max_frmstmp))
                     final_val = np.mean(tmp_iorg[-5:])
@@ -191,7 +193,7 @@ if __name__ == "__main__":
                     plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
                              label=file.name)
                     plt.show(block=False)
-                    plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
+                    #plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
                     r += 1
 
                 if dataset.framestamps[-1] > max_frmstamp:
@@ -199,7 +201,7 @@ if __name__ == "__main__":
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
-        plt.ylim([0, 0.9])
+        plt.ylim([0, 1.5])
         #plt.legend()
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
@@ -219,9 +221,10 @@ if __name__ == "__main__":
         #pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
         all_frmstamps = np.arange(max_frmstamp+1)
 
-        prestim_ind = all_frmstamps < dataset.stimtrain_frame_stamps[0]
-        poststim_ind = np.logical_and(all_frmstamps >= dataset.stimtrain_frame_stamps[0],
-                                      all_frmstamps < (dataset.stimtrain_frame_stamps[0] + 20))
+        prestim_ind = np.logical_and(all_frmstamps < dataset.stimtrain_frame_stamps[0],
+                                     all_frmstamps >= (dataset.stimtrain_frame_stamps[0] - int(1 * dataset.framerate)))
+        poststim_ind = np.logical_and(all_frmstamps >= dataset.stimtrain_frame_stamps[1],
+                                      all_frmstamps < (dataset.stimtrain_frame_stamps[1] + int(0.5 * dataset.framerate)))
         poststim_loc = all_frmstamps[poststim_ind]
         prestim_amp = np.nanmedian(pooled_iORG[prestim_ind])
         poststim = pooled_iORG[poststim_ind]
@@ -233,7 +236,7 @@ if __name__ == "__main__":
             pop_iORG_implicit[r] = np.NaN
             pop_iORG_recover[r] = np.NaN
         else:
-            poststim_amp = np.nanmax(poststim)
+            poststim_amp = np.quantile(poststim, [0.95])
             max_frmstmp = poststim_loc[np.argmax(poststim)] - dataset.stimtrain_frame_stamps[0]
 
             final_val = np.mean(pooled_iORG[-5:])
@@ -259,7 +262,7 @@ if __name__ == "__main__":
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0, max_frmstamp / dataset.framerate])
-        plt.ylim([0, 0.9])
+        plt.ylim([0, 1.5])
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
