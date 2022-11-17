@@ -95,7 +95,7 @@ def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=3):
     return coordinates
 
 
-def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", centroid=None, display=False):
+def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1, summary="mean", sigma=None, display=False):
     """
     This function extracts temporal profiles from a 3D matrix, where the first two dimensions are assumed to
     contain data from a single time point (a single image)
@@ -106,8 +106,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     :param seg_radius: the radius of the mask shape that will be used.
     :param summary: the method used to summarize the area inside the segmentation radius. Default: "mean",
                     Options: "mean", "median"
-    :param centroid: precede extraction at each stage with a centroid using a supplied method. Default: None,
-                    Options: "voronoi", "simple", "xcorr"
+    :param sigma: Precede extraction with a per-frame Gaussian filter of a supplied sigma. If none, no filtering is applied.
 
     :return: an NxM numpy matrix with N cells and M temporal samples of some signal.
     """
@@ -115,10 +114,13 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     if coordinates is None:
         pass # Todo: create coordinates for every position in the image stack.
 
-    image_stack = image_stack.astype("float64")
-    image_stack[image_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
+    im_stack = image_stack.astype("float64")
+    im_stack[im_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
 
-    im_size = image_stack.shape
+    im_size = im_stack.shape
+    if sigma is not None:
+        for f in range(im_size[-1]):
+            im_stack[..., f] = cv2.GaussianBlur(im_stack[..., f], ksize=(0,0), sigmaX=sigma)
 
     # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
     pluscoord = coordinates + seg_radius
@@ -135,16 +137,16 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     # Removed by MG 2022/10/19 to temporarily fix iORG script bug
 
     if summary != "none":
-        profile_data = np.empty((coordinates.shape[0], image_stack.shape[-1]))
+        profile_data = np.empty((coordinates.shape[0], im_stack.shape[-1]))
     else:
-        profile_data = np.empty((seg_radius*2 + 1, seg_radius*2 + 1,
-                                 image_stack.shape[-1], coordinates.shape[0]))
+        profile_data = np.empty((seg_radius * 2 + 1, seg_radius * 2 + 1,
+                                 im_stack.shape[-1], coordinates.shape[0]))
 
     if seg_mask == "box": # Handle more in the future...
         for i in range(coordinates.shape[0]):
             if includelist[i]:
                 coord = coordinates[i, :]
-                fullcolumn = image_stack[(coord[1]-seg_radius):(coord[1]+seg_radius+1),
+                fullcolumn = im_stack[(coord[1] - seg_radius):(coord[1] + seg_radius + 1),
                                           (coord[0]-seg_radius):(coord[0]+seg_radius+1), :]
 
                 coldims = fullcolumn.shape
@@ -170,6 +172,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
         plt.figure(1)
         for i in range(profile_data.shape[0]):
             plt.plot(profile_data[i, :]-profile_data[i, 0])
+        plt.show()
 
     return profile_data
 
@@ -230,8 +233,8 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
                 frm = video_ref[:, :, f].flatten().astype("float32")
                 frm[frm == 0] = np.nan
                 framewise_norm[f] = np.nanmean(frm)
-            # plt.plot(framewise_norm/np.amax(framewise_norm))
-            # plt.show()
+            #plt.plot(framewise_norm/np.amax(framewise_norm))
+           # plt.show()
     elif norm_method == "median":
         all_norm = np.nanmedian(temporal_profiles[:])
         if video_ref is None:
@@ -355,11 +358,11 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
     if display:
         plt.figure(1)
         for i in range(temporal_profiles.shape[0]):
-            plt.clf()
-            plt.plot(framestamps, temporal_profiles[i, :])
-            plt.waitforbuttonpress()
 
-        plt.show(block=False)
+            plt.plot(framestamps, temporal_profiles[i, :])
+            #plt.waitforbuttonpress()
+
+        plt.show(block=True)
 
 
 

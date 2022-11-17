@@ -5,6 +5,7 @@ import pywt
 from matplotlib import pyplot as plt
 from scipy import signal
 from ssqueezepy import wavelets, p2up, cwt
+from ssqueezepy.experimental import scale_to_freq
 
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
@@ -111,48 +112,78 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     return iORG, num_incl
 
-def wavelet_iORG(temporal_profiles, framestamps, fps, titles):
+def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, display=False):
 
-    wavelet = "gmw"
     padtype = "reflect"
-    #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
 
-    morelet = wavelets.Wavelet(('morlet', {'mu': 3}))
-    morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 1}))
-    morse_diff = wavelets.Wavelet((wavelet, {"gamma": 2, "beta": 1}))
-    bump = wavelets.Wavelet(('bump'))
-    #biorwav = wavelets.Wavelet("bior1.3")
+    time = framestamps/fps
+    the_wavelet = wavelets.Wavelet(("gmw", {"gamma": 2, "beta": 1}))
+    #the_wavelet = wavelets.Wavelet(("hhhat", {"mu": 1}))
+    #the_wavelet = wavelets.Wavelet(("bump", {"mu": 1, "s": 1.2}))
+    #the_wavelet.viz()
 
-    #allWx =
-    mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
-    plt.figure(11)
 
-    signal = plt.subplot(2, 2, 2)
-    waveletd3 = plt.subplot(2, 2, 3)
-    waveletd4 = plt.subplot(2, 2, 4)
+    allWx = []
+    allScales = []
+
+    if display:
+        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
+        plt.figure(12)
+        signal = plt.subplot(2, 2, 2)
+        waveletd3 = plt.subplot(2, 2, 3)
+        waveletthresh = plt.subplot(2, 2, 4)
+        signal.cla()
 
     for r in range(temporal_profiles.shape[0]):
-        nextpowdiff = 2**math.ceil(math.log2(temporal_profiles[r, :].shape[0])) - temporal_profiles[r, :].shape[0]
-        #signal.cla()
-        signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
-        # a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
-        #                               "bior1.3", level=4, trim_approx=True, norm=False)
-        #waveletd3.plot(framestamps / fps, d3[0:176], color=mapper.to_rgba(r, norm=False))
-        #waveletd4.plot(framestamps / fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
-        #print(np.nansum(temporal_profiles[r, :]**2))
+        if display:
+            signal.plot(time, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
 
-        Wx, scales = cwt(temporal_profiles[r, 0:150], wavelet=morse, t=framestamps[0:150]/fps, padtype=padtype, scales="log-piecewise")
-        waveletd3.imshow(np.abs(Wx))#, extent=(0, framestamps[150], scales[0], scales[-1]))
-        Wx, scales = cwt(temporal_profiles[r, 0:150], wavelet=morse_diff, t=framestamps[0:150] / fps, padtype=padtype,
-                         scales="log-piecewise")
-        waveletd4.imshow(np.abs(Wx))
-        plt.title(titles[r].name)
-        if np.all(~(temporal_profiles[r, 0:150] == 0)):
-            plt.show(block=False)
-            plt.waitforbuttonpress()
+        Wx, scales = cwt(temporal_profiles[r, :], wavelet=the_wavelet, t=time, padtype=padtype, scales="log",
+                         l1_norm=True, nv=64)
+        mod_Wx = np.abs(Wx)
+        # Converts our scales to samples, and determines the coi.
+        #To convert to Hz:
+        #wc [(cycles*radians)/samples] / (2pi [radians]) * fs [samples/second]
+        #= fc [cycles/second]
 
-    #wavelet.hist(fifth, bins=10)
-    #plt.waitforbuttonpress()
+        freq_scales = scale_to_freq(scales, the_wavelet, len(temporal_profiles[r, :]), fs=fps, padtype=padtype)
+        coi_scales = (scales * the_wavelet.std_t) / the_wavelet.wc_ct
+        coi_im = np.ones_like(mod_Wx)
+
+        for s, scale_ind in enumerate(coi_scales):
+            scale_ind = int(scale_ind+1)
+            coi_im[s, 0:scale_ind] = 0
+            coi_im[s, -scale_ind:] = 0
+
+        if display:
+            waveletd3.imshow(mod_Wx)
+
+        if sig_threshold is not None:
+            overthresh = mod_Wx > sig_threshold
+            mod_Wx[mod_Wx <= sig_threshold] = 0
+            Wx[mod_Wx <= sig_threshold] = 0
+
+            if display:
+                waveletd3.imshow(mod_Wx)
+                waveletthresh.imshow(np.reshape(overthresh, mod_Wx.shape))#, extent=(0, framestamps[150], scales[0], scales[-1]))
+                plt.show(block=False)
+                #plt.waitforbuttonpress()
+        else:
+            if display:
+                waveletd3.imshow(mod_Wx)
+                plt.show(block=False)
+                #plt.waitforbuttonpress()
+
+        allWx.append(Wx)
+        allScales = freq_scales
+
+
+#        if np.all(~(temporal_profiles[r, 0:150] == 0)):
+    # waveletd3.plot(np.nanvar(np.abs(Wx), axis=1))
+            #plt.waitforbuttonpress()
+
+    return allWx, allScales, coi_im
+
 
 
 

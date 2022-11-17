@@ -115,11 +115,12 @@ if __name__ == "__main__":
                 dataset.load_pipelined_data()
 
                 if first:
-                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data)
+                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data, search_radius=1)
                     full_profiles = []
                     first = False
 
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+                #dataset.coord_data = reference_coord_data
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data, search_radius=3)
                 
                 if maxnum_cells is not None:
                     perm = np.random.permutation(len(dataset.coord_data))
@@ -128,7 +129,7 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=3, summary="none")
+                # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none")
 
                 # for c in range(len(dataset.coord_data)):
                 #      save_tiff_stack(

@@ -99,16 +99,21 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
         return reconstruction, nummissing
     else:
-        return densify_temporal_matrix(temporal_profiles[c, :], framestamps), nummissing
+        print( "Missing " + str(100*(nummissing/framestamps[-1])) + "% of data from this profile. Removing...")
+        reconstruction = densify_temporal_matrix(temporal_profiles[c, :], framestamps)
+        reconstruction[:] = np.nan
+        return reconstruction, nummissing
 
 
-def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
+def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=0.2):
     """
     This function reconstructs the missing profile data using compressed sensing techniques.
 
     :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
     :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_profiles.
     :param method: The method used for compressive sensing. Defaults to an L1 norm based approach.
+    :param threshold: The threshold at which we will simply drop a signal. As we are not doing true compressive sensing,
+                      the default is 0.2 (80% of the signal must be present).
 
     :return: A tuple containing the reconstructed signals, the full framestamp range of the signals, and the number of
              missing framestamps from each signal.
@@ -125,14 +130,15 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
         with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
             reconst = pool.starmap_async(l1_compressed_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
-                                                                    range(temporal_profiles.shape[0]), repeat(0.5)))
+                                                                    range(temporal_profiles.shape[0]), repeat(threshold)))
             res = reconst.get()
             for c, result in enumerate(res):
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
 
-    plt.hist(nummissing, len(fullrange))
-    plt.show(block=False)
+    # plt.figure(9001)
+    # plt.hist(nummissing, len(fullrange))
+    # plt.show(block=False)
 
     print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
 
