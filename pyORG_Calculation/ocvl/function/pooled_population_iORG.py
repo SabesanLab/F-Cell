@@ -160,7 +160,7 @@ if __name__ == "__main__":
                                                  1 * dataset.framerate)))
                 poststim_ind = np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
                                               dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(
-                                                  0.5 * dataset.framerate)))
+                                                  0.75 * dataset.framerate)))
                 poststim_loc = dataset.framestamps[poststim_ind]
                 prestim_amp = np.nanmedian(tmp_iorg[prestim_ind])
                 poststim = tmp_iorg[poststim_ind]
@@ -225,7 +225,7 @@ if __name__ == "__main__":
         prestim_ind = np.logical_and(all_frmstamps < dataset.stimtrain_frame_stamps[0],
                                      all_frmstamps >= (dataset.stimtrain_frame_stamps[0] - int(1 * dataset.framerate)))
         poststim_ind = np.logical_and(all_frmstamps >= dataset.stimtrain_frame_stamps[1],
-                                      all_frmstamps < (dataset.stimtrain_frame_stamps[1] + int(0.5 * dataset.framerate)))
+                                      all_frmstamps < (dataset.stimtrain_frame_stamps[1] + int(0.75 * dataset.framerate)))
         poststim_loc = all_frmstamps[poststim_ind]
         prestim_amp = np.nanmedian(pooled_iORG[prestim_ind])
         poststim = pooled_iORG[poststim_ind]
