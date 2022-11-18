@@ -7,6 +7,7 @@ from tkinter import Tk, filedialog, ttk, HORIZONTAL
 import numpy as np
 import pandas as pd
 import matplotlib
+import re
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 
@@ -245,17 +246,25 @@ if __name__ == "__main__":
         if all_pooled_init == 1:
             all_trial_pooled = np.empty([len(allFiles), len(pooled_iORG)])
             all_trial_pooled[:] = 0
+            tmp_dir_pooled = []
             all_pooled_init = 2
 
-        if this_dirname != 'Control':
+        # if this_dirname != 'Control' and this_dirname != 'Firsts':
+        if re.search(',', this_dirname):
             all_trial_pooled[pooled_incl] = pooled_iORG
+            tmp_dir_pooled.append(this_dirname)
 
             pooled_incl += 1
 
     plt.figure(40)
     plt.ylim(0, 1)
-    plt.plot(range(len(all_trial_pooled[0,])),all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
-             all_trial_pooled[1,],range(len(all_trial_pooled[2,])), all_trial_pooled[2,], range(len(all_trial_pooled[3,])), all_trial_pooled[3,])
+
+    plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
+            all_trial_pooled[1,], range(len(all_trial_pooled[2,])), all_trial_pooled[2,],
+           range(len(all_trial_pooled[3,])), all_trial_pooled[3,])
+
+    # plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
+    #         all_trial_pooled[1,])
     stim_rect = matplotlib.patches.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
                                              (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
     plt.gca().add_patch(stim_rect)
