@@ -110,7 +110,7 @@ if __name__ == "__main__":
                 pb.update()
                 pb_label.update()
 
-                dataset = MEAODataset(file.as_posix(), analysis_modality="760nm", ref_modality="760nm",
+                dataset = MEAODataset(file.as_posix(), analysis_modality="confocal1", ref_modality="confocal1",
                                       stimtrain_path=stimtrain_fName, stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 

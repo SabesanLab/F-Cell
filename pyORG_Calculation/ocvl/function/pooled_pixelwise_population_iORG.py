@@ -249,7 +249,7 @@ if __name__ == "__main__":
             tmp_dir_pooled = []
             all_pooled_init = 2
 
-        # if this_dirname != 'Control' and this_dirname != 'Firsts':
+
         if re.search(',', this_dirname):
             all_trial_pooled[pooled_incl] = pooled_iORG
             tmp_dir_pooled.append(this_dirname)

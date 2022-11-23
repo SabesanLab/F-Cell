@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
                 # Loading in the pipelined data (calls the load_pipelined_data() fxn
                 dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
-                                      analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
+                                      analysis_modality="confocal1", ref_modality="confocal1", stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
                 # Initialize the dict for individual cells.
@@ -132,6 +132,7 @@ if __name__ == "__main__":
                     full_profiles = []
 
                     reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
@@ -154,8 +155,8 @@ if __name__ == "__main__":
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
-                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
-                                                                                       dataset.framestamps)
+                #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
+                #                                                                       dataset.framestamps)
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
@@ -259,11 +260,11 @@ if __name__ == "__main__":
         # plotting the cells with the min/med/max amplitude
         plt.figure(300)
         # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
-        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (150, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[min_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (150, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[med_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (150, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[max_amp_col, :]))
         # This also works...
         # plt.plot(full_framestamp_range.astype('float64'),
