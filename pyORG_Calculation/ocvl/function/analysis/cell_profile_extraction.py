@@ -159,11 +159,12 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                 if summary == "mean":
                     profile_data[i, nani] = np.nan
                     profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
-
                 elif summary == "median":
                     profile_data[i, nani] = np.nan
                     profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
-
+                elif summary == "sum":
+                    profile_data[i, nani] = np.nan
+                    profile_data[i, np.invert(nani)] = np.nansum(coordcolumn[:, np.invert(nani)], axis=0)
                 elif summary == "none":
                     profile_data[:, :, nani, i] = 0
                     profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
@@ -233,6 +234,8 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
                 frm = video_ref[:, :, f].flatten().astype("float32")
                 frm[frm == 0] = np.nan
                 framewise_norm[f] = np.nanmean(frm)
+
+            all_norm = np.nanmean(framewise_norm)
             #plt.plot(framewise_norm/np.amax(framewise_norm))
            # plt.show()
     elif norm_method == "median":
@@ -246,6 +249,8 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
                 frm = video_ref[:, :, f].flatten().astype("float32")
                 frm[frm == 0] = np.nan
                 framewise_norm[f] = np.nanmedian(frm)
+            all_norm = np.nanmean(framewise_norm)
+
     else:
         all_norm = np.nanmean(temporal_profiles[:])
         if video_ref is None:
@@ -257,6 +262,7 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
                 frm = video_ref[:, :, f].flatten().astype("float32")
                 frm[frm == 0] = np.nan
                 framewise_norm[f] = np.nanmean(frm)
+            all_norm = np.nanmean(framewise_norm)
         warnings.warn("The \"" + norm_method + "\" normalization type is not recognized. Defaulting to mean.")
 
     if rescaled: # Provide the option to simply scale the data, instead of keeping it in relative terms
