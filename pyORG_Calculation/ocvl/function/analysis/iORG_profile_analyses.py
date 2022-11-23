@@ -124,7 +124,8 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, disp
 
 
     allWx = []
-    allScales = []
+    allScales = np.nan
+    coi_im = np.nan
 
     if display:
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
@@ -138,44 +139,47 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, disp
         if display:
             signal.plot(time, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
 
-        Wx, scales = cwt(temporal_profiles[r, :], wavelet=the_wavelet, t=time, padtype=padtype, scales="log",
-                         l1_norm=True, nv=64)
-        mod_Wx = np.abs(Wx)
-        # Converts our scales to samples, and determines the coi.
-        #To convert to Hz:
-        #wc [(cycles*radians)/samples] / (2pi [radians]) * fs [samples/second]
-        #= fc [cycles/second]
+        if np.all(np.isfinite(temporal_profiles[r, :])):
+            Wx, scales = cwt(temporal_profiles[r, :], wavelet=the_wavelet, t=time, padtype=padtype, scales="log",
+                             l1_norm=True, nv=64)
+            mod_Wx = np.abs(Wx)
+            # Converts our scales to samples, and determines the coi.
+            #To convert to Hz:
+            #wc [(cycles*radians)/samples] / (2pi [radians]) * fs [samples/second]
+            #= fc [cycles/second]
 
-        freq_scales = scale_to_freq(scales, the_wavelet, len(temporal_profiles[r, :]), fs=fps, padtype=padtype)
-        coi_scales = (scales * the_wavelet.std_t) / the_wavelet.wc_ct
-        coi_im = np.ones_like(mod_Wx)
+            freq_scales = scale_to_freq(scales, the_wavelet, len(temporal_profiles[r, :]), fs=fps, padtype=padtype)
+            coi_scales = (scales * the_wavelet.std_t) / the_wavelet.wc_ct
+            coi_im = np.ones_like(mod_Wx)
 
-        for s, scale_ind in enumerate(coi_scales):
-            scale_ind = int(scale_ind+1)
-            coi_im[s, 0:scale_ind] = 0
-            coi_im[s, -scale_ind:] = 0
-
-        if display:
-            waveletd3.imshow(mod_Wx)
-
-        if sig_threshold is not None:
-            overthresh = mod_Wx > sig_threshold
-            mod_Wx[mod_Wx <= sig_threshold] = 0
-            Wx[mod_Wx <= sig_threshold] = 0
+            for s, scale_ind in enumerate(coi_scales):
+                scale_ind = int(scale_ind+1)
+                coi_im[s, 0:scale_ind] = 0
+                coi_im[s, -scale_ind:] = 0
 
             if display:
                 waveletd3.imshow(mod_Wx)
-                waveletthresh.imshow(np.reshape(overthresh, mod_Wx.shape))#, extent=(0, framestamps[150], scales[0], scales[-1]))
-                plt.show(block=False)
-                #plt.waitforbuttonpress()
+
+            if sig_threshold is not None:
+                overthresh = mod_Wx > sig_threshold
+                mod_Wx[mod_Wx <= sig_threshold] = 0
+                Wx[mod_Wx <= sig_threshold] = 0
+
+                if display:
+                    waveletd3.imshow(mod_Wx)
+                    waveletthresh.imshow(np.reshape(overthresh, mod_Wx.shape))#, extent=(0, framestamps[150], scales[0], scales[-1]))
+                    plt.show(block=False)
+                    #plt.waitforbuttonpress()
+            else:
+                if display:
+                    waveletd3.imshow(mod_Wx)
+                    plt.show(block=False)
+                    #plt.waitforbuttonpress()
+
+            allWx.append(Wx)
+            allScales = freq_scales
         else:
-            if display:
-                waveletd3.imshow(mod_Wx)
-                plt.show(block=False)
-                #plt.waitforbuttonpress()
-
-        allWx.append(Wx)
-        allScales = freq_scales
+            allWx.append(np.nan)
 
 
 #        if np.all(~(temporal_profiles[r, 0:150] == 0)):

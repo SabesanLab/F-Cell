@@ -237,7 +237,7 @@ if __name__ == "__main__":
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
                 full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=5, summary="none", sigma=0.75))
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="mean", sigma=0.75)
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="median", sigma=0.75)
 
                 temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
@@ -245,10 +245,13 @@ if __name__ == "__main__":
                                                  critical_fraction=0.4)
 
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data, rescaled=True)
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
-                                                       method="mean_sub")
-                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
+                # stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
+                #                                        method="mean_sub")
+                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(norm_temporal_profiles,
                                                                                        dataset.framestamps)
+
+                indiv_resp = pd.DataFrame(stdize_profiles)
+                indiv_resp.to_csv("all_cell_profiles.csv")
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
@@ -279,7 +282,9 @@ if __name__ == "__main__":
         # The second dimension (columns) is time
         # The third dimension is each tracked coordinate
         cell_amp = np.zeros( (len(reference_coord_data), len(allFiles[loc])) )
+        cell_amp[:] = np.nan
         peak_scale = np.zeros( (len(reference_coord_data), len(allFiles[loc])) )
+        peak_scale[:] = np.nan
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
@@ -293,62 +298,67 @@ if __name__ == "__main__":
             plt.imshow(ref_im)
             plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
 
+            # What about a temporal histogram?
+
             allcell_CWT, scales, coi = wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate,
                                                     sig_threshold_im, display=False)
 
             print(c)
             for t, t_cwt in enumerate(allcell_CWT):
 
-                cwt_mod = np.abs(t_cwt)
-                cwt_phase = np.arctan(np.imag(t_cwt) / np.real(t_cwt))
-                cwt_phase_unwrapped = np.unwrap(cwt_phase, period=np.pi, axis=1)
+                if np.any(np.isfinite(t_cwt)):
 
-                cwt_window = cwt_mod[:, stimulus_train[0]+cwt_window_start:stimulus_train[1]+cwt_window_end]
-                peak_idx = peak_local_max(cwt_window, exclude_border=False)
+                    cwt_mod = np.abs(t_cwt)
+                    cwt_phase = np.arctan(np.imag(t_cwt) / np.real(t_cwt))
+                    cwt_phase_unwrapped = np.unwrap(cwt_phase, period=np.pi, axis=1)
 
-                if peak_idx.size != 0:
+                    cwt_window = cwt_mod[:, stimulus_train[0]+cwt_window_start:stimulus_train[1]+cwt_window_end]
+                    peak_idx = peak_local_max(cwt_window, exclude_border=False)
 
-                    peak_dist = np.zeros((len(peak_idx), 1))
-                    peak_val = np.zeros((len(peak_idx), 1))
-                    # Find the peak closest to the stimulus delivery, and highest.
-                    for i, peakloc in enumerate(peak_idx):
-                        peak_dist[i] = peakloc[1] + cwt_window_start
-                        peak_val[i] = cwt_window[peakloc[0], peakloc[1]]
+                    if peak_idx.size != 0:
 
-                    maxvalind = np.argmax(peak_val)
-                    mindist = np.amin(peak_dist)
-                    peak_scale[c, t] = scales[peak_idx[maxvalind][0]]
-                    cell_amp[c, t] = np.amax(peak_val)
-                   # if cell_amp[c, t] < 0.6:
-                    print(cell_amp[c, t])
-                    plt.figure(11, figsize=(cwt_window.shape[1] / 2, cwt_window.shape[0] / 2))
-                    plt.clf()
-                    ax1 = plt.gca()
-                    ax1.imshow(cwt_mod, aspect='auto')
-                    ax1.plot(stimulus_train[0]+cwt_window_start+peak_idx[maxvalind][1], peak_idx[maxvalind][0], "r*")
-                    ax1.set_xticks(np.arange(0, cwt_window.shape[1], 5))
-                    ax1.set_yticks(np.arange(0, cwt_window.shape[0], 5))
-                    ax2 = ax1.twinx()
-                    ax2.plot(all_cell_iORG[t, :, c], "r")
+                        peak_dist = np.zeros((len(peak_idx), 1))
+                        peak_val = np.zeros((len(peak_idx), 1))
+                        # Find the peak closest to the stimulus delivery, and highest.
+                        for i, peakloc in enumerate(peak_idx):
+                            peak_dist[i] = peakloc[1] + cwt_window_start
+                            peak_val[i] = cwt_window[peakloc[0], peakloc[1]]
 
-                    plt.figure(12, figsize=(cwt_window.shape[1] / 2, cwt_window.shape[0] / 2))
-                    plt.clf()
-                    ax1 = plt.gca()
-                    ax1.imshow(cwt_phase, aspect='auto')
-                    ax1.plot(stimulus_train[0] + cwt_window_start + peak_idx[maxvalind][1], peak_idx[maxvalind][0],
-                             "r*")
-                    ax1.set_xticks(np.arange(0, cwt_window.shape[1], 5))
-                    ax1.set_yticks(np.arange(0, cwt_window.shape[0], 5))
-                    ax2 = ax1.twinx()
-                    ax2.plot(all_cell_iORG[t, :, c], "r")
+                        maxvalind = np.argmax(peak_val)
+                        mindist = np.amin(peak_dist)
+                        peak_scale[c, t] = scales[peak_idx[maxvalind][0]]
+                        cell_amp[c, t] = np.amax(peak_val)
+                        # if cell_amp[c, t] < 0.6:
+                        print(cell_amp[c, t])
+                        plt.figure()
+                        plt.suptitle(str(t))
+                        ax1 = plt.gca()
+                        ax1.imshow(cwt_mod, aspect='auto', label=str(t))
+                        ax1.plot(stimulus_train[0]+cwt_window_start+peak_idx[maxvalind][1], peak_idx[maxvalind][0], "r*")
+                        ax1.set_xticks(np.arange(0, cwt_window.shape[1], 5))
+                        ax1.set_yticks(np.arange(0, cwt_window.shape[0], 5))
+                        ax2 = ax1.twinx()
+                        ax2.plot(all_cell_iORG[t, :, c], "r")
+
+                        # plt.figure(12, figsize=(cwt_window.shape[1] / 2, cwt_window.shape[0] / 2))
+                        # plt.clf()
+                        # ax1 = plt.gca()
+                        # ax1.imshow(cwt_phase, aspect='auto')
+                        # ax1.plot(stimulus_train[0] + cwt_window_start + peak_idx[maxvalind][1], peak_idx[maxvalind][0],
+                        #          "r*")
+                        # ax1.set_xticks(np.arange(0, cwt_window.shape[1], 5))
+                        # ax1.set_yticks(np.arange(0, cwt_window.shape[0], 5))
+                        # ax2 = ax1.twinx()
+                        # ax2.plot(all_cell_iORG[t, :, c], "r")
 
 
-                    plt.show(block=False)
-                    plt.waitforbuttonpress()
-                else:
-                    mindist = np.nan
-                    peak_scale[c, t] = np.nan
-                    cell_amp[c, t] = np.nan
+                        plt.show(block=False)
+                        plt.draw()
+                        #plt.waitforbuttonpress()
+                    else:
+                        mindist = np.nan
+                        peak_scale[c, t] = np.nan
+                        cell_amp[c, t] = np.nan
 
                 #print(cell_amp[t])
 
@@ -359,9 +369,10 @@ if __name__ == "__main__":
             plt.show(block=False)
             plt.draw()
             plt.waitforbuttonpress()
-            indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
-            indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
-            header=False, index=False)
+            plt.close("all")
+            # indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
+            # indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
+            # header=False, index=False)
 
             cell_profiles[c] = []
             cell_framestamps[c] = []
