@@ -272,11 +272,11 @@ if __name__ == "__main__":
         # plotting the cells with the min/med/max amplitude
         plt.figure(300)
         # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
-        plt.plot(np.reshape(full_framestamp_range, (150, 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
                  np.transpose(cell_power_iORG[min_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (150, 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
                  np.transpose(cell_power_iORG[med_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (150, 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
                  np.transpose(cell_power_iORG[max_amp_col, :]))
         # This also works...
         # plt.plot(full_framestamp_range.astype('float64'),
