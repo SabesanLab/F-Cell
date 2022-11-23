@@ -5,6 +5,7 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 from sklearn import linear_model
+from pynufft import NUFFT
 
 
 def densify_temporal_matrix(temporal_profiles, framestamps, max_framestamp=None):
@@ -73,7 +74,7 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
     nummissing = ((framestamps[-1] +1) - len(framestamps)) + np.sum(np.invert(finers))
 
-    if threshold is None or nummissing/framestamps[-1] < threshold:
+    if threshold is None or nummissing/framestamps[-1] <= threshold:
 
         sigmean = np.mean(temporal_profiles[c, finers])
         sigstd = np.std(temporal_profiles[c, finers])
@@ -135,6 +136,30 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
             for c, result in enumerate(res):
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
+
+    elif method == "NUFFT":
+        Nufft = NUFFT()
+
+        fsamp = np.arange(0 , framestamps[-1])/ framestamps[-1]
+        #om = np.random.randn(temporal_profiles.shape[1]*2, 1)
+
+        for c in range(temporal_profiles.shape[0]):
+            finers = np.isfinite(temporal_profiles[c, :])
+            good_frms = framestamps[finers, np.newaxis]
+            Nufft.plan(good_frms, (int(temporal_profiles[c, finers].shape[-1]),) , (int(good_frms[-1]),), (6,))
+
+            freqy = Nufft.forward(temporal_profiles[c, finers])
+
+            resto = Nufft.solve(freqy, "L1TVOLS", maxiter=30, rho=1)
+
+            plt.figure(0)
+            plt.subplot(2, 1, 1)
+            plt.plot(framestamps[finers], temporal_profiles[c, finers], "-d")
+            plt.figure(0)
+            plt.subplot(2, 1, 2)
+            plt.plot(fullrange, resto, "-d")
+            plt.waitforbuttonpress()
+
 
     # plt.figure(9001)
     # plt.hist(nummissing, len(fullrange))
