@@ -2,7 +2,7 @@ import os
 from os import walk
 from os.path import splitext
 from pathlib import Path
-from tkinter import Tk, filedialog, ttk, HORIZONTAL
+from tkinter import Tk, filedialog, ttk, HORIZONTAL, simpledialog
 
 import numpy as np
 import pandas as pd
@@ -46,6 +46,18 @@ if __name__ == "__main__":
 
     if not stimtrain_fName:
         quit()
+
+    a_mode = simpledialog.askstring(title="Input the analysis modality string: ",
+                                    prompt="Input the analysis modality string:",
+                                    initialvalue="760nm", parent=root)
+    if not a_mode:
+        a_mode = "760nm"
+
+    ref_mode = simpledialog.askstring(title="Input the *alignment reference* modality string. ",
+                                      prompt="Input the *alignment reference* modality string:", initialvalue=a_mode,
+                                      parent=root)
+    if not ref_mode:
+        ref_mode = "760nm"
 
     x = root.winfo_screenwidth() / 2 - 128
     y = root.winfo_screenheight() / 2 - 128
@@ -118,7 +130,7 @@ if __name__ == "__main__":
 
                 # Loading in the pipelined data (calls the load_pipelined_data() fxn
                 dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
-                                      analysis_modality="confocal1", ref_modality="confocal1", stage=PipeStages.PIPELINED)
+                                      analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
                 # Initialize the dict for individual cells.
