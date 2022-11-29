@@ -195,17 +195,19 @@ def exclude_profiles(temporal_profiles, framestamps,
 
         crit_inds = np.where(np.isin(framestamps, critical_region))[0]
         crit_remove = 0
+        good_profiles = np.full((temporal_profiles.shape[0], ), True)
         for i in range(temporal_profiles.shape[0]):
             this_fraction = np.sum(~np.isnan(temporal_profiles[i, crit_inds])) / len(critical_region)
 
             if this_fraction < critical_fraction:
                 crit_remove += 1
                 temporal_profiles[i, :] = np.nan
+                good_profiles[i] = False
 
     if critical_region is not None:
         print(str(crit_remove) + " cells were removed due to missing data at stimulus delivery")
 
-    return temporal_profiles, crit_remove
+    return temporal_profiles, good_profiles
 
 def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_ref=None):
     """

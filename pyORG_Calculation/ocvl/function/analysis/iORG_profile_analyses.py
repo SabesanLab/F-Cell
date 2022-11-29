@@ -1,9 +1,8 @@
-import math
 
 import numpy as np
-import pywt
+from skimage.feature import graycomatrix, graycoprops
 from matplotlib import pyplot as plt
-from scipy import signal
+
 from ssqueezepy import wavelets, p2up, cwt
 from ssqueezepy.experimental import scale_to_freq
 
@@ -187,6 +186,13 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, disp
             #plt.waitforbuttonpress()
 
     return allWx, allScales, coi_im
+
+
+def texture_iORG(full_profiles, framestamps, summary_method="entropy"):
+
+    for i in range(full_profiles.shape[0]):
+        for f in framestamps:
+            grayco = graycomatrix(full_profiles[i, :, :, f])
 
 
 
