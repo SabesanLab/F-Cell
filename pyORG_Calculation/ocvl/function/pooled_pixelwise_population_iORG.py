@@ -128,8 +128,8 @@ if __name__ == "__main__":
                     del x, y, xv, yv
                     first = False
 
-                temp_profiles = extract_profiles(dataset.video_data, coord_data , seg_radius=1)
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
+                temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=1)
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", rescaled=True)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)

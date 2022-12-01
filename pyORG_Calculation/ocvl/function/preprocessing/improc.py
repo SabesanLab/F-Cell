@@ -90,15 +90,15 @@ def norm_video(video_data, norm_method="mean", rescaled=False):
     if rescaled: # Provide the option to simply scale the data, instead of keeping it in relative terms
         ratio = framewise_norm / all_norm
 
-        rescaled_vid = np.empty_like(video_data)
+        rescaled_vid = np.empty(video_data.shape)
         for f in range(video_data.shape[-1]):
-            rescaled_vid[:, :, f] = video_data[:, :, f] / ratio[f]
+            rescaled_vid[:, :, f] = video_data[:, :, f].astype("float32") / ratio[f]
 
         return rescaled_vid
     else:
         rescaled_vid = np.empty_like(video_data)
         for f in range(video_data.shape[-1]):
-            rescaled_vid[:, :, f] = video_data[:, :, f] / framewise_norm[f]
+            rescaled_vid[:, :, f] = video_data[:, :, f].astype("float32") / framewise_norm[f]
 
         return rescaled_vid
 

@@ -14,7 +14,7 @@ from ssqueezepy.experimental import scale_to_freq
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
-from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG
+from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG, extract_texture_profiles
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
@@ -96,7 +96,16 @@ if __name__ == "__main__":
     first = True
     outputcsv = True
     cell_framestamps = []
-    cell_profiles = []
+    mean_cell_profiles = []
+
+
+    contrast_cell_profiles = []
+    dissimilarity_cell_profiles = []
+    homogeneity_cell_profiles = []
+    asm_cell_profiles = []
+    energy_cell_profiles = []
+    correlation_cell_profiles = []
+
     full_cell_profiles = []
 
     segmentation_radius = 2
@@ -107,82 +116,6 @@ if __name__ == "__main__":
    # controlpath = None # TEMP!
     if controlpath is not None:
         print("Processing control data to find noise floor...")
-
-        r = 0
-        all_vars = []
-        for file in allFiles[controlpath]:
-            # Ignores the All_ACQ_AVG tif while running through the files in this location
-            if "ALL_ACQ_AVG" not in file.name:
-                # Waitbar stuff
-                pb["value"] = r
-                pb_label["text"] = "Processing " + file.name + "..."
-                pb.update()
-                pb_label.update()
-
-                print("Processing " + file.name + "...")
-                # Loading in the pipelined data (calls the load_pipelined_data() fxn
-                dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
-                                      analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
-                dataset.load_pipelined_data()
-
-                # Initialize the dict for individual cells.
-                if first:
-                    reference_coord_data = dataset.coord_data
-                    framerate = dataset.framerate
-                    stimulus_train = dataset.stimtrain_frame_stamps
-                    simple_amp = np.empty((len(allFiles), len(reference_coord_data)))
-                    simple_amp[:] = np.nan
-                    ref_im = dataset.reference_im
-                    full_profiles = []
-
-                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)
-
-                    for c in range(len(dataset.coord_data)):
-                        cell_framestamps.append([])
-                        cell_profiles.append([])
-
-                    first = False
-
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
-
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="mean", sigma=0.75)
-
-                temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
-                                                 critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
-                                                                           stimulus_train[1] + int(0.2 * framerate)),
-                                                 critical_fraction=0.4)
-
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
-                                                       method="mean_sub")
-                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
-                                                                                       dataset.framestamps)
-
-                ctrl_wavelets, scales, coi = wavelet_iORG(stdize_profiles, dataset.framestamps, dataset.framerate)
-
-                cell_var = np.zeros((len(ctrl_wavelets), scales.shape[0]))
-                #cell_mean = np.zeros((len(ctrl_wavelets), scales.shape[0]))
-                for i in range( len(ctrl_wavelets) ):
-                    this_cwt = ctrl_wavelets[i]
-                    cell_var[i, :] = np.abs(this_cwt[:, int((this_cwt.shape[1]-1)/2 ) ])
-
-                all_vars.append(cell_var)
-                r += 1
-
-        all_vars = np.vstack(all_vars)
-        avg_var = np.nanvar(all_vars, axis=0)
-        avg_all = np.nanmean(all_vars, axis=0)
-
-
-        # For 95% significance.
-        sig_threshold = avg_all+np.sqrt(avg_var)*2 # 3.85 for 95, for 97.5, 6.63 for 99th from Chi squared distribution
-        sig_threshold_im = np.repeat(np.asmatrix(sig_threshold).transpose(), ctrl_wavelets[0].shape[1], axis=1)
-        sig_threshold_im[coi < 1] = 10000
-        plt.figure(12)
-        plt.plot(scales, sig_threshold)
-        plt.gca().set_xscale("log")
-        plt.show(block=False)
-        del ctrl_wavelets
 
 
     # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
@@ -233,7 +166,7 @@ if __name__ == "__main__":
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
-                        cell_profiles.append([])
+                        mean_cell_profiles.append([])
                         full_cell_profiles.append([])
 
                     first = False
@@ -242,8 +175,9 @@ if __name__ == "__main__":
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
-                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="none", sigma=0.75)
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="median", sigma=0.75)
+                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="none", sigma=1.25)
+
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="median", sigma=1.25)
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
@@ -252,13 +186,18 @@ if __name__ == "__main__":
 
                 full_profiles[:, :, :, ~good_profiles] = np.nan
 
+                contrast, dissimilarity, homogeneity, asm, energy, correlation = extract_texture_profiles(full_profiles, "all", 16,
+                                                                                                          dataset.framestamps,
+                                                                                                          res_dir.joinpath(allFiles[loc][i].name[0:-4])
+                                                                                                        )
+
                 stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps)
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
                     cell_framestamps[c].append(dataset.framestamps)  # HERE IS THE PROBLEM, YO - appends extra things to the same cell, despite not being long enough
-                    cell_profiles[c].append(stdize_profiles[c, :])
+                    mean_cell_profiles[c].append(stdize_profiles[c, :])
                     full_cell_profiles[c].append(full_profiles[:, :, :, c])
 
                 r += 1
@@ -295,7 +234,7 @@ if __name__ == "__main__":
         peak_scale = np.zeros( (len(reference_coord_data), len(allFiles[loc])) )
         peak_scale[:] = np.nan
         for c in range(len(reference_coord_data)):
-            for i, profile in enumerate(cell_profiles[c]):
+            for i, profile in enumerate(mean_cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
                 all_full_cell_iORG[i, :, :, cell_framestamps[c][i], c] = full_cell_profiles[c]
@@ -388,7 +327,7 @@ if __name__ == "__main__":
             # indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
             # header=False, index=False)
 
-            cell_profiles[c] = []
+            mean_cell_profiles[c] = []
             cell_framestamps[c] = []
 
         for c in range(len(reference_coord_data)):
