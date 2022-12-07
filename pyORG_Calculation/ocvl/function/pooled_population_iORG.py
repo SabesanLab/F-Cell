@@ -15,6 +15,7 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+from datetime import datetime, date, time, timezone
 
 if __name__ == "__main__":
     root = Tk()
@@ -212,12 +213,15 @@ if __name__ == "__main__":
                 if dataset.framestamps[-1] > max_frmstamp:
                     max_frmstamp = dataset.framestamps[-1]
 
+        dt = datetime.now()
+        now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
+
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
         plt.ylim([0, 1.5])
         #plt.legend()
-        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
-        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
+        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
+        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".png"))
 
 
         # Grab all of the
@@ -262,13 +266,13 @@ if __name__ == "__main__":
 
         pop_dFrame = pd.DataFrame(np.concatenate((all_iORG,
                                                   np.reshape(pooled_iORG, (1, len(pooled_iORG)))), axis=0))
-        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG.csv"), header=False)
+        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".csv"), header=False)
 
         pop_amp_dFrame = pd.DataFrame( np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
                                                        np.array(pop_iORG_implicit, ndmin=2).transpose(),
                                                        np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
                                        columns=["Amplitude", "Implicit time", "Recovery %"] )
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats.csv"))
+        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
 
         plt.figure(1)
         plt.clf()
@@ -279,7 +283,7 @@ if __name__ == "__main__":
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
 

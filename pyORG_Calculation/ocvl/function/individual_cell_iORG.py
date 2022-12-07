@@ -18,6 +18,7 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.resources import save_video, save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+from datetime import datetime, date, time, timezone
 
 
 def find_nearest(array, value):
@@ -241,12 +242,15 @@ if __name__ == "__main__":
         [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
         # print('max_amp ', max_amp)
 
+        dt = datetime.now()
+        now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
+
         plt.figure(1)
         histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
         plt.hist(simple_amp[l, :], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_" + now_timestamp + ".png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
 
@@ -265,7 +269,7 @@ if __name__ == "__main__":
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi_" + now_timestamp + ".png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
@@ -285,7 +289,7 @@ if __name__ == "__main__":
         # should really be the cell_framestamps that correspond to the cells on the x axis
         # need to fix the bug with the framstamps being empty first though
         # plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
-        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones_" + now_timestamp + ".png"))
         plt.show(block=False)
         plt.close(plt.gcf())
 
@@ -293,7 +297,7 @@ if __name__ == "__main__":
         if outputcsv:
             import csv
 
-            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
+            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG_" + now_timestamp + ".csv")
             print(csv_dir)
             f = open(csv_dir, 'w', newline="")
             writer = csv.writer(f, delimiter=',')
