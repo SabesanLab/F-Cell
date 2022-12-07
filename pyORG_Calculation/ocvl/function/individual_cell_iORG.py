@@ -1,3 +1,4 @@
+import math
 import os
 from os import walk
 from os.path import splitext
@@ -246,13 +247,37 @@ if __name__ == "__main__":
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.figure(1)
-        histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
+        histbins = np.arange(start=-0.1, stop=0.3, step=0.01) #Humans: -0.2, 1.5, 0.025
         plt.hist(simple_amp[l, :], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_" + now_timestamp + ".png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
+
+        plt.figure(40) # log hist
+        histbins_log = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
+        log_amp = np.log10(simple_amp[l,:])
+        plt.hist(log_amp, bins=histbins_log)
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_hist_" + now_timestamp + ".png"))
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        plt.close(plt.gcf())
+
+
+        plt.figure(41)  # log hist +1
+        histbins_logp1 = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
+        log_amp_plus1 = log_amp + 1
+        print("min ", np.nanmin(log_amp_plus1))
+        print("max ", np.nanmax(log_amp_plus1))
+        plt.hist(log_amp_plus1, bins=histbins_logp1)
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_plus1_amp_hist_" + now_timestamp + ".png"))
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        plt.close(plt.gcf())
+
 
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)

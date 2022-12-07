@@ -321,9 +321,9 @@ def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64, 
         plt.plot(tmpframestamps, np.nanmean(asm, axis=0), "k", linewidth=3)
         plt.show(block=False)
 
-        save_tiff_stack(ourbase + "cell(" + str(reference_coord_data[c][0]) + "," +
-                                         str(reference_coord_data[c][1]) ".tif"),
-                        all_full_cell_iORG[i, :, :, cell_framestamps[c][i], c])
+        #save_tiff_stack((ourbase + "cell(" + str(reference_coord_data[c][0]) + "," +
+        #                 str(reference_coord_data[c][1]) ").tif"),
+        #                all_full_cell_iORG[i, :, :, cell_framestamps[c][i], c])
 
         plt.waitforbuttonpress()
 
