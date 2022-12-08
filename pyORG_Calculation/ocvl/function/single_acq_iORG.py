@@ -121,8 +121,8 @@ if __name__ == "__main__":
     # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
     # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
-        if loc == controlpath:
-            continue
+        #if loc == controlpath:
+         #   continue
 
         first = True
         res_dir = loc.joinpath(
@@ -191,9 +191,9 @@ if __name__ == "__main__":
                                                                                                           res_dir.joinpath(file.name[0:-4]),
                                                                                                           dataset.coord_data
                                                                                                         )
-
-                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(temp_profiles,
-                                                                                       dataset.framestamps)
+                stdize_profiles = temp_profiles
+                # stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(temp_profiles,
+                #                                                                        dataset.framestamps)
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):

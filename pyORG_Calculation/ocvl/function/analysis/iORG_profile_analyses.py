@@ -4,6 +4,8 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 from joblib._multiprocessing_helpers import mp
+from scipy.ndimage import center_of_mass
+from scipy.signal import savgol_filter
 from skimage.feature import graycomatrix, graycoprops
 from matplotlib import pyplot as plt
 
@@ -105,13 +107,33 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             temporal_profiles **= 2 # Square first
             for i in range(window_radius, num_samples-window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)] # Fix- window was one element too small.
-                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh): # Fix- threshold was a hard number instead of a variable.
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
+                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
                     iORG[i] = np.nanmean(samples[:]) # Average second
                     iORG[i] = np.sqrt(iORG[i]) # Sqrt last
                    # num_incl[i] = np.sum(samples[:] != np.nan)
 
-            iORG = iORG[window_radius:-window_radius] # Fix- padding wasn't being cropped off first
+            iORG = iORG[window_radius:-window_radius]
+            iORG = iORG[framestamps]
+            #num_incl = num_incl[framestamps]
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+            num_incl = num_incl[framestamps]
+        else:
+            raise Exception("Window size must be less than half of the number of samples")
+    elif summary_method == "avg":
+        if window_radius == 0:
+            iORG = np.nanmean(temporal_profiles, axis=0)  # Average
+            num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
+
+        elif window_size < (num_samples/2):
+
+            for i in range(window_radius, num_samples-window_radius):
+
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
+                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
+                    iORG[i] = np.nanmean(samples[:]) # Average
+
+            iORG = iORG[window_radius:-window_radius]
             iORG = iORG[framestamps]
             #num_incl = num_incl[framestamps]
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
@@ -266,9 +288,12 @@ def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64, 
         thisprofile = np.round(((full_profiles[:, :, :, cellind]-minlvl) / (maxlvl-minlvl)) * (numlevels-1) )
         thisprofile[thisprofile >= numlevels] = numlevels-1
         thisprofile = thisprofile.astype("uint8")
-
+        com=[]
         for f in range(full_profiles.shape[-2]):
-            avg[f] = np.mean(full_profiles[:, :, f, cellind].flatten())
+            avg[f] = np.mean(full_profiles[1:-1, 1:-1, f, cellind].flatten())
+
+            com.append(center_of_mass(full_profiles[:, :, f, cellind]) - np.round(full_profiles.shape[0]/2))
+            glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
             if avg[f] != 0:
                 grayco = graycomatrix(thisprofile[:, :, f], distances=[1], angles=[0, np.pi/4, np.pi/2, np.pi*3/4],
@@ -288,33 +313,50 @@ def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64, 
                 if summary_method == "correlation" or summary_method == "all":
                     correlation[f] = graycoprops(grayco_invar, prop="correlation")
                 if summary_method == "glcmmean" or summary_method == "all":
-                    I, J = np.ogrid[0:numlevels, 0:numlevels]
-                    glcmmean[f] = (np.sum(I*np.squeeze(grayco_invar), axis=(0, 1)) + np.sum(J*np.squeeze(grayco_invar), axis=(0, 1)))/2
+                    pass
+                    #I, J = np.ogrid[0:numlevels, 0:numlevels]
+                    #glcmmean[f] = (np.sum(I*np.squeeze(grayco_invar), axis=(0, 1)) + np.sum(J*np.squeeze(grayco_invar), axis=(0, 1)))/2
                 if summary_method == "entropy" or summary_method == "all":
                     loggray = -np.log(grayco_invar)
                     loggray[~np.isfinite(loggray)] = 0
                     ent[f] = np.sum(grayco_invar * loggray, axis=(0, 1))
 
-
+        com = np.array(com)
         plt.figure(0)
         plt.clf()
         plt.subplot(2, 3, 1)
         plt.title("average")
-        plt.plot(tmpframestamps, avg, "k", linewidth=3)
+        plt.plot(tmpframestamps, avg, "k")
+
+        rmsfilt, nummy = signal_power_iORG(avg.transpose(), tmpframestamps, summary_method="avg", window_size=7)
+        plt.plot(tmpframestamps, rmsfilt.transpose(), "r", linewidth=3)
+
+
+        plt.plot(tmpframestamps, savgol_filter(avg.flatten(), 9, 2), "b", linewidth=3)
+
         #plt.plot(tmpframestamps, contrast, "r", linestyle="-")
         # plt.plot(tmpframestamps, contrast[1, :], "r", linestyle="-")
         # plt.plot(tmpframestamps, contrast[2, :], "r", linestyle="-")
         # plt.plot(tmpframestamps, contrast[3, :], "r", linestyle="-")
         plt.subplot(2, 3, 2)
-        plt.title("glcm mean")
-        plt.plot(tmpframestamps, glcmmean, linestyle="-")
+        plt.title("center_of_mass")
+        for f in range(full_profiles.shape[-2]):
+            if f < 58:
+                plt.plot(com[f, 1], com[f, 0], 'k.')
+            else:
+                plt.plot(com[f, 1], com[f, 0], 'r.')
+
         # plt.plot(tmpframestamps, dissimilarity[1, :], linestyle="-")
         # plt.plot(tmpframestamps, dissimilarity[2, :], linestyle="-")
         # plt.plot(tmpframestamps, dissimilarity[3, :], linestyle="-")
         # plt.plot(tmpframestamps, np.nanmean(dissimilarity, axis=0), "k", linewidth=3)
         plt.subplot(2, 3, 3)
         plt.title("homogeneity")
+        rmsfilt, nummy = signal_power_iORG(homogeneity[None, ...], tmpframestamps, summary_method="avg", window_size=7)
         plt.plot(tmpframestamps, homogeneity, linestyle="-")
+        plt.plot(tmpframestamps, rmsfilt.transpose(), "r", linewidth=3)
+        plt.plot(tmpframestamps, savgol_filter(homogeneity, 9, 2), "b", linewidth=3)
+
         # plt.plot(tmpframestamps, homogeneity[1, :], linestyle="-")
         # plt.plot(tmpframestamps, homogeneity[2, :], linestyle="-")
         # plt.plot(tmpframestamps, homogeneity[3, :], linestyle="-")
