@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     full_cell_profiles = []
 
-    segmentation_radius = 2
+    segmentation_radius = 3
 
 
     # Before we start, get an estimate of the "noise" from the control signals.
@@ -171,13 +171,13 @@ if __name__ == "__main__":
 
                     first = False
 
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
+                #dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
-                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="none", sigma=1.25)
+                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="none", sigma=1)
 
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="median", sigma=1.25)
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="median", sigma=1)
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
@@ -186,9 +186,10 @@ if __name__ == "__main__":
 
                 full_profiles[:, :, :, ~good_profiles] = np.nan
 
-                contrast, dissimilarity, homogeneity, asm, energy, correlation = extract_texture_profiles(full_profiles, "all", 16,
+                contrast, dissimilarity, homogeneity, asm, energy, correlation = extract_texture_profiles(full_profiles, "all", 32,
                                                                                                           dataset.framestamps,
-                                                                                                          res_dir.joinpath(allFiles[loc][i].name[0:-4])
+                                                                                                          res_dir.joinpath(file.name[0:-4]),
+                                                                                                          dataset.coord_data
                                                                                                         )
 
                 stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(temp_profiles,

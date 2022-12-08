@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from ssqueezepy import wavelets, p2up, cwt
 from ssqueezepy.experimental import scale_to_freq
 
+from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
@@ -230,100 +231,113 @@ def extract_texture(full_profiles, cellind, summary_method):
 
     return contrast, dissimilarity, homogeneity, energy, correlation, asm
 
-def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64,  tmpframestamps=None):
-    if summary_method == "contrast" or summary_method == "all":
-        contrast = np.full((4, full_profiles.shape[-2]), np.nan)
-    if summary_method == "dissimilarity" or summary_method == "all":
-        dissimilarity = np.full((4, full_profiles.shape[-2]), np.nan)
-    if summary_method == "homogeneity" or summary_method == "all":
-        homogeneity = np.full((4, full_profiles.shape[-2]), np.nan)
-    if summary_method == "energy" or summary_method == "all":
-        energy = np.full((4, full_profiles.shape[-2]), np.nan)
-    if summary_method == "correlation" or summary_method == "all":
-        correlation = np.full((4, full_profiles.shape[-2]), np.nan)
-    if summary_method == "asm" or summary_method == "all":
-        asm = np.full((4, full_profiles.shape[-2]), np.nan)
+def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64,  tmpframestamps=None, outname=None, coords=None):
+
 
     for cellind in range(full_profiles.shape[-1]):
+        if summary_method == "contrast" or summary_method == "all":
+            contrast = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "dissimilarity" or summary_method == "all":
+            dissimilarity = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "homogeneity" or summary_method == "all":
+            homogeneity = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "energy" or summary_method == "all":
+            energy = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "correlation" or summary_method == "all":
+            correlation = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "glcmmean" or summary_method == "all":
+            glcmmean = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "entropy" or summary_method == "all":
+            ent = np.full((full_profiles.shape[-2]), np.nan)
+
         avg = np.empty((full_profiles.shape[-2], 1))
 
-        minlvl = np.nanmin(full_profiles[:, :, :, cellind].flatten())
-        maxlvl = np.nanmax(full_profiles[:, :, :, cellind].flatten())
+        minlvl = 0 #np.nanmin(full_profiles[:, :, :, cellind].flatten())
+        maxlvl = 255 #np.nanmax(full_profiles[:, :, :, cellind].flatten())
 
         print("Min: "+str(minlvl)+" Max: "+str(maxlvl))
 
         thisprofile = np.round(((full_profiles[:, :, :, cellind]-minlvl) / (maxlvl-minlvl)) * (numlevels-1) )
+        thisprofile[thisprofile >= numlevels] = numlevels-1
         thisprofile = thisprofile.astype("uint8")
 
         for f in range(full_profiles.shape[-2]):
-            avg[f] = np.nanmean(full_profiles[:, :, f, cellind].flatten())
+            avg[f] = np.mean(full_profiles[:, :, f, cellind].flatten())
 
             if avg[f] != 0:
-                grayco = graycomatrix(thisprofile[:, :, f], distances=[1], angles=[0, np.pi/4, np.pi/2, np.pi*3/4], levels=numlevels)
+                grayco = graycomatrix(thisprofile[:, :, f], distances=[1], angles=[0, np.pi/4, np.pi/2, np.pi*3/4],
+                                      levels=numlevels, normed=True, symmetric=True)
+
+                grayco_invar = np.mean(grayco, axis=-1)
+                grayco_invar = grayco_invar[..., None]
 
                 if summary_method == "contrast" or summary_method == "all":
-                    contrast[:, f] = graycoprops(grayco, prop="contrast")
+                    contrast[f] = graycoprops(grayco_invar, prop="contrast")
                 if summary_method == "dissimilarity" or summary_method == "all":
-                    dissimilarity[:, f] = graycoprops(grayco, prop="dissimilarity")
+                    dissimilarity[f] = graycoprops(grayco_invar, prop="dissimilarity")
                 if summary_method == "homogeneity" or summary_method == "all":
-                    homogeneity[:, f] = graycoprops(grayco, prop="homogeneity")
+                    homogeneity[f] = graycoprops(grayco_invar, prop="homogeneity")
                 if summary_method == "energy" or summary_method == "all":
-                    energy[:, f] = graycoprops(grayco, prop="energy")
+                    energy[f] = graycoprops(grayco_invar, prop="energy")
                 if summary_method == "correlation" or summary_method == "all":
-                    correlation[:, f] = graycoprops(grayco, prop="correlation")
-                if summary_method == "asm" or summary_method == "all":
-                    asm[:, f] = graycoprops(grayco, prop="ASM")
+                    correlation[f] = graycoprops(grayco_invar, prop="correlation")
+                if summary_method == "glcmmean" or summary_method == "all":
+                    I, J = np.ogrid[0:numlevels, 0:numlevels]
+                    glcmmean[f] = (np.sum(I*np.squeeze(grayco_invar), axis=(0, 1)) + np.sum(J*np.squeeze(grayco_invar), axis=(0, 1)))/2
+                if summary_method == "entropy" or summary_method == "all":
+                    loggray = -np.log(grayco_invar)
+                    loggray[~np.isfinite(loggray)] = 0
+                    ent[f] = np.sum(grayco_invar * loggray, axis=(0, 1))
 
 
         plt.figure(0)
         plt.clf()
         plt.subplot(2, 3, 1)
-        plt.title("contrast")
+        plt.title("average")
         plt.plot(tmpframestamps, avg, "k", linewidth=3)
-        plt.plot(tmpframestamps, contrast[0, :], "r", linestyle="-")
-        plt.plot(tmpframestamps, contrast[1, :], "r", linestyle="-")
-        plt.plot(tmpframestamps, contrast[2, :], "r", linestyle="-")
-        plt.plot(tmpframestamps, contrast[3, :], "r", linestyle="-")
+        #plt.plot(tmpframestamps, contrast, "r", linestyle="-")
+        # plt.plot(tmpframestamps, contrast[1, :], "r", linestyle="-")
+        # plt.plot(tmpframestamps, contrast[2, :], "r", linestyle="-")
+        # plt.plot(tmpframestamps, contrast[3, :], "r", linestyle="-")
         plt.subplot(2, 3, 2)
-        plt.title("dissimilarity")
-        plt.plot(tmpframestamps, dissimilarity[0, :], linestyle="-")
-        plt.plot(tmpframestamps, dissimilarity[1, :], linestyle="-")
-        plt.plot(tmpframestamps, dissimilarity[2, :], linestyle="-")
-        plt.plot(tmpframestamps, dissimilarity[3, :], linestyle="-")
-        plt.plot(tmpframestamps, np.nanmean(dissimilarity, axis=0), "k", linewidth=3)
+        plt.title("glcm mean")
+        plt.plot(tmpframestamps, glcmmean, linestyle="-")
+        # plt.plot(tmpframestamps, dissimilarity[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, dissimilarity[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, dissimilarity[3, :], linestyle="-")
+        # plt.plot(tmpframestamps, np.nanmean(dissimilarity, axis=0), "k", linewidth=3)
         plt.subplot(2, 3, 3)
         plt.title("homogeneity")
-        plt.plot(tmpframestamps, homogeneity[0, :], linestyle="-")
-        plt.plot(tmpframestamps, homogeneity[1, :], linestyle="-")
-        plt.plot(tmpframestamps, homogeneity[2, :], linestyle="-")
-        plt.plot(tmpframestamps, homogeneity[3, :], linestyle="-")
-        plt.plot(tmpframestamps, np.nanmean(homogeneity, axis=0), "k", linewidth=3)
+        plt.plot(tmpframestamps, homogeneity, linestyle="-")
+        # plt.plot(tmpframestamps, homogeneity[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, homogeneity[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, homogeneity[3, :], linestyle="-")
+        # plt.plot(tmpframestamps, np.nanmean(homogeneity, axis=0), "k", linewidth=3)
         plt.subplot(2, 3, 4)
         plt.title("energy")
-        plt.plot(tmpframestamps, energy[0, :], linestyle="-")
-        plt.plot(tmpframestamps, energy[1, :], linestyle="-")
-        plt.plot(tmpframestamps, energy[2, :], linestyle="-")
-        plt.plot(tmpframestamps, energy[3, :], linestyle="-")
-        plt.plot(tmpframestamps, np.nanmean(energy, axis=0), "k", linewidth=3)
+        plt.plot(tmpframestamps, energy, linestyle="-")
+        # plt.plot(tmpframestamps, energy[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, energy[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, energy[3, :], linestyle="-")
+        # plt.plot(tmpframestamps, np.nanmean(energy, axis=0), "k", linewidth=3)
         plt.subplot(2, 3, 5)
-        plt.title("correlation")
-        plt.plot(tmpframestamps, correlation[0, :], linestyle="-")
-        plt.plot(tmpframestamps, correlation[1, :], linestyle="-")
-        plt.plot(tmpframestamps, correlation[2, :], linestyle="-")
-        plt.plot(tmpframestamps, correlation[3, :], linestyle="-")
-        plt.plot(tmpframestamps, np.nanmean(correlation, axis=0), "k", linewidth=3)
+        plt.title("contrast")
+        plt.plot(tmpframestamps, contrast, linestyle="-")
+        # plt.plot(tmpframestamps, correlation[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, correlation[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, correlation[3, :], linestyle="-")
+        # plt.plot(tmpframestamps.transpose(), np.nanmean(correlation, axis=0), "k", linewidth=3)
         plt.subplot(2, 3, 6)
-        plt.title("asm")
-        plt.plot(tmpframestamps, asm[0, :], linestyle="-")
-        plt.plot(tmpframestamps, asm[1, :], linestyle="-")
-        plt.plot(tmpframestamps, asm[2, :], linestyle="-")
-        plt.plot(tmpframestamps, asm[3, :], linestyle="-")
-        plt.plot(tmpframestamps, np.nanmean(asm, axis=0), "k", linewidth=3)
+        plt.title("entropy")
+        plt.plot(tmpframestamps, ent, linestyle="-")
+        # plt.plot(tmpframestamps, asm[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, asm[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, asm[3, :], linestyle="-")
+        # plt.plot(tmpframestamps.transpose(), np.nanmean(asm, axis=0), "k", linewidth=3)
         plt.show(block=False)
 
-        save_tiff_stack(ourbase + "cell(" + str(reference_coord_data[c][0]) + "," +
-                                         str(reference_coord_data[c][1]) ".tif"),
-                        all_full_cell_iORG[i, :, :, cell_framestamps[c][i], c])
+        save_tiff_stack(outname.with_name( outname.name + "cell" + str(coords[cellind][0]) + "," + str(coords[cellind][1]) +".tif"),
+                        full_profiles[:, :, :, cellind])
 
         plt.waitforbuttonpress()
 
@@ -363,7 +377,7 @@ def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64, 
     #         if summary_method == "asm" or summary_method == "all":
     #             asm[c, :] = np.array(result[5])
 
-    return contrast, dissimilarity, homogeneity, energy, correlation, asm
+    return contrast, dissimilarity, homogeneity, energy, correlation, glcmmean
 
 
 
