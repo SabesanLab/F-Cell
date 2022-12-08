@@ -83,15 +83,15 @@ def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=3):
             match_reg = cv2.matchTemplate(stack_im, ref_template, cv2.TM_CCOEFF_NORMED)
             minV, maxV, minL, maxL = cv2.minMaxLoc(match_reg)
             maxL = np.array(maxL) - search_radius  # Make relative to the center.
-            # print(coord)
+            #print(coord)
             coordinates[i, :] = coord + maxL
-            # print(coordinates[i, :])
+            #print(coordinates[i, :])
             # plt.figure(10)
             # plt.imshow(stack_im)
             # plt.figure(11)
             # plt.imshow(match_reg)
             # plt.show(block=False)
-            # print(maxL)
+            #print(maxL)
     return coordinates
 
 
@@ -114,15 +114,22 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     if coordinates is None:
         pass # Todo: create coordinates for every position in the image stack.
 
-    im_stack = image_stack.astype("float64")
-    im_stack[im_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
+    #im_stack = image_stack.astype("float64")
+
+    im_stack_mask = image_stack == 0
+    im_stack_mask = cv2.morphologyEx(im_stack_mask.astype("uint8"), cv2.MORPH_OPEN, np.ones((3, 3)),
+                                     borderType=cv2.BORDER_CONSTANT, borderValue=1)
+
+    im_stack = image_stack.astype("float32")
+    im_stack[im_stack_mask.astype("bool")] = np.nan  # Anything that is outside our main image area should be made a nan.
 
     im_size = im_stack.shape
     if sigma is not None:
         for f in range(im_size[-1]):
-            im_stack[..., f] = cv2.GaussianBlur(im_stack[..., f], ksize=(0,0), sigmaX=sigma)
+            im_stack[..., f] = cv2.GaussianBlur(im_stack[..., f], ksize=(0, 0), sigmaX=sigma)
 
-    # Generate an exclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
+
+
     pluscoord = coordinates + seg_radius
     includelist = pluscoord[:, 0] < im_size[1]
     includelist &= pluscoord[:, 1] < im_size[0]
@@ -133,25 +140,24 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     includelist &= minuscoord[:, 1] >= 0
     del minuscoord
 
-    # coordinates = np.round(coordinates[includelist, :]).astype("int")
-    # Removed by MG 2022/10/19 to temporarily fix iORG script bug
+    coordinates = np.floor(coordinates).astype("int")
 
     if summary != "none":
-        profile_data = np.empty((coordinates.shape[0], im_stack.shape[-1]))
+        profile_data = np.full((coordinates.shape[0], im_stack.shape[-1]), np.nan)
     else:
-        profile_data = np.empty((seg_radius * 2 + 1, seg_radius * 2 + 1,
-                                 im_stack.shape[-1], coordinates.shape[0]))
+        profile_data = np.full((seg_radius * 2 + 1, seg_radius * 2 + 1,
+                                 im_stack.shape[-1], coordinates.shape[0]), np.nan)
 
     if seg_mask == "box": # Handle more in the future...
         for i in range(coordinates.shape[0]):
             if includelist[i]:
                 coord = coordinates[i, :]
                 fullcolumn = im_stack[(coord[1] - seg_radius):(coord[1] + seg_radius + 1),
-                                          (coord[0]-seg_radius):(coord[0]+seg_radius+1), :]
+                                      (coord[0] - seg_radius):(coord[0] + seg_radius + 1), :]
 
                 coldims = fullcolumn.shape
                 coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
-
+                #print(coord)
                 # No partial columns allowed. If there are nans in the column, wipe it out entirely.
                 nani = np.any(np.isnan(coordcolumn), axis=0)
                 coordcolumn[:, nani] = np.nan
@@ -166,6 +172,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                     profile_data[i, nani] = np.nan
                     profile_data[i, np.invert(nani)] = np.nansum(coordcolumn[:, np.invert(nani)], axis=0)
                 elif summary == "none":
+
                     profile_data[:, :, nani, i] = 0
                     profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
 
