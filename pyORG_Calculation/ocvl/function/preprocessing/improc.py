@@ -44,11 +44,19 @@ def flat_field(dataset, sigma=20):
 
 
 
-# Where the image data is N rows x M cols and F frames
-# and the row_shifts and col_shifts are F x N.
-# Assumes a row-wise distortion/a row-wise fast scan ("distortionless" along each row)
-# Returns a float image (spans from 0-1).
+
 def dewarp_2D_data(image_data, row_shifts, col_shifts, method="median"):
+    '''
+    # Where the image data is N rows x M cols and F frames
+    # and the row_shifts and col_shifts are F x N.
+    # Assumes a row-wise distortion/a row-wise fast scan ("distortionless" along each row)
+    # Returns a float image (spans from 0-1).
+    :param image_data:
+    :param row_shifts:
+    :param col_shifts:
+    :param method:
+    :return:
+    '''
     numstrips = row_shifts.shape[1]
     height = image_data.shape[0]
     width = image_data.shape[1]
