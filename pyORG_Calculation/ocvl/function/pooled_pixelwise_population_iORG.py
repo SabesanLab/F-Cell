@@ -7,6 +7,7 @@ from tkinter import Tk, filedialog, ttk, HORIZONTAL
 import numpy as np
 import pandas as pd
 import matplotlib
+import re
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 
@@ -16,6 +17,7 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_video
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+from datetime import datetime, date, time, timezone
 
 if __name__ == "__main__":
     root = Tk()
@@ -127,8 +129,8 @@ if __name__ == "__main__":
                     del x, y, xv, yv
                     first = False
 
-                temp_profiles = extract_profiles(dataset.video_data, coord_data , seg_radius=1)
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean")
+                temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=1)
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", rescaled=True)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
@@ -165,9 +167,13 @@ if __name__ == "__main__":
                 if dataset.framestamps[-1] > max_frmstamp:
                     max_frmstamp = dataset.framestamps[-1]
 
+
+        dt = datetime.now()
+        now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
+
         #plt.legend()
-        plt.savefig( res_dir.joinpath(this_dirname + "_pixelpop_iORG.svg"))
-        plt.savefig( res_dir.joinpath(this_dirname + "_pixelpop_iORG.png") )
+        plt.savefig( res_dir.joinpath(this_dirname + "_pixelpop_iORG_" + now_timestamp + ".svg"))
+        plt.savefig( res_dir.joinpath(this_dirname + "_pixelpop_iORG_" + now_timestamp + ".png") )
 
 
 
@@ -194,7 +200,7 @@ if __name__ == "__main__":
         hist_normie = Normalize(vmin=0, vmax=np.nanpercentile(video_profiles[:], 99))
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("inferno"), norm=hist_normie)
 
-        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.avi").as_posix(), video_profiles, 29.4,
+        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_" + now_timestamp + ".avi").as_posix(), video_profiles, 29.4,
                    scalar_mapper=hist_mapper)
 
         print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 5)))
@@ -205,7 +211,7 @@ if __name__ == "__main__":
         video_profiles[video_profiles < 0] = 0
         video_profiles[video_profiles > 1] = 1
         video_profiles *= 255
-        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_gray.avi").as_posix(),
+        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_gray_" + now_timestamp + ".avi").as_posix(),
                    video_profiles, 29.4)
 
 
@@ -229,36 +235,44 @@ if __name__ == "__main__":
 
         pop_dFrame = pd.DataFrame(np.concatenate((all_iORG,
                                                   np.reshape(pooled_iORG, (1, len(pooled_iORG)))), axis=0))
-        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pixelpop_iORG.csv"), header=False)
+        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pixelpop_iORG_" + now_timestamp + ".csv"), header=False)
 
         pop_amp_dFrame = pd.DataFrame(pop_iORG_amp)
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pixelpop_iORG_amp.csv"), header=False)
+        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pixelpop_iORG_amp_" + now_timestamp + ".csv"), header=False)
 
         plt.figure(1)
         plt.clf()
         plt.plot(pooled_iORG)
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
 
         if all_pooled_init == 1:
             all_trial_pooled = np.empty([len(allFiles), len(pooled_iORG)])
             all_trial_pooled[:] = 0
+            tmp_dir_pooled = []
             all_pooled_init = 2
 
-        if this_dirname != 'Control':
+
+        if re.search(',', this_dirname):
             all_trial_pooled[pooled_incl] = pooled_iORG
+            tmp_dir_pooled.append(this_dirname)
 
             pooled_incl += 1
 
     plt.figure(40)
     plt.ylim(0, 1)
-    plt.plot(range(len(all_trial_pooled[0,])),all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
-             all_trial_pooled[1,],range(len(all_trial_pooled[2,])), all_trial_pooled[2,], range(len(all_trial_pooled[3,])), all_trial_pooled[3,])
+
+    plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
+            all_trial_pooled[1,], range(len(all_trial_pooled[2,])), all_trial_pooled[2,],
+           range(len(all_trial_pooled[3,])), all_trial_pooled[3,])
+
+    # plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
+    #         all_trial_pooled[1,])
     stim_rect = matplotlib.patches.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
                                              (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
     plt.gca().add_patch(stim_rect)
-    plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG.png"))
-    plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG.svg"))
+    plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG_" + now_timestamp + ".png"))
+    plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG_" + now_timestamp + ".svg"))
 

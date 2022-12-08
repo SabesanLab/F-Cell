@@ -1,15 +1,16 @@
-import math
 import os
 from os import walk
 from os.path import splitext
 from pathlib import Path
-from tkinter import Tk, filedialog, ttk, HORIZONTAL, simpledialog
+from tkinter import Tk, filedialog, ttk, HORIZONTAL
 
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.spatial import Voronoi, voronoi_plot_2d
+from skimage.feature import peak_local_max
+from ssqueezepy.experimental import scale_to_freq
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
@@ -19,13 +20,13 @@ from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.resources import save_video, save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
-from datetime import datetime, date, time, timezone
 
 
 def find_nearest(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
+
 
 
 if __name__ == "__main__":
@@ -49,18 +50,6 @@ if __name__ == "__main__":
     if not stimtrain_fName:
         quit()
 
-    a_mode = simpledialog.askstring(title="Input the analysis modality string: ",
-                                    prompt="Input the analysis modality string:",
-                                    initialvalue="760nm", parent=root)
-    if not a_mode:
-        a_mode = "760nm"
-
-    ref_mode = simpledialog.askstring(title="Input the *alignment reference* modality string. ",
-                                      prompt="Input the *alignment reference* modality string:", initialvalue=a_mode,
-                                      parent=root)
-    if not ref_mode:
-        ref_mode = "760nm"
-
     x = root.winfo_screenwidth() / 2 - 128
     y = root.winfo_screenheight() / 2 - 128
     root.geometry(
@@ -72,6 +61,7 @@ if __name__ == "__main__":
 
     totFiles = 0
     # Parse out the locations and filenames, store them in a hash table.
+    controlpath = None
     searchpath = Path(pName)
     for path in searchpath.rglob("*.avi"):
         if "piped" in path.name:
@@ -80,6 +70,10 @@ if __name__ == "__main__":
             if path.parent not in allFiles:
                 allFiles[path.parent] = []
                 allFiles[path.parent].append(path)
+
+                if "control" in path.parent.name:
+                    print("DETECTED CONTROL DATA AT: " + str(path.parent))
+                    controlpath = path.parent
             else:
                 allFiles[path.parent].append(path)
 
@@ -103,9 +97,96 @@ if __name__ == "__main__":
     cell_framestamps = []
     cell_profiles = []
 
+
+    # Before we start, get an estimate of the "noise" from the control signals.
+    sig_threshold_im = None
+   # controlpath = None # TEMP!
+    if controlpath is not None:
+        print("Processing control data to find noise floor...")
+
+        r = 0
+        all_vars = []
+        for file in allFiles[controlpath]:
+            # Ignores the All_ACQ_AVG tif while running through the files in this location
+            if "ALL_ACQ_AVG" not in file.name:
+                # Waitbar stuff
+                pb["value"] = r
+                pb_label["text"] = "Processing " + file.name + "..."
+                pb.update()
+                pb_label.update()
+
+                print("Processing " + file.name + "...")
+                # Loading in the pipelined data (calls the load_pipelined_data() fxn
+                dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
+                                      analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
+                dataset.load_pipelined_data()
+
+                # Initialize the dict for individual cells.
+                if first:
+                    reference_coord_data = dataset.coord_data
+                    framerate = dataset.framerate
+                    stimulus_train = dataset.stimtrain_frame_stamps
+                    simple_amp = np.empty((len(allFiles), len(reference_coord_data)))
+                    simple_amp[:] = np.nan
+                    ref_im = dataset.reference_im
+                    full_profiles = []
+
+                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+
+                    for c in range(len(dataset.coord_data)):
+                        cell_framestamps.append([])
+                        cell_profiles.append([])
+
+                    first = False
+
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
+
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="mean", sigma=0.75)
+
+                temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
+                                                 critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
+                                                                           stimulus_train[1] + int(0.2 * framerate)),
+                                                 critical_fraction=0.4)
+
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
+                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
+                                                       method="mean_sub")
+                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
+                                                                                       dataset.framestamps)
+
+                ctrl_wavelets, scales, coi = wavelet_iORG(stdize_profiles, dataset.framestamps, dataset.framerate)
+
+                cell_var = np.zeros((len(ctrl_wavelets), scales.shape[0]))
+                #cell_mean = np.zeros((len(ctrl_wavelets), scales.shape[0]))
+                for i in range( len(ctrl_wavelets) ):
+                    this_cwt = ctrl_wavelets[i]
+                    cell_var[i, :] = np.abs(this_cwt[:, int((this_cwt.shape[1]-1)/2 ) ])
+
+                all_vars.append(cell_var)
+                r += 1
+
+        all_vars = np.vstack(all_vars)
+        avg_var = np.nanvar(all_vars, axis=0)
+        avg_all = np.nanmean(all_vars, axis=0)
+
+
+        # For 95% significance.
+        sig_threshold = avg_all+np.sqrt(avg_var)*2 # 3.85 for 95, for 97.5, 6.63 for 99th from Chi squared distribution
+        sig_threshold_im = np.repeat(np.asmatrix(sig_threshold).transpose(), ctrl_wavelets[0].shape[1], axis=1)
+        sig_threshold_im[coi < 1] = 10000
+        plt.figure(12)
+        plt.plot(scales, sig_threshold)
+        plt.gca().set_xscale("log")
+        plt.show(block=False)
+        del ctrl_wavelets
+
+
     # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
     # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
+        if loc == controlpath:
+            continue
+
         first = True
         res_dir = loc.joinpath(
             "Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
@@ -132,7 +213,7 @@ if __name__ == "__main__":
 
                 # Loading in the pipelined data (calls the load_pipelined_data() fxn
                 dataset = MEAODataset(file.as_posix(), stimtrain_path=stimtrain_fName,
-                                      analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PIPELINED)
+                                      analysis_modality="760nm", ref_modality="760nm", stage=PipeStages.PIPELINED)
                 dataset.load_pipelined_data()
 
                 # Initialize the dict for individual cells.
@@ -147,7 +228,6 @@ if __name__ == "__main__":
 
                     reference_coord_data = refine_coord(ref_im, dataset.coord_data)
 
-
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
                         cell_profiles.append([])
@@ -156,21 +236,22 @@ if __name__ == "__main__":
 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
-                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=5, summary="none"))
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="median")
+                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=5, summary="none", sigma=0.75))
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="median", sigma=0.75)
 
-                # print(str((stimulus_train[0] - int(0.15 * framerate)) / framerate) + " to " + str(
-                #    (stimulus_train[1] + int(0.2 * framerate)) / framerate))
                 temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
                                                                            stimulus_train[1] + int(0.2 * framerate)),
                                                  critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
-                                                       method="mean_sub")
-                #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
-                #                                                                       dataset.framestamps)
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data, rescaled=True)
+                # stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
+                #                                        method="mean_sub")
+                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(norm_temporal_profiles,
+                                                                                       dataset.framestamps)
+
+                indiv_resp = pd.DataFrame(stdize_profiles)
+                indiv_resp.to_csv("all_cell_profiles.csv")
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
@@ -184,7 +265,6 @@ if __name__ == "__main__":
 
         del dataset, temp_profiles, norm_temporal_profiles, stdize_profiles
 
-
         # Rows: Acquisitions
         # Cols: Framestamps
         # Depth: Coordinate
@@ -195,14 +275,104 @@ if __name__ == "__main__":
         cell_power_iORG = np.empty((len(reference_coord_data), max_frmstamp + 1))
         cell_power_iORG[:] = np.nan
 
+        cwt_window_start = int(-0.25*framerate)
+        cwt_window_end = int(1*framerate)
         # Make 3D matricies, where:
         # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
         # The second dimension (columns) is time
         # The third dimension is each tracked coordinate
+        cell_amp = np.zeros( (len(reference_coord_data), len(allFiles[loc])) )
+        cell_amp[:] = np.nan
+        peak_scale = np.zeros( (len(reference_coord_data), len(allFiles[loc])) )
+        peak_scale[:] = np.nan
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
+                save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
+                                                  str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"), full_profiles[i][:, :, :, c])
+
+            plt.figure(11)
+            plt.clf()
+            plt.subplot(2, 2, 1)
+            plt.imshow(ref_im)
+            plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
+
+            # What about a temporal histogram?
+
+            allcell_CWT, scales, coi = wavelet_iORG(all_cell_iORG[:, :, c], full_framestamp_range, framerate,
+                                                    sig_threshold_im, display=False)
+
+            print(c)
+            for t, t_cwt in enumerate(allcell_CWT):
+
+                if np.any(np.isfinite(t_cwt)):
+
+                    cwt_mod = np.abs(t_cwt)
+                    cwt_phase = np.arctan(np.imag(t_cwt) / np.real(t_cwt))
+                    cwt_phase_unwrapped = np.unwrap(cwt_phase, period=np.pi, axis=1)
+
+                    cwt_window = cwt_mod[:, stimulus_train[0]+cwt_window_start:stimulus_train[1]+cwt_window_end]
+                    peak_idx = peak_local_max(cwt_window, exclude_border=False)
+
+                    if peak_idx.size != 0:
+
+                        peak_dist = np.zeros((len(peak_idx), 1))
+                        peak_val = np.zeros((len(peak_idx), 1))
+                        # Find the peak closest to the stimulus delivery, and highest.
+                        for i, peakloc in enumerate(peak_idx):
+                            peak_dist[i] = peakloc[1] + cwt_window_start
+                            peak_val[i] = cwt_window[peakloc[0], peakloc[1]]
+
+                        maxvalind = np.argmax(peak_val)
+                        mindist = np.amin(peak_dist)
+                        peak_scale[c, t] = scales[peak_idx[maxvalind][0]]
+                        cell_amp[c, t] = np.amax(peak_val)
+                        # if cell_amp[c, t] < 0.6:
+                        print(cell_amp[c, t])
+                        plt.figure()
+                        plt.suptitle(str(t))
+                        ax1 = plt.gca()
+                        ax1.imshow(cwt_mod, aspect='auto', label=str(t))
+                        ax1.plot(stimulus_train[0]+cwt_window_start+peak_idx[maxvalind][1], peak_idx[maxvalind][0], "r*")
+                        ax1.set_xticks(np.arange(0, cwt_window.shape[1], 5))
+                        ax1.set_yticks(np.arange(0, cwt_window.shape[0], 5))
+                        ax2 = ax1.twinx()
+                        ax2.plot(all_cell_iORG[t, :, c], "r")
+
+                        # plt.figure(12, figsize=(cwt_window.shape[1] / 2, cwt_window.shape[0] / 2))
+                        # plt.clf()
+                        # ax1 = plt.gca()
+                        # ax1.imshow(cwt_phase, aspect='auto')
+                        # ax1.plot(stimulus_train[0] + cwt_window_start + peak_idx[maxvalind][1], peak_idx[maxvalind][0],
+                        #          "r*")
+                        # ax1.set_xticks(np.arange(0, cwt_window.shape[1], 5))
+                        # ax1.set_yticks(np.arange(0, cwt_window.shape[0], 5))
+                        # ax2 = ax1.twinx()
+                        # ax2.plot(all_cell_iORG[t, :, c], "r")
+
+
+                        plt.show(block=False)
+                        plt.draw()
+                        #plt.waitforbuttonpress()
+                    else:
+                        mindist = np.nan
+                        peak_scale[c, t] = np.nan
+                        cell_amp[c, t] = np.nan
+
+                #print(cell_amp[t])
+
+            plt.figure(110)
+            plt.clf()
+            plt.plot(peak_scale[c, :], cell_amp[c, :], "ko")
+            print(np.nanmedian(cell_amp[c, :]))
+            plt.show(block=False)
+            plt.draw()
+            plt.waitforbuttonpress()
+            plt.close("all")
+            # indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
+            # indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
+            # header=False, index=False)
 
             cell_profiles[c] = []
             cell_framestamps[c] = []
@@ -243,41 +413,14 @@ if __name__ == "__main__":
         [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
         # print('max_amp ', max_amp)
 
-        dt = datetime.now()
-        now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
-
         plt.figure(1)
-        histbins = np.arange(start=-0.1, stop=0.3, step=0.01) #Humans: -0.2, 1.5, 0.025
+        histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
         plt.hist(simple_amp[l, :], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
-
-        plt.figure(40) # log hist
-        histbins_log = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
-        log_amp = np.log10(simple_amp[l,:])
-        plt.hist(log_amp, bins=histbins_log)
-        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_hist_" + now_timestamp + ".png"))
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
-        plt.close(plt.gcf())
-
-
-        plt.figure(41)  # log hist +1
-        histbins_logp1 = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
-        log_amp_plus1 = log_amp + 1
-        print("min ", np.nanmin(log_amp_plus1))
-        print("max ", np.nanmax(log_amp_plus1))
-        plt.hist(log_amp_plus1, bins=histbins_logp1)
-        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_plus1_amp_hist_" + now_timestamp + ".png"))
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
-        plt.close(plt.gcf())
-
 
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
@@ -294,18 +437,18 @@ if __name__ == "__main__":
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
         # plotting the cells with the min/med/max amplitude
         plt.figure(300)
         # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[min_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[med_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
                  np.transpose(cell_power_iORG[max_amp_col, :]))
         # This also works...
         # plt.plot(full_framestamp_range.astype('float64'),
@@ -314,7 +457,7 @@ if __name__ == "__main__":
         # should really be the cell_framestamps that correspond to the cells on the x axis
         # need to fix the bug with the framstamps being empty first though
         # plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
-        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones.png"))
         plt.show(block=False)
         plt.close(plt.gcf())
 
@@ -322,7 +465,7 @@ if __name__ == "__main__":
         if outputcsv:
             import csv
 
-            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG_" + now_timestamp + ".csv")
+            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
             print(csv_dir)
             f = open(csv_dir, 'w', newline="")
             writer = csv.writer(f, delimiter=',')

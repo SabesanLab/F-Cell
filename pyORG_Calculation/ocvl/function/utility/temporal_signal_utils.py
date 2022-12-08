@@ -5,6 +5,7 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 from sklearn import linear_model
+from pynufft import NUFFT
 
 
 def densify_temporal_matrix(temporal_profiles, framestamps, max_framestamp=None):
@@ -73,7 +74,7 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
     nummissing = ((framestamps[-1] +1) - len(framestamps)) + np.sum(np.invert(finers))
 
-    if threshold is None or nummissing/framestamps[-1] < threshold:
+    if threshold is None or nummissing/framestamps[-1] <= threshold:
 
         sigmean = np.mean(temporal_profiles[c, finers])
         sigstd = np.std(temporal_profiles[c, finers])
@@ -99,16 +100,21 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
         return reconstruction, nummissing
     else:
-        return densify_temporal_matrix(temporal_profiles[c, :], framestamps), nummissing
+        print( "Missing " + str(100*(nummissing/framestamps[-1])) + "% of data from this profile. Removing...")
+        reconstruction = densify_temporal_matrix(temporal_profiles[c, :], framestamps)
+        reconstruction[:] = np.nan
+        return reconstruction, nummissing
 
 
-def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
+def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=0.2):
     """
     This function reconstructs the missing profile data using compressed sensing techniques.
 
     :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
     :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_profiles.
     :param method: The method used for compressive sensing. Defaults to an L1 norm based approach.
+    :param threshold: The threshold at which we will simply drop a signal. As we are not doing true compressive sensing,
+                      the default is 0.2 (80% of the signal must be present).
 
     :return: A tuple containing the reconstructed signals, the full framestamp range of the signals, and the number of
              missing framestamps from each signal.
@@ -125,14 +131,39 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1"):
         with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
             reconst = pool.starmap_async(l1_compressed_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
-                                                                    range(temporal_profiles.shape[0]), repeat(0.5)))
+                                                                    range(temporal_profiles.shape[0]), repeat(threshold)))
             res = reconst.get()
             for c, result in enumerate(res):
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
 
-    plt.hist(nummissing, len(fullrange))
-    plt.show(block=False)
+    elif method == "NUFFT":
+        Nufft = NUFFT()
+
+        fsamp = np.arange(0 , framestamps[-1])/ framestamps[-1]
+        #om = np.random.randn(temporal_profiles.shape[1]*2, 1)
+
+        for c in range(temporal_profiles.shape[0]):
+            finers = np.isfinite(temporal_profiles[c, :])
+            good_frms = framestamps[finers, np.newaxis]
+            Nufft.plan(good_frms, (int(temporal_profiles[c, finers].shape[-1]),) , (int(good_frms[-1]),), (6,))
+
+            freqy = Nufft.forward(temporal_profiles[c, finers])
+
+            resto = Nufft.solve(freqy, "L1TVOLS", maxiter=30, rho=1)
+
+            plt.figure(0)
+            plt.subplot(2, 1, 1)
+            plt.plot(framestamps[finers], temporal_profiles[c, finers], "-d")
+            plt.figure(0)
+            plt.subplot(2, 1, 2)
+            plt.plot(fullrange, resto, "-d")
+            plt.waitforbuttonpress()
+
+
+    # plt.figure(9001)
+    # plt.hist(nummissing, len(fullrange))
+    # plt.show(block=False)
 
     print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
 

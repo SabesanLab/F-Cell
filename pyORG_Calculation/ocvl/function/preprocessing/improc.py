@@ -1,3 +1,5 @@
+import warnings
+
 import cv2
 import numpy as np
 import SimpleITK as sitk
@@ -41,6 +43,64 @@ def flat_field(dataset, sigma=20):
         return flat_fielded_dataset.astype(dataset.dtype)
     else:
         return flat_field_frame(dataset, sigma)
+
+
+def norm_video(video_data, norm_method="mean", rescaled=False):
+    """
+    This function normalizes a video (a single sample of all cells) using a method supplied by the user.
+
+    :param video_data: A NxMxF numpy matrix with N rows, M columns, and F frames of some video.
+    :param norm_method: The normalization method chosen by the user. Default is "mean". Options: "mean", "median"
+    :param rescaled: Whether or not to keep the data at the original scale (only modulate the numbers in place). Useful
+                     if you want the data to stay in the same units. Default: False. Options: True/False
+
+    :return: a NxMxF numpy matrix of normalized video data.
+    """
+
+    if norm_method == "mean":
+        # Determine each frame's mean.
+        framewise_norm = np.empty([video_data.shape[-1]])
+        for f in range(video_data.shape[-1]):
+            frm = video_data[:, :, f].flatten().astype("float32")
+            frm[frm == 0] = np.nan
+            framewise_norm[f] = np.nanmean(frm)
+
+        all_norm = np.nanmean(framewise_norm)
+        #plt.plot(framewise_norm/np.amax(framewise_norm))
+    # plt.show()
+    elif norm_method == "median":
+        # Determine each frame's median.
+        framewise_norm = np.empty([video_data.shape[-1]])
+        for f in range(video_data.shape[-1]):
+            frm = video_data[:, :, f].flatten().astype("float32")
+            frm[frm == 0] = np.nan
+            framewise_norm[f] = np.nanmedian(frm)
+        all_norm = np.nanmean(framewise_norm)
+
+    else:
+        # Determine each frame's mean.
+        framewise_norm = np.empty([video_data.shape[-1]])
+        for f in range(video_data.shape[-1]):
+            frm = video_data[:, :, f].flatten().astype("float32")
+            frm[frm == 0] = np.nan
+            framewise_norm[f] = np.nanmean(frm)
+        all_norm = np.nanmean(framewise_norm)
+        warnings.warn("The \"" + norm_method + "\" normalization type is not recognized. Defaulting to mean.")
+
+    if rescaled: # Provide the option to simply scale the data, instead of keeping it in relative terms
+        ratio = framewise_norm / all_norm
+
+        rescaled_vid = np.empty(video_data.shape)
+        for f in range(video_data.shape[-1]):
+            rescaled_vid[:, :, f] = video_data[:, :, f].astype("float32") / ratio[f]
+
+        return rescaled_vid
+    else:
+        rescaled_vid = np.empty_like(video_data)
+        for f in range(video_data.shape[-1]):
+            rescaled_vid[:, :, f] = video_data[:, :, f].astype("float32") / framewise_norm[f]
+
+        return rescaled_vid
 
 
 

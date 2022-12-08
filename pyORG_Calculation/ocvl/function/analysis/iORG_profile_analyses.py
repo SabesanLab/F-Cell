@@ -1,11 +1,15 @@
-import math
+from itertools import repeat
+from multiprocessing import Pool
 
 import numpy as np
-import pywt
+from joblib._multiprocessing_helpers import mp
+from skimage.feature import graycomatrix, graycoprops
 from matplotlib import pyplot as plt
-from scipy import signal
-from ssqueezepy import wavelets, p2up, cwt
 
+from ssqueezepy import wavelets, p2up, cwt
+from ssqueezepy.experimental import scale_to_freq
+
+from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
@@ -111,48 +115,269 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     return iORG, num_incl
 
-def wavelet_iORG(temporal_profiles, framestamps, fps, titles):
+def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, display=False):
 
-    wavelet = "gmw"
     padtype = "reflect"
-    #reconst_profiles, fullrange, nummissing = reconstruct_profiles(temporal_profiles, framestamps)
 
-    morelet = wavelets.Wavelet(('morlet', {'mu': 3}))
-    morse = wavelets.Wavelet((wavelet, {"gamma": 3, "beta": 1}))
-    morse_diff = wavelets.Wavelet((wavelet, {"gamma": 2, "beta": 1}))
-    bump = wavelets.Wavelet(('bump'))
-    #biorwav = wavelets.Wavelet("bior1.3")
+    time = framestamps/fps
+    the_wavelet = wavelets.Wavelet(("gmw", {"gamma": 2, "beta": 1}))
+    #the_wavelet = wavelets.Wavelet(("hhhat", {"mu": 1}))
+    #the_wavelet = wavelets.Wavelet(("bump", {"mu": 1, "s": 1.2}))
+    #the_wavelet.viz()
 
-    #allWx =
-    mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
-    plt.figure(11)
 
-    signal = plt.subplot(2, 2, 2)
-    waveletd3 = plt.subplot(2, 2, 3)
-    waveletd4 = plt.subplot(2, 2, 4)
+    allWx = []
+    allScales = np.nan
+    coi_im = np.nan
+
+    if display:
+        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
+        plt.figure(12)
+        signal = plt.subplot(2, 2, 2)
+        waveletd3 = plt.subplot(2, 2, 3)
+        waveletthresh = plt.subplot(2, 2, 4)
+        signal.cla()
 
     for r in range(temporal_profiles.shape[0]):
-        nextpowdiff = 2**math.ceil(math.log2(temporal_profiles[r, :].shape[0])) - temporal_profiles[r, :].shape[0]
-        #signal.cla()
-        signal.plot(framestamps/fps, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
-        # a4, d4, d3, d2, d1 = pywt.swt(np.pad(temporal_profiles[r, :], (0, nextpowdiff), mode="reflect"),
-        #                               "bior1.3", level=4, trim_approx=True, norm=False)
-        #waveletd3.plot(framestamps / fps, d3[0:176], color=mapper.to_rgba(r, norm=False))
-        #waveletd4.plot(framestamps / fps, d4[0:176], color=mapper.to_rgba(r, norm=False))
-        #print(np.nansum(temporal_profiles[r, :]**2))
+        if display:
+            signal.plot(time, temporal_profiles[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
 
-        Wx, scales = cwt(temporal_profiles[r, 0:150], wavelet=morse, t=framestamps[0:150]/fps, padtype=padtype, scales="log-piecewise")
-        waveletd3.imshow(np.abs(Wx))#, extent=(0, framestamps[150], scales[0], scales[-1]))
-        Wx, scales = cwt(temporal_profiles[r, 0:150], wavelet=morse_diff, t=framestamps[0:150] / fps, padtype=padtype,
-                         scales="log-piecewise")
-        waveletd4.imshow(np.abs(Wx))
-        plt.title(titles[r].name)
-        if np.all(~(temporal_profiles[r, 0:150] == 0)):
-            plt.show(block=False)
-            plt.waitforbuttonpress()
+        if np.all(np.isfinite(temporal_profiles[r, :])):
+            Wx, scales = cwt(temporal_profiles[r, :], wavelet=the_wavelet, t=time, padtype=padtype, scales="log",
+                             l1_norm=True, nv=64)
+            mod_Wx = np.abs(Wx)
+            # Converts our scales to samples, and determines the coi.
+            #To convert to Hz:
+            #wc [(cycles*radians)/samples] / (2pi [radians]) * fs [samples/second]
+            #= fc [cycles/second]
 
-    #wavelet.hist(fifth, bins=10)
-    #plt.waitforbuttonpress()
+            freq_scales = scale_to_freq(scales, the_wavelet, len(temporal_profiles[r, :]), fs=fps, padtype=padtype)
+            coi_scales = (scales * the_wavelet.std_t) / the_wavelet.wc_ct
+            coi_im = np.ones_like(mod_Wx)
+
+            for s, scale_ind in enumerate(coi_scales):
+                scale_ind = int(scale_ind+1)
+                coi_im[s, 0:scale_ind] = 0
+                coi_im[s, -scale_ind:] = 0
+
+            if display:
+                waveletd3.imshow(mod_Wx)
+
+            if sig_threshold is not None:
+                overthresh = mod_Wx > sig_threshold
+                mod_Wx[mod_Wx <= sig_threshold] = 0
+                Wx[mod_Wx <= sig_threshold] = 0
+
+                if display:
+                    waveletd3.imshow(mod_Wx)
+                    waveletthresh.imshow(np.reshape(overthresh, mod_Wx.shape))#, extent=(0, framestamps[150], scales[0], scales[-1]))
+                    plt.show(block=False)
+                    #plt.waitforbuttonpress()
+            else:
+                if display:
+                    waveletd3.imshow(mod_Wx)
+                    plt.show(block=False)
+                    #plt.waitforbuttonpress()
+
+            allWx.append(Wx)
+            allScales = freq_scales
+        else:
+            allWx.append(np.nan)
+
+
+#        if np.all(~(temporal_profiles[r, 0:150] == 0)):
+    # waveletd3.plot(np.nanvar(np.abs(Wx), axis=1))
+            #plt.waitforbuttonpress()
+
+    return allWx, allScales, coi_im
+
+
+def extract_texture(full_profiles, cellind, summary_method):
+
+    if summary_method == "contrast" or summary_method == "all":
+        contrast = np.empty((1, full_profiles.shape[-2]))
+    if summary_method == "dissimilarity" or summary_method == "all":
+        dissimilarity = np.empty((1, full_profiles.shape[-2]))
+    if summary_method == "homogeneity" or summary_method == "all":
+        homogeneity = np.empty((1, full_profiles.shape[-2]))
+    if summary_method == "energy" or summary_method == "all":
+        energy = np.empty((1, full_profiles.shape[-2]))
+    if summary_method == "correlation" or summary_method == "all":
+        correlation = np.empty((1, full_profiles.shape[-2]))
+    if summary_method == "asm" or summary_method == "all":
+        asm = np.empty((1, full_profiles.shape[-2]))
+
+    for f in range(full_profiles.shape[-2]):
+        grayco = graycomatrix(full_profiles[:, :, f, cellind], distances=[1], angles=[0, np.pi/2], levels=255)
+
+        if summary_method == "contrast" or summary_method == "all":
+            print(graycoprops(grayco, prop="contrast"))
+            contrast[f] = graycoprops(grayco, prop="contrast")
+        if summary_method == "dissimilarity" or summary_method == "all":
+            print(graycoprops(grayco, prop="dissimilarity"))
+            dissimilarity[f] = graycoprops(grayco, prop="dissimilarity")
+        if summary_method == "homogeneity" or summary_method == "all":
+            print(graycoprops(grayco, prop="homogeneity"))
+            homogeneity[f] = graycoprops(grayco, prop="homogeneity")
+        if summary_method == "energy" or summary_method == "all":
+            print(graycoprops(grayco, prop="energy"))
+            energy[f] = graycoprops(grayco, prop="energy")
+        if summary_method == "correlation" or summary_method == "all":
+            print(graycoprops(grayco, prop="correlation"))
+            correlation[f] = graycoprops(grayco, prop="correlation")
+        if summary_method == "asm" or summary_method == "all":
+            print(graycoprops(grayco, prop="ASM"))
+            asm[f] = graycoprops(grayco, prop="ASM")
+
+    return contrast, dissimilarity, homogeneity, energy, correlation, asm
+
+def extract_texture_profiles(full_profiles, summary_method="all", numlevels=64,  tmpframestamps=None, outname=None, coords=None):
+
+
+    for cellind in range(full_profiles.shape[-1]):
+        if summary_method == "contrast" or summary_method == "all":
+            contrast = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "dissimilarity" or summary_method == "all":
+            dissimilarity = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "homogeneity" or summary_method == "all":
+            homogeneity = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "energy" or summary_method == "all":
+            energy = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "correlation" or summary_method == "all":
+            correlation = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "glcmmean" or summary_method == "all":
+            glcmmean = np.full((full_profiles.shape[-2]), np.nan)
+        if summary_method == "entropy" or summary_method == "all":
+            ent = np.full((full_profiles.shape[-2]), np.nan)
+
+        avg = np.empty((full_profiles.shape[-2], 1))
+
+        minlvl = 0 #np.nanmin(full_profiles[:, :, :, cellind].flatten())
+        maxlvl = 255 #np.nanmax(full_profiles[:, :, :, cellind].flatten())
+
+        print("Min: "+str(minlvl)+" Max: "+str(maxlvl))
+
+        thisprofile = np.round(((full_profiles[:, :, :, cellind]-minlvl) / (maxlvl-minlvl)) * (numlevels-1) )
+        thisprofile[thisprofile >= numlevels] = numlevels-1
+        thisprofile = thisprofile.astype("uint8")
+
+        for f in range(full_profiles.shape[-2]):
+            avg[f] = np.mean(full_profiles[:, :, f, cellind].flatten())
+
+            if avg[f] != 0:
+                grayco = graycomatrix(thisprofile[:, :, f], distances=[1], angles=[0, np.pi/4, np.pi/2, np.pi*3/4],
+                                      levels=numlevels, normed=True, symmetric=True)
+
+                grayco_invar = np.mean(grayco, axis=-1)
+                grayco_invar = grayco_invar[..., None]
+
+                if summary_method == "contrast" or summary_method == "all":
+                    contrast[f] = graycoprops(grayco_invar, prop="contrast")
+                if summary_method == "dissimilarity" or summary_method == "all":
+                    dissimilarity[f] = graycoprops(grayco_invar, prop="dissimilarity")
+                if summary_method == "homogeneity" or summary_method == "all":
+                    homogeneity[f] = graycoprops(grayco_invar, prop="homogeneity")
+                if summary_method == "energy" or summary_method == "all":
+                    energy[f] = graycoprops(grayco_invar, prop="energy")
+                if summary_method == "correlation" or summary_method == "all":
+                    correlation[f] = graycoprops(grayco_invar, prop="correlation")
+                if summary_method == "glcmmean" or summary_method == "all":
+                    I, J = np.ogrid[0:numlevels, 0:numlevels]
+                    glcmmean[f] = (np.sum(I*np.squeeze(grayco_invar), axis=(0, 1)) + np.sum(J*np.squeeze(grayco_invar), axis=(0, 1)))/2
+                if summary_method == "entropy" or summary_method == "all":
+                    loggray = -np.log(grayco_invar)
+                    loggray[~np.isfinite(loggray)] = 0
+                    ent[f] = np.sum(grayco_invar * loggray, axis=(0, 1))
+
+
+        plt.figure(0)
+        plt.clf()
+        plt.subplot(2, 3, 1)
+        plt.title("average")
+        plt.plot(tmpframestamps, avg, "k", linewidth=3)
+        #plt.plot(tmpframestamps, contrast, "r", linestyle="-")
+        # plt.plot(tmpframestamps, contrast[1, :], "r", linestyle="-")
+        # plt.plot(tmpframestamps, contrast[2, :], "r", linestyle="-")
+        # plt.plot(tmpframestamps, contrast[3, :], "r", linestyle="-")
+        plt.subplot(2, 3, 2)
+        plt.title("glcm mean")
+        plt.plot(tmpframestamps, glcmmean, linestyle="-")
+        # plt.plot(tmpframestamps, dissimilarity[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, dissimilarity[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, dissimilarity[3, :], linestyle="-")
+        # plt.plot(tmpframestamps, np.nanmean(dissimilarity, axis=0), "k", linewidth=3)
+        plt.subplot(2, 3, 3)
+        plt.title("homogeneity")
+        plt.plot(tmpframestamps, homogeneity, linestyle="-")
+        # plt.plot(tmpframestamps, homogeneity[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, homogeneity[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, homogeneity[3, :], linestyle="-")
+        # plt.plot(tmpframestamps, np.nanmean(homogeneity, axis=0), "k", linewidth=3)
+        plt.subplot(2, 3, 4)
+        plt.title("energy")
+        plt.plot(tmpframestamps, energy, linestyle="-")
+        # plt.plot(tmpframestamps, energy[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, energy[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, energy[3, :], linestyle="-")
+        # plt.plot(tmpframestamps, np.nanmean(energy, axis=0), "k", linewidth=3)
+        plt.subplot(2, 3, 5)
+        plt.title("contrast")
+        plt.plot(tmpframestamps, contrast, linestyle="-")
+        # plt.plot(tmpframestamps, correlation[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, correlation[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, correlation[3, :], linestyle="-")
+        # plt.plot(tmpframestamps.transpose(), np.nanmean(correlation, axis=0), "k", linewidth=3)
+        plt.subplot(2, 3, 6)
+        plt.title("entropy")
+        plt.plot(tmpframestamps, ent, linestyle="-")
+        # plt.plot(tmpframestamps, asm[1, :], linestyle="-")
+        # plt.plot(tmpframestamps, asm[2, :], linestyle="-")
+        # plt.plot(tmpframestamps, asm[3, :], linestyle="-")
+        # plt.plot(tmpframestamps.transpose(), np.nanmean(asm, axis=0), "k", linewidth=3)
+        plt.show(block=False)
+
+        save_tiff_stack(outname.with_name( outname.name + "cell" + str(coords[cellind][0]) + "," + str(coords[cellind][1]) +".tif"),
+                        full_profiles[:, :, :, cellind])
+
+        plt.waitforbuttonpress()
+
+
+
+    # if summary_method == "contrast" or summary_method == "all":
+    #     contrast = np.empty((full_profiles.shape[-1], full_profiles.shape[-2])) # Assumes supplied by extract_profiles,
+    #                                                                             # which has this form.
+    # if summary_method == "dissimilarity" or summary_method == "all":
+    #     dissimilarity = np.empty((full_profiles.shape[-1], full_profiles.shape[-2]))
+    # if summary_method == "homogeneity" or summary_method == "all":
+    #     homogeneity = np.empty((full_profiles.shape[-1], full_profiles.shape[-2]))
+    # if summary_method == "energy" or summary_method == "all":
+    #     energy = np.empty((full_profiles.shape[-1], full_profiles.shape[-2]))
+    # if summary_method == "correlation" or summary_method == "all":
+    #     correlation = np.empty((full_profiles.shape[-1], full_profiles.shape[-2]))
+    # if summary_method == "asm" or summary_method == "all":
+    #     asm = np.empty((full_profiles.shape[-1], full_profiles.shape[-2]))
+    #
+    # with Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
+    #
+    #     reconst = pool.starmap_async(extract_texture, zip(repeat(full_profiles.astype("uint16")), range(full_profiles.shape[-1]),
+    #                                             repeat(summary_method)))
+    #
+    #     res = reconst.get()
+    #     for c, result in enumerate(res):
+    #         if summary_method == "contrast" or summary_method == "all":
+    #             contrast[c, :] = np.array(result[0])
+    #         if summary_method == "dissimilarity" or summary_method == "all":
+    #             dissimilarity[c, :] = np.array(result[1])
+    #         if summary_method == "homogeneity" or summary_method == "all":
+    #             homogeneity[c, :] = np.array(result[2])
+    #         if summary_method == "energy" or summary_method == "all":
+    #             energy[c, :] = np.array(result[3])
+    #         if summary_method == "correlation" or summary_method == "all":
+    #             correlation[c, :] = np.array(result[4])
+    #         if summary_method == "asm" or summary_method == "all":
+    #             asm[c, :] = np.array(result[5])
+
+    return contrast, dissimilarity, homogeneity, energy, correlation, glcmmean
 
 
 
