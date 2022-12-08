@@ -2,6 +2,7 @@ from itertools import repeat
 from multiprocessing import Pool
 
 import numpy as np
+import pandas as pd
 from joblib._multiprocessing_helpers import mp
 from skimage.feature import graycomatrix, graycoprops
 from matplotlib import pyplot as plt
@@ -13,7 +14,7 @@ from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
-def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1):
+def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1, fraction_thresh=0.25):
     """
     Calculates the iORG on a supplied dataset, using a variety of power based summary methods published in
     Cooper et. al. 2020, and Cooper et. al. 2017.
@@ -24,8 +25,10 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
                             "var", "std", and "moving_rms". Default: "var"
     :param window_size: The window size used to summarize the population at each sample. Can be an odd integer from
                         1 (no window) to M/2. Default: 1
+    :param fraction_thresh: The fraction of the values inside the sample window that must be finite in order for the power
+                            to be calculated- otherwise, the value will be considered np.nan.
 
-    :return: a 1xM population iORG signal.
+    :return: a 1xM population iORG signal
     """
 
     if window_size != 0:
@@ -58,11 +61,12 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
             for i in range(window_radius, num_samples-window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
-                if np.sum(samples[:] != np.nan) > 10:
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
+                if np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
                     iORG[i] = np.nanvar(samples[:])
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
+            iORG = iORG[window_radius:-window_radius]
             iORG = iORG[framestamps]
             num_incl = num_incl[framestamps]
         else:
@@ -77,11 +81,12 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
             for i in range(window_radius, num_samples-window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
-                if np.sum(samples[:] != np.nan) > 10:
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
+                if np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
                     iORG[i] = np.nanstd(samples[:])
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
+            iORG = iORG[window_radius:-window_radius]
             iORG = iORG[framestamps]
             num_incl = num_incl[framestamps]
         else:
@@ -100,12 +105,13 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             temporal_profiles **= 2 # Square first
             for i in range(window_radius, num_samples-window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius)]
-                if samples[:].size != 0 and np.sum(samples[:] != np.nan) > 10:
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)] # Fix- window was one element too small.
+                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh): # Fix- threshold was a hard number instead of a variable.
                     iORG[i] = np.nanmean(samples[:]) # Average second
                     iORG[i] = np.sqrt(iORG[i]) # Sqrt last
                    # num_incl[i] = np.sum(samples[:] != np.nan)
 
+            iORG = iORG[window_radius:-window_radius] # Fix- padding wasn't being cropped off first
             iORG = iORG[framestamps]
             #num_incl = num_incl[framestamps]
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
