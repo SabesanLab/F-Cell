@@ -4,8 +4,8 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 from joblib._multiprocessing_helpers import mp
-from scipy.ndimage import center_of_mass
-from scipy.signal import savgol_filter
+from scipy.ndimage import center_of_mass, convolve1d
+from scipy.signal import savgol_filter, convolve
 from skimage.feature import graycomatrix, graycoprops
 from matplotlib import pyplot as plt
 
@@ -37,7 +37,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
         if window_size % 2 < 1:
             raise Exception("Window size must be an odd integer.")
         else:
-            window_radius = int((window_size-1)/2)
+            window_radius = int((window_size - 1) / 2)
     else:
         window_radius = 0
 
@@ -59,12 +59,12 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             iORG = np.nanvar(temporal_profiles, axis=0)
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
 
-        elif window_size < (num_samples/2):
+        elif window_size < (num_samples / 2):
 
-            for i in range(window_radius, num_samples-window_radius):
+            for i in range(window_radius, num_samples - window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
-                if np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius + 1)]
+                if np.sum(np.isfinite(samples[:])) > np.ceil(samples.size * fraction_thresh):
                     iORG[i] = np.nanvar(samples[:])
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
@@ -79,12 +79,12 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             iORG = np.nanstd(temporal_profiles, axis=0)
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
 
-        elif window_size < (num_samples/2):
+        elif window_size < (num_samples / 2):
 
-            for i in range(window_radius, num_samples-window_radius):
+            for i in range(window_radius, num_samples - window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
-                if np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius + 1)]
+                if np.sum(np.isfinite(samples[:])) > np.ceil(samples.size * fraction_thresh):
                     iORG[i] = np.nanstd(samples[:])
                     num_incl[i] = np.sum(samples[:] != np.nan)
 
@@ -97,25 +97,25 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
     elif summary_method == "rms":
         if window_radius == 0:
 
-            temporal_profiles **= 2 # Square first
+            temporal_profiles **= 2  # Square first
             iORG = np.nanmean(temporal_profiles, axis=0)  # Average second
             iORG = np.sqrt(iORG)  # Sqrt last
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
 
-        elif window_size < (num_samples/2):
+        elif window_size < (num_samples / 2):
 
-            temporal_profiles **= 2 # Square first
-            for i in range(window_radius, num_samples-window_radius):
+            temporal_profiles **= 2  # Square first
+            for i in range(window_radius, num_samples - window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
-                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
-                    iORG[i] = np.nanmean(samples[:]) # Average second
-                    iORG[i] = np.sqrt(iORG[i]) # Sqrt last
-                   # num_incl[i] = np.sum(samples[:] != np.nan)
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius + 1)]
+                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size * fraction_thresh):
+                    iORG[i] = np.nanmean(samples[:])  # Average second
+                    iORG[i] = np.sqrt(iORG[i])  # Sqrt last
+                # num_incl[i] = np.sum(samples[:] != np.nan)
 
             iORG = iORG[window_radius:-window_radius]
             iORG = iORG[framestamps]
-            #num_incl = num_incl[framestamps]
+            # num_incl = num_incl[framestamps]
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
             num_incl = num_incl[framestamps]
         else:
@@ -125,17 +125,17 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             iORG = np.nanmean(temporal_profiles, axis=0)  # Average
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
 
-        elif window_size < (num_samples/2):
+        elif window_size < (num_samples / 2):
 
-            for i in range(window_radius, num_samples-window_radius):
+            for i in range(window_radius, num_samples - window_radius):
 
-                samples = temporal_profiles[:, (i - window_radius):(i + window_radius+1)]
-                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size*fraction_thresh):
-                    iORG[i] = np.nanmean(samples[:]) # Average
+                samples = temporal_profiles[:, (i - window_radius):(i + window_radius + 1)]
+                if samples[:].size != 0 and np.sum(np.isfinite(samples[:])) > np.ceil(samples.size * fraction_thresh):
+                    iORG[i] = np.nanmean(samples[:])  # Average
 
             iORG = iORG[window_radius:-window_radius]
             iORG = iORG[framestamps]
-            #num_incl = num_incl[framestamps]
+            # num_incl = num_incl[framestamps]
             num_incl = np.sum(np.isfinite(temporal_profiles), axis=0)
             num_incl = num_incl[framestamps]
         else:
@@ -143,16 +143,15 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
 
     return iORG, num_incl
 
-def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, display=False):
 
+def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold=None, display=False):
     padtype = "reflect"
 
-    time = framestamps/fps
+    time = framestamps / fps
     the_wavelet = wavelets.Wavelet(("gmw", {"gamma": 2, "beta": 1}))
-    #the_wavelet = wavelets.Wavelet(("hhhat", {"mu": 1}))
-    #the_wavelet = wavelets.Wavelet(("bump", {"mu": 1, "s": 1.2}))
-    #the_wavelet.viz()
-
+    # the_wavelet = wavelets.Wavelet(("hhhat", {"mu": 1}))
+    # the_wavelet = wavelets.Wavelet(("bump", {"mu": 1, "s": 1.2}))
+    # the_wavelet.viz()
 
     allWx = []
     allScales = np.nan
@@ -175,16 +174,16 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, disp
                              l1_norm=True, nv=64)
             mod_Wx = np.abs(Wx)
             # Converts our scales to samples, and determines the coi.
-            #To convert to Hz:
-            #wc [(cycles*radians)/samples] / (2pi [radians]) * fs [samples/second]
-            #= fc [cycles/second]
+            # To convert to Hz:
+            # wc [(cycles*radians)/samples] / (2pi [radians]) * fs [samples/second]
+            # = fc [cycles/second]
 
             freq_scales = scale_to_freq(scales, the_wavelet, len(temporal_profiles[r, :]), fs=fps, padtype=padtype)
             coi_scales = (scales * the_wavelet.std_t) / the_wavelet.wc_ct
             coi_im = np.ones_like(mod_Wx)
 
             for s, scale_ind in enumerate(coi_scales):
-                scale_ind = int(scale_ind+1)
+                scale_ind = int(scale_ind + 1)
                 coi_im[s, 0:scale_ind] = 0
                 coi_im[s, -scale_ind:] = 0
 
@@ -198,30 +197,29 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold = None, disp
 
                 if display:
                     waveletd3.imshow(mod_Wx)
-                    waveletthresh.imshow(np.reshape(overthresh, mod_Wx.shape))#, extent=(0, framestamps[150], scales[0], scales[-1]))
+                    waveletthresh.imshow(
+                        np.reshape(overthresh, mod_Wx.shape))  # , extent=(0, framestamps[150], scales[0], scales[-1]))
                     plt.show(block=False)
-                    #plt.waitforbuttonpress()
+                    # plt.waitforbuttonpress()
             else:
                 if display:
                     waveletd3.imshow(mod_Wx)
                     plt.show(block=False)
-                    #plt.waitforbuttonpress()
+                    # plt.waitforbuttonpress()
 
             allWx.append(Wx)
             allScales = freq_scales
         else:
             allWx.append(np.nan)
 
-
-#        if np.all(~(temporal_profiles[r, 0:150] == 0)):
+    #        if np.all(~(temporal_profiles[r, 0:150] == 0)):
     # waveletd3.plot(np.nanvar(np.abs(Wx), axis=1))
-            #plt.waitforbuttonpress()
+    # plt.waitforbuttonpress()
 
     return allWx, allScales, coi_im
 
 
 def extract_texture(full_profiles, cellind, numlevels, summary_methods):
-
     contrast = np.full((1), np.nan)
     dissimilarity = np.full((1), np.nan)
     homogeneity = np.full((1), np.nan)
@@ -320,8 +318,9 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
 
     with Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
-        reconst = pool.starmap_async(extract_texture, zip(repeat(full_profiles.astype("uint16")), range(full_profiles.shape[-1]),
-                                                          repeat(numlevels), repeat(summary_methods)))
+        reconst = pool.starmap_async(extract_texture,
+                                     zip(repeat(full_profiles.astype("uint16")), range(full_profiles.shape[-1]),
+                                         repeat(numlevels), repeat(summary_methods)))
 
         res = reconst.get()
         for c, result in enumerate(res):
@@ -387,7 +386,6 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
                 plt.show(block=False)
             plt.waitforbuttonpress()
 
-
     return retdict
 
     # Temp: for center of mass calculation.
@@ -395,7 +393,58 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
+def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", filter_size=33, display=True):
+    if filter_type == "savgol":
+        filtered_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=2, mode="mirror",
+                                          axis=1)
+        filter_grad_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=2, mode="mirror",
+                                             axis=1, deriv=1)  # np.gradient(filtered_profiles, axis=1)
+    elif filter_type == "trunc_sinc":
+        # Formulas from Schmid et al
+        alpha = 2
+        m = (filter_size - 1) / 2
+        x = np.linspace(-m, m, filter_size) / (m+1)
+        n = 4
+        window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
+                 - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
 
 
+        adj_sinc = np.sin( ((n+2)/2)* np.pi*x ) / (((n+2)/2)*np.pi*x)
+        adj_sinc[int(m)] = 0
+
+        if n == 4:
+            j = 0
+            k = 0.02194 + 0.05028 / (0.76562 - m)**3
+            correction = np.zeros_like(adj_sinc)
+            for i in range(len(x)):
+                correction[i] = np.sum(k * x[i]*np.sin((j+1)*np.pi*x[i]))
+            adj_sinc += correction
 
 
+        trunc_sinc = adj_sinc*window
+        trunc_sinc /= np.sum(trunc_sinc)
+
+        filtered_profiles = convolve1d(temporal_profiles, trunc_sinc, mode="reflect", axis=1)
+        filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
+
+    auc_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 57:90]), axis=1)
+
+    # plt.figure(42)
+    # plt.clf()
+    # for i in range(temporal_profiles.shape[0]):
+    #     plt.subplot(2, 2, 1)
+    #     plt.title("Raw data")
+    #     plt.plot(framestamps, temporal_profiles[i, :])
+    #     plt.subplot(2, 2, 2)
+    #     plt.title("Filtered data")
+    #     plt.plot(framestamps, filtered_profiles[i, :])
+    #     plt.subplot(2, 2, 3)
+    #     plt.title("Filtered Derivative")
+    #     plt.plot(framestamps, filter_grad_profiles[i, :])
+    #     plt.subplot(2, 2, 4)
+    #     plt.title("AUC")
+    #     plt.plot(framestamps[57:90], auc_profiles[i, :])
+    #
+    # plt.waitforbuttonpress()
+
+    return np.amax(auc_profiles, axis=1)
