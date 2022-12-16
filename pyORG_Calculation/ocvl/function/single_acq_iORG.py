@@ -244,9 +244,9 @@ if __name__ == "__main__":
                 all_cell_texture_iORG[i, cell_framestamps[c][i], c] = texture_cell_profiles[c][i]
                 #all_full_cell_iORG[i, :, :, og_framestamps[c][i], c] = full_cell_profiles[c][i].reshape(all_full_cell_iORG[i, :, :, og_framestamps[c][i], c].shape, order="F")
 
-                save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
-                                                  str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
-                                                  full_cell_profiles[c][i])
+                # save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
+                #                                   str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
+                #                                   full_cell_profiles[c][i])
             #
             # plt.figure(11)
             # plt.clf()
@@ -259,9 +259,14 @@ if __name__ == "__main__":
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=3)
 
+        fad[fad == 0] = np.nan
+
         plt.figure(11)
-        plt.clf()
-        plt.hist(np.nanmean(fad, axis=1), 50)
+        plt.hist(np.log(fad), 50)
+        plt.show(block=False)
+
+        plt.figure(12)
+        plt.hist(np.nanmean(np.log(fad), axis=1), 50)
         plt.show(block=False)
         plt.waitforbuttonpress()
 
