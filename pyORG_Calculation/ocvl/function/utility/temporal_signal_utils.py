@@ -4,13 +4,13 @@ from itertools import repeat
 import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
+from scipy.interpolate import make_lsq_spline
 from sklearn import linear_model
 from pynufft import NUFFT
 
 
-def densify_temporal_matrix(temporal_profiles, framestamps, max_framestamp=None):
+def densify_temporal_matrix(temporal_profiles, framestamps, max_framestamp=None, value=np.nan):
     """
-
     By default, most algorithms in this package work with sparsely sampled data by default (governed by the framestamps)
     to save what little ram we can. This function takes this sparse representation and makes it "dense" for algorithms
     that rely on temporally coupled samples (like those that use windows)
@@ -30,11 +30,11 @@ def densify_temporal_matrix(temporal_profiles, framestamps, max_framestamp=None)
     if len(temporal_profiles.shape) == 1:
         num_signals = 1
         densified_profiles = np.empty(max_framestamp)
-        densified_profiles[:] = np.nan
+        densified_profiles[:] = value
     else:
         num_signals = temporal_profiles.shape[0]
         densified_profiles = np.empty((num_signals, max_framestamp))
-        densified_profiles[:] = np.nan
+        densified_profiles[:] = value
 
     i=0
     for j in range(max_framestamp):
@@ -106,7 +106,7 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
         return reconstruction, nummissing
 
 
-def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=0.2):
+def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=0.2, critical_region=None):
     """
     This function reconstructs the missing profile data using compressed sensing techniques.
 
@@ -159,6 +159,48 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
             plt.subplot(2, 1, 2)
             plt.plot(fullrange, resto, "-d")
             plt.waitforbuttonpress()
+    elif method == "lsq_spline":
+
+        for c in range(temporal_profiles.shape[0]):
+
+            finers = np.isfinite(temporal_profiles[c, :])
+
+            nummissing = ((framestamps[-1] + 1) - len(framestamps)) + np.sum(np.invert(finers))
+
+            if threshold is None or nummissing / framestamps[-1] <= threshold:
+
+                finite_framestamps = framestamps[finers]
+                finite_profiles =  temporal_profiles[c, finers]
+
+                order = 3
+                knot_rate = (order+1)
+                if critical_region is not None:
+
+                    crit_inds = np.where(np.isin(finite_framestamps, critical_region))[0]
+
+                    preknots = finite_framestamps[range(0, crit_inds[0]-knot_rate, knot_rate)]
+                    midknots = finite_framestamps[crit_inds]
+                    postknots = finite_framestamps[range(crit_inds[-1]+knot_rate, len(finite_framestamps) , knot_rate)]
+
+                    knots = np.r_[(finite_framestamps[0],) * order,
+                                  preknots,
+                                  midknots,
+                                  postknots,
+                                  (finite_framestamps[-1],) * order]
+                else:
+                    knots = np.r_[(finite_framestamps[0],) * order,
+                                  finite_framestamps[range(0, len(finite_framestamps), knot_rate)],
+                                  (finite_framestamps[-1],) * order]
+                lsqSfit = make_lsq_spline(finite_framestamps, finite_profiles, knots, k=order)
+
+                reconstruction[c, :] = lsqSfit(fullrange)
+
+                # plt.figure(42)
+                # plt.clf()
+                # plt.plot(framestamps, temporal_profiles[c, :])
+                # plt.plot(fullrange, reconstruction[c, :])
+                # plt.waitforbuttonpress()
+
 
 
     # plt.figure(9001)

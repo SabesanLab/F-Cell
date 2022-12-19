@@ -4,8 +4,11 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 from joblib._multiprocessing_helpers import mp
+from numpy.fft import fftshift
+from scipy import signal
+from scipy.fft import fft
 from scipy.ndimage import center_of_mass, convolve1d
-from scipy.signal import savgol_filter, convolve
+from scipy.signal import savgol_filter, convolve, freqz
 from skimage.feature import graycomatrix, graycoprops
 from matplotlib import pyplot as plt
 
@@ -394,20 +397,24 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
 
 
 def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", filter_size=33, display=True):
+    firfilt = signal.firwin(filter_size, (0.75, 2), fs=29.4, pass_zero="bandstop", window=("kaiser", 2))
+
     if filter_type == "savgol":
-        filtered_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=2, mode="mirror",
+        filtered_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=4, mode="mirror",
                                           axis=1)
-        filter_grad_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=2, mode="mirror",
-                                             axis=1, deriv=1)  # np.gradient(filtered_profiles, axis=1)
+        # filter_grad_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=2, mode="mirror",
+        #                                      axis=1, deriv=1)  # np.gradient(filtered_profiles, axis=1)
+        filtered_profiles = convolve1d(filtered_profiles, firfilt, mode="reflect", axis=1)
+
+        filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
     elif filter_type == "trunc_sinc":
-        # Formulas from Schmid et al
-        alpha = 2
-        m = (filter_size - 1) / 2
+        # Formulas from Schmid et al- these are MS1 filters.
+        alpha = 4
+        m = (filter_size - 1)/2
         x = np.linspace(-m, m, filter_size) / (m+1)
-        n = 4
+        n = 2
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
-
 
         adj_sinc = np.sin( ((n+2)/2)* np.pi*x ) / (((n+2)/2)*np.pi*x)
         adj_sinc[int(m)] = 0
@@ -424,27 +431,34 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
+        #filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
         filtered_profiles = convolve1d(temporal_profiles, trunc_sinc, mode="reflect", axis=1)
+        filtered_profiles = convolve1d(filtered_profiles, firfilt, mode="reflect", axis=1)
+
         filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
 
-    auc_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 57:90]), axis=1)
+    auc_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 48:90]), axis=1)
 
-    # plt.figure(42)
-    # plt.clf()
-    # for i in range(temporal_profiles.shape[0]):
-    #     plt.subplot(2, 2, 1)
-    #     plt.title("Raw data")
-    #     plt.plot(framestamps, temporal_profiles[i, :])
-    #     plt.subplot(2, 2, 2)
-    #     plt.title("Filtered data")
-    #     plt.plot(framestamps, filtered_profiles[i, :])
-    #     plt.subplot(2, 2, 3)
-    #     plt.title("Filtered Derivative")
-    #     plt.plot(framestamps, filter_grad_profiles[i, :])
-    #     plt.subplot(2, 2, 4)
-    #     plt.title("AUC")
-    #     plt.plot(framestamps[57:90], auc_profiles[i, :])
-    #
-    # plt.waitforbuttonpress()
+    plt.figure(42)
+    plt.clf()
+    for i in range(temporal_profiles.shape[0]):
+        plt.subplot(2, 2, 1)
+        plt.title("Raw data")
+        plt.plot(framestamps, temporal_profiles[i, :])
+        plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+        # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+        plt.subplot(2, 2, 2)
+        plt.title("Filtered data")
+        plt.plot(framestamps, filtered_profiles[i, :])
+        plt.subplot(2, 2, 3)
+        plt.title("Filtered Derivative")
+        plt.plot(framestamps, filter_grad_profiles[i, :])
+        # plt.title("Power spectrum of filtered signal")
+        # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+        plt.subplot(2, 2, 4)
+        plt.title("AUC")
+        plt.plot(framestamps[48:90], auc_profiles[i, :])
+
+    plt.waitforbuttonpress()
 
     return np.amax(auc_profiles, axis=1)
