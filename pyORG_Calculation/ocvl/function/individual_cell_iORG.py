@@ -145,7 +145,7 @@ if __name__ == "__main__":
                     ref_im = dataset.reference_im
                     full_profiles = []
 
-                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+                    #reference_coord_data = refine_coord(ref_im, dataset.coord_data)
 
 
                     for c in range(len(dataset.coord_data)):
@@ -154,9 +154,9 @@ if __name__ == "__main__":
 
                     first = False
 
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
+                #dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
-                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=5, summary="none"))
+                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none"))
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="median")
 
                 # print(str((stimulus_train[0] - int(0.15 * framerate)) / framerate) + " to " + str(
@@ -269,6 +269,7 @@ if __name__ == "__main__":
         plt.figure(41)  # log hist +1
         histbins_logp1 = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
         log_amp_plus1 = log_amp + 1
+        amp_plus1_log = np.log10(simple_amp[l,:]+1)
         print("min ", np.nanmin(log_amp_plus1))
         print("max ", np.nanmax(log_amp_plus1))
         plt.hist(log_amp_plus1, bins=histbins_logp1)
@@ -328,6 +329,12 @@ if __name__ == "__main__":
             writer = csv.writer(f, delimiter=',')
             writer.writerows(cell_power_iORG)
             f.close
+
+            amp_dir = res_dir.joinpath(this_dirname + "_cell_amplitude_" + now_timestamp + ".csv")
+            f2 = open(amp_dir, 'w', newline="")
+            writer2 = csv.writer(f2, delimiter=',')
+            writer2.writerows(simple_amp)
+            f2.close
 
         print("Done!")
         print(stimulus_train)
