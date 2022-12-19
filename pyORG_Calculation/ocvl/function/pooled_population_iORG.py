@@ -132,8 +132,8 @@ if __name__ == "__main__":
                     full_profiles = []
                     first = False
 
-                #dataset.coord_data = reference_coord_data
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data, search_radius=3)
+                dataset.coord_data = reference_coord_data
+                #dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data, search_radius=3)
                 
                 if maxnum_cells is not None:
                     perm = np.random.permutation(len(dataset.coord_data))
