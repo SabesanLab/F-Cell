@@ -41,7 +41,7 @@ def refine_coord(ref_image, coordinates, search_radius=2):
     return coordinates
 
 
-def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=3):
+def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=2):
     ref_image = ref_image.astype("uint8")
     image_stack = image_stack.astype("uint8")
     #image_stack[image_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
@@ -397,6 +397,6 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
 #     stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
 #
 #
-#     pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=0)
+#     pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_methods="std", window_size=0)
 #     plt.plot(dataset.framestamps, pop_iORG)
 #     plt.show()
