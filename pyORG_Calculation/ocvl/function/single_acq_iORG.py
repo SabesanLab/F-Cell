@@ -104,7 +104,7 @@ if __name__ == "__main__":
     texture_cell_profiles = []
     full_cell_profiles = []
 
-    segmentation_radius = 3
+    segmentation_radius = 2
 
     # Before we start, get an estimate of the "noise" from the control signals.
     sig_threshold_im = None
@@ -187,9 +187,13 @@ if __name__ == "__main__":
                                                         framestamps=dataset.framestamps, display=False)
 
 
-                stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles, dataset.framestamps, method="lsq_spline",
-                                                       critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
-                                                                                 stimulus_train[1] + int(0.1 * framerate)))
+                # stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles, dataset.framestamps, method="lsq_spline",
+                #                                        critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
+                #                                                                  stimulus_train[1] + int(0.1 * framerate)))
+
+                stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
+                                                                                       dataset.framestamps,
+                                                                                       method="L1")
 
                 homogeneity, reconst_framestamps, nummissed = reconstruct_profiles(texture_dict["homogeneity"],
                                                                                        dataset.framestamps)
@@ -257,24 +261,32 @@ if __name__ == "__main__":
             # plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
 
             # What about a temporal histogram?
-            fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range, filter_type="savgol")
+            fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
+                                                     filter_type="trunc_sinc")
             fad[fad == 0] = np.nan
-            plt.figure(11)
-            plt.hist(np.log(fad[c, :]), 10)
-            plt.show(block=False)
-            plt.draw()
+            # plt.figure(11)
+            # plt.hist(np.log(fad[c, :]), 10)
+            # plt.show(block=False)
+            # plt.draw()
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=3)
 
 
-
         plt.figure(11)
-        plt.hist(np.log(fad), 50)
+        plt.hist(np.nanstd(np.log(fad), axis=1), 50)
         plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_stddev.png"))
 
         plt.figure(12)
         plt.hist(np.nanmedian(np.log(fad), axis=1), 50)
         plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
+
+        plt.figure(13)
+        plt.plot(np.nanmedian(np.log(fad), axis=1), np.nanstd(np.log(fad), axis=1), 'k.')
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
+
         plt.waitforbuttonpress()
 
         for c in range(len(reference_coord_data)):

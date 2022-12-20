@@ -397,6 +397,7 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
 
 
 def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", filter_size=33, display=True):
+
     firfilt = signal.firwin(filter_size, (0.75, 2), fs=29.4, pass_zero="bandstop", window=("kaiser", 2))
 
     if filter_type == "savgol":
@@ -431,34 +432,41 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        #filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
-        filtered_profiles = convolve1d(temporal_profiles, trunc_sinc, mode="reflect", axis=1)
-        filtered_profiles = convolve1d(filtered_profiles, firfilt, mode="reflect", axis=1)
+        filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
+        filtered_profiles = convolve1d(filtered_profiles, trunc_sinc, mode="reflect", axis=1)
+        #filtered_profiles = convolve1d(filtered_profiles, firfilt, mode="reflect", axis=1)
 
         filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
 
-    auc_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 48:90]), axis=1)
+    abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 48:80]), axis=1)
 
-    plt.figure(42)
-    plt.clf()
-    for i in range(temporal_profiles.shape[0]):
-        plt.subplot(2, 2, 1)
-        plt.title("Raw data")
-        plt.plot(framestamps, temporal_profiles[i, :])
-        plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-        # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-        plt.subplot(2, 2, 2)
-        plt.title("Filtered data")
-        plt.plot(framestamps, filtered_profiles[i, :])
-        plt.subplot(2, 2, 3)
-        plt.title("Filtered Derivative")
-        plt.plot(framestamps, filter_grad_profiles[i, :])
-        # plt.title("Power spectrum of filtered signal")
-        # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-        plt.subplot(2, 2, 4)
-        plt.title("AUC")
-        plt.plot(framestamps[48:90], auc_profiles[i, :])
+    fad = np.amax(abs_diff_profiles, axis=1)
+    fad[fad == 0] = np.nan
+    if np.nanstd(np.log(fad), axis=-1) > .7:
 
-    plt.waitforbuttonpress()
+        plt.figure(42)
+        plt.clf()
+        for i in range(temporal_profiles.shape[0]):
 
-    return np.amax(auc_profiles, axis=1)
+            plt.subplot(2, 2, 1)
+            plt.title("Raw data")
+            plt.plot(framestamps, temporal_profiles[i, :])
+            plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+            # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+            plt.subplot(2, 2, 2)
+            plt.title("Filtered data")
+            plt.plot(framestamps, filtered_profiles[i, :])
+            plt.subplot(2, 2, 3)
+            plt.title("Filtered Derivative")
+            plt.plot(framestamps, filter_grad_profiles[i, :])
+            # plt.title("Power spectrum of filtered signal")
+            # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+            plt.subplot(2, 2, 4)
+            plt.title("AUC")
+            plt.plot(framestamps[48:80], abs_diff_profiles[i, :])
+            # plt.waitforbuttonpress()
+
+
+        plt.waitforbuttonpress()
+
+    return np.amax(abs_diff_profiles, axis=1)
