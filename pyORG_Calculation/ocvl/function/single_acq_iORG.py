@@ -104,7 +104,7 @@ if __name__ == "__main__":
     texture_cell_profiles = []
     full_cell_profiles = []
 
-    segmentation_radius = 2
+    segmentation_radius = 3
 
     # Before we start, get an estimate of the "noise" from the control signals.
     sig_threshold_im = None
@@ -172,9 +172,11 @@ if __name__ == "__main__":
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
-                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="none", sigma=1)
+                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
+                                                 summary="none", sigma=1)
 
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius-1, summary="median", sigma=1)
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=1,
+                                                 summary="mean", sigma=1)
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
@@ -194,9 +196,9 @@ if __name__ == "__main__":
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
                                                                                        method="L1")
-
-                homogeneity, reconst_framestamps, nummissed = reconstruct_profiles(texture_dict["homogeneity"],
-                                                                                       dataset.framestamps)
+                homogeneity= texture_dict["homogeneity"]
+                # homogeneity, reconst_framestamps, nummissed = reconstruct_profiles(texture_dict["homogeneity"],
+                #                                                                    dataset.framestamps)
 
                 # reconst_framestamps = dataset.framestamps
                 # stdize_profiles = temp_profiles
@@ -248,18 +250,18 @@ if __name__ == "__main__":
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
                 all_cell_mean_iORG[i, cell_framestamps[c][i], c] = profile
-                all_cell_texture_iORG[i, cell_framestamps[c][i], c] = texture_cell_profiles[c][i]
+                #all_cell_texture_iORG[i, cell_framestamps[c][i], c] = texture_cell_profiles[c][i]
                 #all_full_cell_iORG[i, :, :, og_framestamps[c][i], c] = full_cell_profiles[c][i].reshape(all_full_cell_iORG[i, :, :, og_framestamps[c][i], c].shape, order="F")
 
-                # save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
-                #                                   str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
-                #                                   full_cell_profiles[c][i])
+                save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
+                                                  str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
+                                                  full_cell_profiles[c][i])
             #
-            # plt.figure(11)
-            # plt.clf()
-            # plt.imshow(ref_im)
-            # plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
-
+            plt.figure(11)
+            plt.clf()
+            plt.imshow(ref_im)
+            plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
+            plt.show(block=False)
             # What about a temporal histogram?
             fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                      filter_type="trunc_sinc")
@@ -273,17 +275,17 @@ if __name__ == "__main__":
 
 
         plt.figure(11)
-        plt.hist(np.nanstd(np.log(fad), axis=1), 50)
+        plt.hist(np.nanstd(np.log(fad), axis=-1), 50)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_stddev.png"))
 
         plt.figure(12)
-        plt.hist(np.nanmedian(np.log(fad), axis=1), 50)
+        plt.hist(np.nanmedian(np.log(fad), axis=-1), 50)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
         plt.figure(13)
-        plt.plot(np.nanmedian(np.log(fad), axis=1), np.nanstd(np.log(fad), axis=1), 'k.')
+        plt.plot(np.nanmedian(np.log(fad), axis=-1), np.nanstd(np.log(fad), axis=1), 'k.')
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
 

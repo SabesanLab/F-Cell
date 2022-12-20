@@ -245,10 +245,10 @@ def extract_texture(full_profiles, cellind, numlevels, summary_methods):
     if "entropy" in summary_methods or "all" in summary_methods:
         ent = np.full((full_profiles.shape[-2]), np.nan)
 
-    avg = np.empty((full_profiles.shape[-2], 1))
+    avg = np.full((full_profiles.shape[-2], 1), np.nan)
 
-    minlvl = 0  # np.nanmin(full_profiles[:, :, :, cellind].flatten())
-    maxlvl = 255  # np.nanmax(full_profiles[:, :, :, cellind].flatten())
+    minlvl = np.nanmin(full_profiles[:, :, :, cellind].flatten())
+    maxlvl = np.nanmax(full_profiles[:, :, :, cellind].flatten())
 
     thisprofile = np.round(((full_profiles[:, :, :, cellind] - minlvl) / (maxlvl - minlvl)) * (numlevels - 1))
     thisprofile[thisprofile >= numlevels] = numlevels - 1
@@ -322,7 +322,7 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     with Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
         reconst = pool.starmap_async(extract_texture,
-                                     zip(repeat(full_profiles.astype("uint16")), range(full_profiles.shape[-1]),
+                                     zip(repeat(full_profiles), range(full_profiles.shape[-1]),
                                          repeat(numlevels), repeat(summary_methods)))
 
         res = reconst.get()
@@ -432,8 +432,8 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
-        filtered_profiles = convolve1d(filtered_profiles, trunc_sinc, mode="reflect", axis=1)
+        #filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
+        filtered_profiles = convolve1d(temporal_profiles, trunc_sinc, mode="reflect", axis=1)
         #filtered_profiles = convolve1d(filtered_profiles, firfilt, mode="reflect", axis=1)
 
         filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
@@ -442,8 +442,9 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
 
     fad = np.amax(abs_diff_profiles, axis=1)
     fad[fad == 0] = np.nan
-    if np.nanstd(np.log(fad), axis=-1) > .7:
+    # if np.nanstd(np.log(fad), axis=-1) > .7:
 
+    if np.any(fad>0):
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):
