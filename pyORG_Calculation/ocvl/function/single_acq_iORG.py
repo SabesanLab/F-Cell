@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
+from scipy.interpolate import barycentric_interpolate, splev, make_lsq_spline
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from skimage.feature import peak_local_max
 from ssqueezepy.experimental import scale_to_freq
@@ -21,7 +22,7 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.resources import save_video, save_tiff_stack
-from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix
 
 
 def find_nearest(array, value):
@@ -185,8 +186,10 @@ if __name__ == "__main__":
                 texture_dict = extract_texture_profiles(full_profiles, ("homogeneity", "energy"), 32,
                                                         framestamps=dataset.framestamps, display=False)
 
-                stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
-                                                                                        dataset.framestamps)
+
+                stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles, dataset.framestamps, method="lsq_spline",
+                                                       critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
+                                                                                 stimulus_train[1] + int(0.1 * framerate)))
 
                 homogeneity, reconst_framestamps, nummissed = reconstruct_profiles(texture_dict["homogeneity"],
                                                                                        dataset.framestamps)
@@ -254,19 +257,23 @@ if __name__ == "__main__":
             # plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
 
             # What about a temporal histogram?
-            fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range, filter_type="trunc_sinc")
-
+            fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range, filter_type="savgol")
+            fad[fad == 0] = np.nan
+            plt.figure(11)
+            plt.hist(np.log(fad[c, :]), 10)
+            plt.show(block=False)
+            plt.draw()
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=3)
 
-        fad[fad == 0] = np.nan
+
 
         plt.figure(11)
         plt.hist(np.log(fad), 50)
         plt.show(block=False)
 
         plt.figure(12)
-        plt.hist(np.nanmean(np.log(fad), axis=1), 50)
+        plt.hist(np.nanmedian(np.log(fad), axis=1), 50)
         plt.show(block=False)
         plt.waitforbuttonpress()
 
