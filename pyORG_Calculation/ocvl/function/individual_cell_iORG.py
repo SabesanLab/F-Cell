@@ -140,8 +140,12 @@ if __name__ == "__main__":
                     reference_coord_data = dataset.coord_data
                     framerate = dataset.framerate
                     stimulus_train = dataset.stimtrain_frame_stamps
-                    simple_amp = np.empty((len(allFiles), len(reference_coord_data)))
+                    simple_amp = np.empty((len(reference_coord_data), 1))
                     simple_amp[:] = np.nan
+                    log_amp = np.empty((len(reference_coord_data), 1))
+                    log_amp[:] = np.nan
+                    amp_plus1_log = np.empty((len(reference_coord_data), 1))
+                    amp_plus1_log[:] = np.nan
                     ref_im = dataset.reference_im
                     full_profiles = []
 
@@ -214,7 +218,7 @@ if __name__ == "__main__":
             prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
             poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1] + 10)])
 
-            simple_amp[l, c] = poststim_amp - prestim_amp
+            simple_amp[c, 0] = poststim_amp - prestim_amp
 
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
         # clippedcoords = coordclip(coord_data, 10, 100, 'i')
@@ -247,8 +251,8 @@ if __name__ == "__main__":
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.figure(1)
-        histbins = np.arange(start=-0.1, stop=0.3, step=0.01) #Humans: -0.2, 1.5, 0.025
-        plt.hist(simple_amp[l, :], bins=histbins)
+        histbins = np.arange(start=-0.2, stop=1.5, step=0.01) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
+        plt.hist(simple_amp[:, 0], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_" + now_timestamp + ".png"))
@@ -256,8 +260,8 @@ if __name__ == "__main__":
         plt.close(plt.gcf())
 
         plt.figure(40) # log hist
-        histbins_log = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
-        log_amp = np.log10(simple_amp[l,:])
+        histbins_log = np.arange(start=-3, stop=1, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
+        log_amp[:, 0] = np.log10(simple_amp[:, 0])
         plt.hist(log_amp, bins=histbins_log)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
@@ -267,12 +271,11 @@ if __name__ == "__main__":
 
 
         plt.figure(41)  # log hist +1
-        histbins_logp1 = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
-        log_amp_plus1 = log_amp + 1
-        amp_plus1_log = np.log10(simple_amp[l,:]+1)
-        print("min ", np.nanmin(log_amp_plus1))
-        print("max ", np.nanmax(log_amp_plus1))
-        plt.hist(log_amp_plus1, bins=histbins_logp1)
+        histbins_logp1 = np.arange(start=-0.2, stop=1.5, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
+        amp_plus1_log[:, 0] = np.log10(simple_amp[:, 0]+1)
+        print("min ", np.nanmin(amp_plus1_log))
+        print("max ", np.nanmax(amp_plus1_log))
+        plt.hist(amp_plus1_log, bins=histbins_logp1)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_plus1_amp_hist_" + now_timestamp + ".png"))
@@ -291,7 +294,7 @@ if __name__ == "__main__":
         for c, cell in enumerate(vor.regions[1:]):
             if not -1 in cell:
                 poly = [vor.vertices[i] for i in cell]
-                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[l, c]))
+                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[c, 0]))
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
@@ -330,11 +333,24 @@ if __name__ == "__main__":
             writer.writerows(cell_power_iORG)
             f.close
 
+
             amp_dir = res_dir.joinpath(this_dirname + "_cell_amplitude_" + now_timestamp + ".csv")
             f2 = open(amp_dir, 'w', newline="")
             writer2 = csv.writer(f2, delimiter=',')
             writer2.writerows(simple_amp)
             f2.close
+
+            log_amp_dir = res_dir.joinpath(this_dirname + "log10_cell_amplitude_" + now_timestamp + ".csv")
+            f3 = open(log_amp_dir, 'w', newline="")
+            writer3 = csv.writer(f3, delimiter=',')
+            writer3.writerows(log_amp)
+            f3.close
+
+            log_amp_dir_p1 = res_dir.joinpath(this_dirname + "log10_cell_amplitude_plus1" + now_timestamp + ".csv")
+            f4 = open(log_amp_dir_p1, 'w', newline="")
+            writer4 = csv.writer(f4, delimiter=',')
+            writer4.writerows(amp_plus1_log)
+            f4.close
 
         print("Done!")
         print(stimulus_train)
