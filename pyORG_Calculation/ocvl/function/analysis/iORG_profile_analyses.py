@@ -398,7 +398,7 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
 
 def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", filter_size=33, display=True):
 
-    firfilt = signal.firwin(filter_size, (0.75, 2), fs=29.4, pass_zero="bandstop", window=("kaiser", 2))
+    #firfilt = signal.firwin(filter_size, (0.75, 2), fs=29.4, pass_zero="bandstop", window=("kaiser", 2))
 
     if filter_type == "savgol":
         filtered_profiles = savgol_filter(temporal_profiles, window_length=filter_size, polyorder=4, mode="mirror",
@@ -432,7 +432,12 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
+        #filtered_profiles = convolve1d(temporal_profiles, firfilt, mode="reflect", axis=1)
+
+        sos = signal.butter(filter_size, (0.5, 1.5), "bandstop", fs=29.5, output='sos')
+
+        filtered_profiles = signal.sosfilt(sos, temporal_profiles)
+
         filtered_profiles = convolve1d(filtered_profiles, trunc_sinc, mode="reflect", axis=1)
         #filtered_profiles = convolve1d(filtered_profiles, firfilt, mode="reflect", axis=1)
 
