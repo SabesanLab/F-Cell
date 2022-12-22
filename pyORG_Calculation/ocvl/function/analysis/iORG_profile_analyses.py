@@ -398,6 +398,8 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
 
 def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, display=True):
 
+    mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
+
     # Remove heartbeats?
     finite_data = np.isfinite(temporal_profiles)
     temporal_profiles[~finite_data] = 0
@@ -439,7 +441,7 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     elif filter_type == "MS1":
         # Formulas from Schmid et al- these are MS1 filters.
         alpha = 4
-        n = 2
+        n = 4
         m = np.round(fwhm_size * (0.8874 + 0.3402*n + 0.129*np.log(n)) - 1 ).astype("int")
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
@@ -471,29 +473,29 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
 
     # if np.nanstd(np.log(fad), axis=-1) > .7:
 
-    # plt.figure(42)
-    # plt.clf()
-    # for i in range(temporal_profiles.shape[0]):
-    #
-    #     plt.subplot(2, 2, 1)
-    #     plt.title("Raw data")
-    #     plt.plot(framestamps, temporal_profiles[i, :])
-    #     plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-    #     # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-    #     plt.subplot(2, 2, 2)
-    #     plt.title("Filtered data")
-    #     plt.plot(framestamps, filtered_profiles[i, :])
-    #     plt.subplot(2, 2, 3)
-    #     plt.title("Filtered Derivative")
-    #     plt.plot(framestamps, filter_grad_profiles[i, :])
-    #     # plt.title("Power spectrum of filtered signal")
-    #     # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-    #     plt.subplot(2, 2, 4)
-    #     plt.title("AUC")
-    #     plt.plot(framestamps[58:80], abs_diff_profiles[i, :])
-    #     # plt.waitforbuttonpress()
-    #
-    #
-    # plt.waitforbuttonpress()
+    plt.figure(43)
+    plt.clf()
+    for i in range(temporal_profiles.shape[0]):
+
+        plt.subplot(2, 2, 1)
+        plt.title("Raw data")
+        plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+        plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+        # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+        plt.subplot(2, 2, 2)
+        plt.title("Filtered data")
+        plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+        plt.subplot(2, 2, 3)
+        plt.title("Filtered Derivative")
+        plt.plot(framestamps, filter_grad_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+        # plt.title("Power spectrum of filtered signal")
+        # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+        plt.subplot(2, 2, 4)
+        plt.title("AUC")
+        plt.plot(framestamps[58:80], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+        # plt.waitforbuttonpress()
+
+
+    plt.waitforbuttonpress()
 
     return fad
