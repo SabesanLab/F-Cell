@@ -10,7 +10,7 @@ from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 
-def refine_coord(ref_image, coordinates, search_radius=2):
+def refine_coord(ref_image, coordinates, search_radius=1, numiter=2):
 
     im_size = ref_image.shape
 
@@ -28,15 +28,17 @@ def refine_coord(ref_image, coordinates, search_radius=2):
     coordinates = np.round(coordinates[includelist, :]).astype("int")
 
     for i in range(coordinates.shape[0]):
-        coord = coordinates[i, :]
+        for iter in range(numiter):
+            coord = coordinates[i, :]
 
-        ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
-                                 (coord[0] - search_radius):(coord[0] + search_radius + 1)]
+            ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
+                                     (coord[0] - search_radius):(coord[0] + search_radius + 1)]
 
-        minV, maxV, minL, maxL = cv2.minMaxLoc(ref_template)
+            minV, maxV, minL, maxL = cv2.minMaxLoc(ref_template)
 
-        maxL = np.array(maxL)-search_radius # Make relative to the center.
-        coordinates[i, :] = coord + maxL
+            maxL = np.array(maxL)-search_radius # Make relative to the center.
+            coordinates[i, :] = coord + maxL
+
 
     return coordinates
 
