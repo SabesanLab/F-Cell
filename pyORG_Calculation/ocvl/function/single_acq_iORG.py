@@ -16,7 +16,7 @@ from ssqueezepy.experimental import scale_to_freq
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG, extract_texture_profiles, \
-    filtered_absolute_difference
+    filtered_absolute_difference, pooled_variance
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
@@ -275,19 +275,23 @@ if __name__ == "__main__":
 
 
         plt.figure(11)
-        plt.hist(np.nanstd(np.log(fad), axis=-1), 50)
+        plt.hist(np.nanstd(np.log10(fad), axis=-1), 50)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_stddev.png"))
 
         plt.figure(12)
-        plt.hist(np.nanmedian(np.log(fad), axis=-1), 50)
+        plt.hist(np.nanmedian(np.log10(fad), axis=-1), 50)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
         plt.figure(13)
-        plt.plot(np.nanmedian(np.log(fad), axis=-1), np.nanstd(np.log(fad), axis=1), 'k.')
+        plt.plot(np.nanmedian(np.log10(fad), axis=-1), np.nanstd(np.log10(fad), axis=1), 'k.')
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
+
+        pvar = pooled_variance(np.log10(fad))
+        print( 100* 2.77*np.sqrt(pvar) / np.nanmean(np.log10(fad)) )
+
 
         plt.waitforbuttonpress()
 

@@ -466,36 +466,46 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
 
 
     filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
-    abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 58:80]), axis=1)
+    abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 50:90]), axis=1)
 
     abs_diff_profiles[abs_diff_profiles == 0] = np.nan
     fad = np.amax(abs_diff_profiles, axis=1)
 
     # if np.nanstd(np.log(fad), axis=-1) > .7:
 
-    plt.figure(43)
-    plt.clf()
-    for i in range(temporal_profiles.shape[0]):
-
-        plt.subplot(2, 2, 1)
-        plt.title("Raw data")
-        plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-        plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-        # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-        plt.subplot(2, 2, 2)
-        plt.title("Filtered data")
-        plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-        plt.subplot(2, 2, 3)
-        plt.title("Filtered Derivative")
-        plt.plot(framestamps, filter_grad_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-        # plt.title("Power spectrum of filtered signal")
-        # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-        plt.subplot(2, 2, 4)
-        plt.title("AUC")
-        plt.plot(framestamps[58:80], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-        # plt.waitforbuttonpress()
-
-
-    plt.waitforbuttonpress()
+    # plt.figure(43)
+    # plt.clf()
+    # for i in range(temporal_profiles.shape[0]):
+    #
+    #     plt.subplot(2, 2, 1)
+    #     plt.title("Raw data")
+    #     plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #     plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+    #     # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+    #     plt.subplot(2, 2, 2)
+    #     plt.title("Filtered data")
+    #     plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #     plt.subplot(2, 2, 3)
+    #     plt.title("Filtered Derivative")
+    #     plt.plot(framestamps, filter_grad_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #     # plt.title("Power spectrum of filtered signal")
+    #     # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+    #     plt.subplot(2, 2, 4)
+    #     plt.title("AUC")
+    #     plt.plot(framestamps[50:90], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #     # plt.waitforbuttonpress()
+    #
+    #
+    # plt.waitforbuttonpress()
 
     return fad
+
+
+def pooled_variance(data, axis=1):
+
+    datavar = np.nanvar(data, axis=axis)
+    datacount = np.sum(np.isfinite(data), axis=axis) - 1
+
+    return np.sum(datavar*datacount) / np.sum(datacount)
+
+
