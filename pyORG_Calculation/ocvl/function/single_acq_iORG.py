@@ -16,13 +16,13 @@ from ssqueezepy.experimental import scale_to_freq
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG, extract_texture_profiles, \
-    filtered_absolute_difference
+    filtered_absolute_difference, pooled_variance
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.pycoordclip import coordclip
 from ocvl.function.utility.resources import save_video, save_tiff_stack
-from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix
+from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix, trim_video
 
 
 def find_nearest(array, value):
@@ -170,6 +170,9 @@ if __name__ == "__main__":
 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
+                dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
+                                                                     stimulus_train[1]*2)
+
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
@@ -195,7 +198,8 @@ if __name__ == "__main__":
 
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
-                                                                                       method="L1")
+                                                                                       method="L1",
+                                                                                       threshold=0.3)
                 homogeneity= texture_dict["homogeneity"]
                 # homogeneity, reconst_framestamps, nummissed = reconstruct_profiles(texture_dict["homogeneity"],
                 #                                                                    dataset.framestamps)
@@ -236,6 +240,7 @@ if __name__ == "__main__":
 
         full_framestamp_range = np.arange(max_frmstamp + 1)
         cell_power_iORG = np.full((len(reference_coord_data), max_frmstamp + 1), np.nan)
+        cell_power_fad = np.full((len(reference_coord_data)), np.nan)
 
         cwt_window_start = int(-0.25*framerate)
         cwt_window_end = int(1*framerate)
@@ -245,7 +250,7 @@ if __name__ == "__main__":
         # The third dimension is each tracked coordinate
         cell_amp = np.full( (len(reference_coord_data), len(allFiles[loc])), np.nan)
         peak_scale = np.full_like(cell_amp, np.nan)
-        fad = np.full_like(cell_amp, np.nan)
+        indiv_fad = np.full_like(cell_amp, np.nan)
 
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
@@ -259,11 +264,11 @@ if __name__ == "__main__":
             #
 
             # What about a temporal histogram?
-            fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                     filter_type="MS1")
-            fad[fad == 0] = np.nan
+            indiv_fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
+                                                           filter_type="MS1", notch_filter=(0.75, 1.5))
+            indiv_fad[indiv_fad == 0] = np.nan
 
-            # if np.nanmedian(np.log10(fad[c, :]), axis=-1) <= 1.6:
+            # if np.nanmedian(np.log10(indiv_fad[c, :]), axis=-1) <= 1.6:
             #     plt.figure(11)
             #     plt.clf()
             #     plt.imshow(ref_im)
@@ -276,83 +281,56 @@ if __name__ == "__main__":
             #     plt.waitforbuttonpress()
 
             # plt.figure(11)
-            # plt.hist(np.log(fad[c, :]), 10)
+            # plt.hist(np.log(indiv_fad[c, :]), 10)
             # plt.show(block=False)
             # plt.draw()
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                               summary_method="rms", window_size=3)
+                                                               summary_method="rms", window_size=1)
 
+        cell_power_fad = filtered_absolute_difference(cell_power_iORG, full_framestamp_range,
+                                                         filter_type="MS1", notch_filter=(0.75, 1.5), display=True)
+        cell_power_fad[cell_power_fad == 0] = np.nan
+
+        median_indiv_fad = np.nanmedian(np.log10(indiv_fad), axis=-1)
 
         plt.figure(11)
-        plt.hist(np.nanquantile(np.log10(fad), 0.25, axis=-1), 50)
+        plt.hist(np.nanmedian(np.log10(cell_power_fad), axis=-1), 50)
+        plt.title("RMS power FAD")
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_power_amp.png"))
+
+        plt.figure(11)
+        plt.hist(np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1), 50)
         plt.title("25th percentile of each cell's responses")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_25pct.png"))
 
         plt.figure(12)
-        plt.hist(np.nanquantile(np.log10(fad), 0.75, axis=-1), 50)
+        plt.hist(np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1), 50)
         plt.title("75th percentile of each cell's responses")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_75pct.png"))
 
         plt.figure(13)
-        plt.hist(np.nanmedian(np.log10(fad), axis=-1), 50)
+        plt.hist(np.nanmedian(np.log10(indiv_fad), axis=-1), 50)
         plt.title("Median absolute deviation")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
         plt.figure(14)
-        plt.plot(np.nanmedian(np.log(fad), axis=-1),
-                 np.nanquantile(np.log10(fad), 0.75, axis=-1)-np.nanquantile(np.log10(fad), 0.25, axis=-1), 'k.')
+        plt.plot(np.nanmedian(np.log10(indiv_fad), axis=-1),
+                 np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1) - np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1), 'k.')
         plt.title("MAD vs percentile width")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_percentile.png"))
 
+        pvar = pooled_variance(np.log10(indiv_fad))
+        print(2.77 * np.sqrt(pvar))
+        print(100 * 2.77 * np.sqrt(pvar) / np.nanmean(np.log10(indiv_fad)))
+
         plt.waitforbuttonpress()
 
-        for c in range(len(reference_coord_data)):
-
-
-            prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
-            poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1] + 10)])
-
-            simple_amp[l, c] = poststim_amp - prestim_amp
-
-        # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
-        # clippedcoords = coordclip(coord_data, 10, 100, 'i')
-
-        # plt.figure(0)
-        # plt.clf()
-        # for a in range(all_cell_iORG.shape[0]):
-        #     plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
-        #     plt.plot(stimulus_train[0], poststim_amp, "rD")
-        # plt.hist(simple_amp)
-        # plt.plot(cell_power_iORG[c, :])
-        #   plt.show(block=False)
-        #   plt.waitforbuttonpress()
-        # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
-
-        # find the cells with the min, med, and max amplitude
-        min_amp = np.nanmin(simple_amp[0, :])
-        [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
-        # print('min_amp ',min_amp)
-        med_amp = np.nanmedian(simple_amp[0, :])
-        near_med_amp = find_nearest(simple_amp[0, :], med_amp)
-        [med_amp_row, med_amp_col] = np.where(simple_amp == near_med_amp)
-
-        # print('med_amp ', med_amp)
-        max_amp = np.nanmax(simple_amp[0, :])
-        [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
-        # print('max_amp ', max_amp)
-
-        plt.figure(1)
         histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
-        plt.hist(simple_amp[l, :], bins=histbins)
-        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
-        plt.close(plt.gcf())
 
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
@@ -365,7 +343,7 @@ if __name__ == "__main__":
         for c, cell in enumerate(vor.regions[1:]):
             if not -1 in cell:
                 poly = [vor.vertices[i] for i in cell]
-                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[l, c]))
+                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(median_indiv_fad[c]))
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
@@ -373,36 +351,16 @@ if __name__ == "__main__":
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
-        # plotting the cells with the min/med/max amplitude
-        plt.figure(300)
-        # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
-        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
-                 np.transpose(cell_power_iORG[min_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
-                 np.transpose(cell_power_iORG[med_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (176, 1)).astype('float64'),
-                 np.transpose(cell_power_iORG[max_amp_col, :]))
-        # This also works...
-        # plt.plot(full_framestamp_range.astype('float64'),
-        #         np.ravel(cell_power_iORG[min_amp_col, :]))
-
-        # should really be the cell_framestamps that correspond to the cells on the x axis
-        # need to fix the bug with the framstamps being empty first though
-        # plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
-        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones.png"))
-        plt.show(block=False)
-        plt.close(plt.gcf())
-
-        # output cell_power_iORG to csv (optional)
-        if outputcsv:
-            import csv
-
-            csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
-            print(csv_dir)
-            f = open(csv_dir, 'w', newline="")
-            writer = csv.writer(f, delimiter=',')
-            writer.writerows(cell_power_iORG)
-            f.close
-
-        print("Done!")
-        print(stimulus_train)
+        # # output cell_power_iORG to csv (optional)
+        # if outputcsv:
+        #     import csv
+        #
+        #     csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
+        #     print(csv_dir)
+        #     f = open(csv_dir, 'w', newline="")
+        #     writer = csv.writer(f, delimiter=',')
+        #     writer.writerows(cell_power_iORG)
+        #     f.close
+        #
+        # print("Done!")
+        # print(stimulus_train)
