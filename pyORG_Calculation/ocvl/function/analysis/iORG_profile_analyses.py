@@ -396,7 +396,8 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=11, display=True):
+def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, notch_filter=None,
+                                 display=False):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
 
@@ -404,8 +405,11 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     finite_data = np.isfinite(temporal_profiles)
     temporal_profiles[~finite_data] = 0
 
-    sos = signal.butter(10, (0.75, 1.5), "bandstop", fs=29.5, output='sos')
-    butter_filtered_profiles = signal.sosfiltfilt(sos, temporal_profiles)
+    if notch_filter is not None:
+        sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
+        butter_filtered_profiles = signal.sosfiltfilt(sos, temporal_profiles)
+    else:
+        butter_filtered_profiles = temporal_profiles
 
     if filter_type == "savgol":
         filtered_profiles = savgol_filter(butter_filtered_profiles, window_length=fwhm_size, polyorder=4, mode="mirror",
@@ -470,31 +474,46 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     abs_diff_profiles[abs_diff_profiles == 0] = np.nan
     fad = np.amax(abs_diff_profiles, axis=1)
 
-    # if np.nanmedian(np.log10(fad), axis=-1) <= 1.6:
-    #
-    #     plt.figure(42)
-    #     plt.clf()
-    #     for i in range(temporal_profiles.shape[0]):
-    #
-    #         plt.subplot(2, 2, 1)
-    #         plt.title("Raw data")
-    #         plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-    #         # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-    #         plt.subplot(2, 2, 2)
-    #         plt.title("Butter Filtered data")
-    #         plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         plt.subplot(2, 2, 3)
-    #         plt.title("Filtered data")
-    #         plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         # plt.title("Power spectrum of filtered signal")
-    #         # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-    #         plt.subplot(2, 2, 4)
-    #         plt.title("AUC")
-    #         plt.plot(framestamps[50:90], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    # if np.nanmedian(np.log10(indiv_fad), axis=-1) <= 1.6:
+
+    if display:
+        plt.figure(42)
+        plt.clf()
+        for i in range(temporal_profiles.shape[0]):
+
+            plt.subplot(2, 2, 1)
+            plt.title("Raw data")
+            plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+            # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+            plt.subplot(2, 2, 2)
+            plt.title("Butter Filtered data")
+            plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.subplot(2, 2, 3)
+            plt.title("Filtered data")
+            plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            # plt.title("Power spectrum of filtered signal")
+            # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+            plt.subplot(2, 2, 4)
+            plt.title("AUC")
+            plt.plot(framestamps[50:90], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             # plt.waitforbuttonpress()
+
+        plt.waitforbuttonpress()
     #
     #
 
 
     return fad
+
+
+def pooled_variance(data, axis=1):
+
+    finers = np.isfinite(data)
+    goodrow = np.any(finers, axis=1)
+
+    datavar = np.nanvar(data[goodrow, :], axis=axis)
+    datacount = np.nansum(finers[goodrow, :], axis=axis) - 1
+
+    return np.sum(datavar*datacount) / np.sum(datacount)
+
