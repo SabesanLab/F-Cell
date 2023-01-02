@@ -9,6 +9,12 @@ from sklearn import linear_model
 from pynufft import NUFFT
 
 
+def trim_video(video_data, framestamps, new_max_framestamp):
+
+    wheregood = np.where(framestamps <= new_max_framestamp)
+
+    return np.squeeze(video_data[:, :, wheregood]), framestamps[wheregood]
+
 def densify_temporal_matrix(temporal_profiles, framestamps, max_framestamp=None, value=np.nan):
     """
     By default, most algorithms in this package work with sparsely sampled data by default (governed by the framestamps)
@@ -100,7 +106,7 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
         return reconstruction, nummissing
     else:
-        print( "Missing " + str(100*(nummissing/framestamps[-1])) + "% of data from this profile. Removing...")
+        #print( "Missing " + str(100*(nummissing/framestamps[-1])) + "% of data from this profile. Removing...")
         reconstruction = densify_temporal_matrix(temporal_profiles[c, :], framestamps)
         reconstruction[:] = np.nan
         return reconstruction, nummissing
