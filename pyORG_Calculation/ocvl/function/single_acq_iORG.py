@@ -16,7 +16,7 @@ from ssqueezepy.experimental import scale_to_freq
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG, extract_texture_profiles, \
-    filtered_absolute_difference, pooled_variance
+    filtered_absolute_difference
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
@@ -175,8 +175,8 @@ if __name__ == "__main__":
                 full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
                                                  summary="none", sigma=1)
 
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=1,
-                                                 summary="mean", sigma=1)
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius-1,
+                                                 summary="median", sigma=1)
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
@@ -257,15 +257,24 @@ if __name__ == "__main__":
                 #                                   str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
                 #                                   full_cell_profiles[c][i])
             #
-            # plt.figure(11)
-            # plt.clf()
-            # plt.imshow(ref_im)
-            # plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
-            # plt.show(block=False)
+
             # What about a temporal histogram?
             fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                      filter_type="MS1")
             fad[fad == 0] = np.nan
+
+            # if np.nanmedian(np.log10(fad[c, :]), axis=-1) <= 1.6:
+            #     plt.figure(11)
+            #     plt.clf()
+            #     plt.imshow(ref_im)
+            #     plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
+            #     plt.show(block=False)
+            #     for i, profile in enumerate(mean_cell_profiles[c]):
+            #         save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
+            #                                           str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
+            #                                           full_cell_profiles[c][i])
+            #     plt.waitforbuttonpress()
+
             # plt.figure(11)
             # plt.hist(np.log(fad[c, :]), 10)
             # plt.show(block=False)
@@ -275,23 +284,29 @@ if __name__ == "__main__":
 
 
         plt.figure(11)
-        plt.hist(np.nanstd(np.log10(fad), axis=-1), 50)
+        plt.hist(np.nanquantile(np.log10(fad), 0.25, axis=-1), 50)
+        plt.title("25th percentile of each cell's responses")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_stddev.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_25pct.png"))
 
         plt.figure(12)
+        plt.hist(np.nanquantile(np.log10(fad), 0.75, axis=-1), 50)
+        plt.title("75th percentile of each cell's responses")
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_75pct.png"))
+
+        plt.figure(13)
         plt.hist(np.nanmedian(np.log10(fad), axis=-1), 50)
+        plt.title("Median absolute deviation")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
-        plt.figure(13)
-        plt.plot(np.nanmedian(np.log10(fad), axis=-1), np.nanstd(np.log10(fad), axis=1), 'k.')
+        plt.figure(14)
+        plt.plot(np.nanmedian(np.log(fad), axis=-1),
+                 np.nanquantile(np.log10(fad), 0.75, axis=-1)-np.nanquantile(np.log10(fad), 0.25, axis=-1), 'k.')
+        plt.title("MAD vs percentile width")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
-
-        pvar = pooled_variance(np.log10(fad))
-        print( 100* 2.77*np.sqrt(pvar) / np.nanmean(np.log10(fad)) )
-
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_percentile.png"))
 
         plt.waitforbuttonpress()
 

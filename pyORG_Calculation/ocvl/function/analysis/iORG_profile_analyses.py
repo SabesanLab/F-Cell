@@ -396,7 +396,7 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, display=True):
+def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=11, display=True):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
 
@@ -404,16 +404,16 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     finite_data = np.isfinite(temporal_profiles)
     temporal_profiles[~finite_data] = 0
 
-    sos = signal.butter(14, (1, 2), "bandstop", fs=29.5, output='sos')
-    filtered_profiles = signal.sosfiltfilt(sos, temporal_profiles)
+    sos = signal.butter(10, (0.75, 1.5), "bandstop", fs=29.5, output='sos')
+    butter_filtered_profiles = signal.sosfiltfilt(sos, temporal_profiles)
 
     if filter_type == "savgol":
-        filtered_profiles = savgol_filter(filtered_profiles, window_length=fwhm_size, polyorder=4, mode="mirror",
+        filtered_profiles = savgol_filter(butter_filtered_profiles, window_length=fwhm_size, polyorder=4, mode="mirror",
                                           axis=1)
     elif filter_type == "MS":
         # Formulas from Schmid et al- these are MS filters.
         alpha = 4
-        n = 4
+        n = 6
         m = np.round(fwhm_size * (0.8874 + 0.3402*n + 0.129*np.log(n)) - 1 ).astype("int") #(filter_size - 1)/2
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
 
@@ -435,13 +435,13 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        filtered_profiles = convolve1d(filtered_profiles, trunc_sinc, mode="reflect", axis=1)
+        filtered_profiles = convolve1d(butter_filtered_profiles, trunc_sinc, mode="reflect", axis=1)
         filtered_profiles[~finite_data] = np.nan
 
     elif filter_type == "MS1":
         # Formulas from Schmid et al- these are MS1 filters.
         alpha = 4
-        n = 4
+        n = 2
         m = np.round(fwhm_size * (0.8874 + 0.3402*n + 0.129*np.log(n)) - 1 ).astype("int")
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
@@ -461,9 +461,8 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        filtered_profiles = convolve1d(filtered_profiles, trunc_sinc, mode="reflect", axis=1)
+        filtered_profiles = convolve1d(butter_filtered_profiles, trunc_sinc, mode="reflect", axis=1)
         filtered_profiles[~finite_data] = np.nan
-
 
     filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
     abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 50:90]), axis=1)
@@ -471,41 +470,31 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     abs_diff_profiles[abs_diff_profiles == 0] = np.nan
     fad = np.amax(abs_diff_profiles, axis=1)
 
-    # if np.nanstd(np.log(fad), axis=-1) > .7:
+    # if np.nanmedian(np.log10(fad), axis=-1) <= 1.6:
+    #
+    #     plt.figure(42)
+    #     plt.clf()
+    #     for i in range(temporal_profiles.shape[0]):
+    #
+    #         plt.subplot(2, 2, 1)
+    #         plt.title("Raw data")
+    #         plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+    #         # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+    #         plt.subplot(2, 2, 2)
+    #         plt.title("Butter Filtered data")
+    #         plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         plt.subplot(2, 2, 3)
+    #         plt.title("Filtered data")
+    #         plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         # plt.title("Power spectrum of filtered signal")
+    #         # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+    #         plt.subplot(2, 2, 4)
+    #         plt.title("AUC")
+    #         plt.plot(framestamps[50:90], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            # plt.waitforbuttonpress()
+    #
+    #
 
-    # plt.figure(43)
-    # plt.clf()
-    # for i in range(temporal_profiles.shape[0]):
-    #
-    #     plt.subplot(2, 2, 1)
-    #     plt.title("Raw data")
-    #     plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #     plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-    #     # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-    #     plt.subplot(2, 2, 2)
-    #     plt.title("Filtered data")
-    #     plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #     plt.subplot(2, 2, 3)
-    #     plt.title("Filtered Derivative")
-    #     plt.plot(framestamps, filter_grad_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #     # plt.title("Power spectrum of filtered signal")
-    #     # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-    #     plt.subplot(2, 2, 4)
-    #     plt.title("AUC")
-    #     plt.plot(framestamps[50:90], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #     # plt.waitforbuttonpress()
-    #
-    #
-    # plt.waitforbuttonpress()
 
     return fad
-
-
-def pooled_variance(data, axis=1):
-
-    datavar = np.nanvar(data, axis=axis)
-    datacount = np.sum(np.isfinite(data), axis=axis) - 1
-
-    return np.sum(datavar*datacount) / np.sum(datacount)
-
-
