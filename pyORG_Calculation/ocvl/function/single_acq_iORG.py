@@ -265,7 +265,7 @@ if __name__ == "__main__":
 
             # What about a temporal histogram?
             indiv_fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                           filter_type="MS1", notch_filter=(0.75, 1.5))
+                                                           filter_type="MS1", notch_filter=(1, 1.4), display=True)
             indiv_fad[indiv_fad == 0] = np.nan
 
             # if np.nanmedian(np.log10(indiv_fad[c, :]), axis=-1) <= 1.6:
@@ -280,49 +280,53 @@ if __name__ == "__main__":
             #                                           full_cell_profiles[c][i])
             #     plt.waitforbuttonpress()
 
-            # plt.figure(11)
-            # plt.hist(np.log(indiv_fad[c, :]), 10)
-            # plt.show(block=False)
-            # plt.draw()
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
         cell_power_fad = filtered_absolute_difference(cell_power_iORG, full_framestamp_range,
-                                                         filter_type="MS1", notch_filter=(0.75, 1.5), display=True)
+                                                         filter_type="MS1", notch_filter=(1, 1.4))
         cell_power_fad[cell_power_fad == 0] = np.nan
+
+        # *** MAKE THIS A PARAM ***
+        enough_data = np.sum(np.isfinite(indiv_fad), axis=1) > np.floor( len(allFiles[loc])/2 )
+        indiv_fad = np.squeeze(indiv_fad[enough_data, :])
 
         median_indiv_fad = np.nanmedian(np.log10(indiv_fad), axis=-1)
 
+        histbins = np.arange(start=0.9, stop=2.0, step=0.025)
+
         plt.figure(11)
-        plt.hist(np.nanmedian(np.log10(cell_power_fad), axis=-1), 50)
+        plt.hist(np.nanmean(np.log10(cell_power_fad), axis=-1), 50)
         plt.title("RMS power FAD")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_power_amp.png"))
 
-        plt.figure(11)
-        plt.hist(np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1), 50)
-        plt.title("25th percentile of each cell's responses")
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_25pct.png"))
-
-        plt.figure(12)
-        plt.hist(np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1), 50)
-        plt.title("75th percentile of each cell's responses")
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_75pct.png"))
+        # plt.figure(11)
+        # plt.hist(np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1), 50)
+        # plt.title("25th percentile of each cell's responses")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_25pct.png"))
+        #
+        # plt.figure(12)
+        # plt.hist(np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1), 50)
+        # plt.title("75th percentile of each cell's responses")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_75pct.png"))
 
         plt.figure(13)
-        plt.hist(np.nanmedian(np.log10(indiv_fad), axis=-1), 50)
+        plt.hist(np.nanmean(np.log10(indiv_fad), axis=-1), bins=histbins)
         plt.title("Median absolute deviation")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
         plt.figure(14)
-        plt.plot(np.nanmedian(np.log10(indiv_fad), axis=-1),
-                 np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1) - np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1), 'k.')
+        plt.plot(np.nanmean(np.log10(indiv_fad), axis=-1),
+                 #np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1) - np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1),
+                 np.nanstd(np.log10(indiv_fad), axis=-1),
+                 'k.')
         plt.title("MAD vs percentile width")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_percentile.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
 
         pvar = pooled_variance(np.log10(indiv_fad))
         print(2.77 * np.sqrt(pvar))
@@ -330,26 +334,26 @@ if __name__ == "__main__":
 
         plt.waitforbuttonpress()
 
-        histbins = np.arange(start=-0.2, stop=1.5, step=0.025)
+
 
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
         # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
 
-        plt.figure(2)
-        vor = Voronoi(reference_coord_data)
-        voronoi_plot_2d(vor, show_vertices=False, show_points=False)
-        for c, cell in enumerate(vor.regions[1:]):
-            if not -1 in cell:
-                poly = [vor.vertices[i] for i in cell]
-                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(median_indiv_fad[c]))
-        ax = plt.gca()
-        ax.set_aspect("equal", adjustable="box")
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
-        plt.close(plt.gcf())
+        # plt.figure(2)
+        # vor = Voronoi(reference_coord_data)
+        # voronoi_plot_2d(vor, show_vertices=False, show_points=False)
+        # for c, cell in enumerate(vor.regions[1:]):
+        #     if not -1 in cell:
+        #         poly = [vor.vertices[i] for i in cell]
+        #         plt.fill(*zip(*poly), color=hist_mapper.to_rgba(median_indiv_fad[c]))
+        # ax = plt.gca()
+        # ax.set_aspect("equal", adjustable="box")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
+        # # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
+        # plt.close(plt.gcf())
 
         # # output cell_power_iORG to csv (optional)
         # if outputcsv:

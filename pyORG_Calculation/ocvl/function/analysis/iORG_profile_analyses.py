@@ -396,18 +396,21 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, notch_filter=None,
+def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=11, notch_filter=None,
                                  display=False):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
 
     # Remove heartbeats?
     finite_data = np.isfinite(temporal_profiles)
-    temporal_profiles[~finite_data] = 0
+    #temporal_profiles[~finite_data] = 0
 
     if notch_filter is not None:
         sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
-        butter_filtered_profiles = signal.sosfiltfilt(sos, temporal_profiles)
+        butter_filtered_profiles = np.full_like(temporal_profiles, np.nan)
+        for i in range(temporal_profiles.shape[0]):
+            if np.any(finite_data[i, :]):
+                butter_filtered_profiles[i, finite_data[i, :]] = signal.sosfiltfilt(sos, temporal_profiles[i, finite_data[i, :]])
     else:
         butter_filtered_profiles = temporal_profiles
 
@@ -439,8 +442,10 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        filtered_profiles = convolve1d(butter_filtered_profiles, trunc_sinc, mode="reflect", axis=1)
-        filtered_profiles[~finite_data] = np.nan
+        filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
+        for i in range(temporal_profiles.shape[0]):
+            filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
+                                                                 trunc_sinc, mode="reflect", axis=1)
 
     elif filter_type == "MS1":
         # Formulas from Schmid et al- these are MS1 filters.
@@ -465,44 +470,43 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         trunc_sinc = adj_sinc*window
         trunc_sinc /= np.sum(trunc_sinc)
 
-        filtered_profiles = convolve1d(butter_filtered_profiles, trunc_sinc, mode="reflect", axis=1)
-        filtered_profiles[~finite_data] = np.nan
+        filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
+        for i in range(temporal_profiles.shape[0]):
+            filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
+                                                                 trunc_sinc, mode="reflect")
+
 
     filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
-    abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 50:90]), axis=1)
+    abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 50:80]), axis=1)
 
     abs_diff_profiles[abs_diff_profiles == 0] = np.nan
     fad = np.amax(abs_diff_profiles, axis=1)
 
-    # if np.nanmedian(np.log10(indiv_fad), axis=-1) <= 1.6:
-
-    if display:
-        plt.figure(42)
-        plt.clf()
-        for i in range(temporal_profiles.shape[0]):
-
-            plt.subplot(2, 2, 1)
-            plt.title("Raw data")
-            plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-            # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-            plt.subplot(2, 2, 2)
-            plt.title("Butter Filtered data")
-            plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.subplot(2, 2, 3)
-            plt.title("Filtered data")
-            plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            # plt.title("Power spectrum of filtered signal")
-            # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-            plt.subplot(2, 2, 4)
-            plt.title("AUC")
-            plt.plot(framestamps[50:90], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            # plt.waitforbuttonpress()
-
-        plt.waitforbuttonpress()
+    # if np.nanmean(np.log10(fad), axis=-1) >= 1.5 and np.sum(np.isfinite(fad)) > 3:
+    # if display and np.sum(np.isfinite(fad)) > 3:
+    #     plt.figure(42)
+    #     plt.clf()
+    #     for i in range(temporal_profiles.shape[0]):
     #
-    #
-
+    #         plt.subplot(2, 2, 1)
+    #         plt.title("Raw data")
+    #         plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+    #         # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+    #         plt.subplot(2, 2, 2)
+    #         plt.title("Butter Filtered data")
+    #         plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         plt.subplot(2, 2, 3)
+    #         plt.title("Filtered data")
+    #         plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         # plt.title("Power spectrum of filtered signal")
+    #         # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+    #         plt.subplot(2, 2, 4)
+    #         plt.title("AUC")
+    #         plt.plot(framestamps[50:80], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+    #         # plt.waitforbuttonpress()
+    # #
+    #     plt.waitforbuttonpress()
 
     return fad
 

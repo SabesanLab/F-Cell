@@ -94,6 +94,7 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
         reconstruction = sp.fft.idct(lasso.coef_.reshape((len(fullrange),)), axis=0,
                                      norm="ortho", orthogonalize=True) * sigstd + sigmean
 
+        reconstruction[ reconstruction == 0 ] = np.nan
         # filled_recon = densify_temporal_matrix(reconstruction, framestamps)
 
         # plt.figure(0)
@@ -127,8 +128,8 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
     """
     fullrange = np.arange(framestamps[-1] + 1)
 
-    reconstruction = np.empty((temporal_profiles.shape[0], len(fullrange)))
-    nummissing = np.empty((temporal_profiles.shape[0], 1))
+    reconstruction = np.full((temporal_profiles.shape[0], len(fullrange)), np.nan)
+    nummissing = np.full((temporal_profiles.shape[0], 1), np.nan)
 
     if method == "L1":
 
