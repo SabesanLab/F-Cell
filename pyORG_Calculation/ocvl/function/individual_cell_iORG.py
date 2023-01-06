@@ -186,7 +186,8 @@ if __name__ == "__main__":
                 if dataset.framestamps[-1] > max_frmstamp:
                     max_frmstamp = dataset.framestamps[-1]
 
-        del dataset, temp_profiles, norm_temporal_profiles, stdize_profiles
+        #del dataset, temp_profiles, norm_temporal_profiles, stdize_profiles
+        del temp_profiles, norm_temporal_profiles, stdize_profiles
 
 
         # Rows: Acquisitions
@@ -214,9 +215,24 @@ if __name__ == "__main__":
         for c in range(len(reference_coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
+            prestim_ind = np.logical_and(full_framestamp_range < dataset.stimtrain_frame_stamps[0],
+                                         full_framestamp_range >= (dataset.stimtrain_frame_stamps[0] - int(
+                                             0.75 * dataset.framerate)))
+            poststim_ind = np.logical_and(full_framestamp_range >= dataset.stimtrain_frame_stamps[1],
+                                          full_framestamp_range < (dataset.stimtrain_frame_stamps[1] + int(
+                                              0.75 * dataset.framerate)))
+            poststim = cell_power_iORG[c, poststim_ind]
+            prestim = cell_power_iORG[c, prestim_ind]
 
-            prestim_amp = np.nanmedian(cell_power_iORG[c, 0:stimulus_train[0]])
-            poststim_amp = np.nanmedian(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1] + 10)])
+
+            if poststim.size == 0:
+                poststim_amp = np.NaN
+                prestim_amp = np.NaN
+
+            else:
+                poststim_amp = np.quantile(poststim, [0.95])
+                prestim_amp = np.nanmedian(prestim)
+            
 
             simple_amp[c, 0] = poststim_amp - prestim_amp
 
@@ -303,14 +319,14 @@ if __name__ == "__main__":
         plt.close(plt.gcf())
 
         # plotting the cells with the min/med/max amplitude
-        plt.figure(300)
+        #plt.figure(300)
         # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-                 np.transpose(cell_power_iORG[min_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-                 np.transpose(cell_power_iORG[med_amp_col, :]))
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-                 np.transpose(cell_power_iORG[max_amp_col, :]))
+        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        #          np.transpose(cell_power_iORG[min_amp_col, :]))
+        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        #          np.transpose(cell_power_iORG[med_amp_col, :]))
+        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        #          np.transpose(cell_power_iORG[max_amp_col, :]))
         # This also works...
         # plt.plot(full_framestamp_range.astype('float64'),
         #         np.ravel(cell_power_iORG[min_amp_col, :]))
@@ -318,9 +334,9 @@ if __name__ == "__main__":
         # should really be the cell_framestamps that correspond to the cells on the x axis
         # need to fix the bug with the framstamps being empty first though
         # plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
-        plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones_" + now_timestamp + ".png"))
-        plt.show(block=False)
-        plt.close(plt.gcf())
+        # plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones_" + now_timestamp + ".png"))
+        # plt.show(block=False)
+        # plt.close(plt.gcf())
 
         # output cell_power_iORG to csv (optional)
         if outputcsv:
