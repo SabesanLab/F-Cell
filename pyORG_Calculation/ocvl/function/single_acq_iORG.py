@@ -173,18 +173,20 @@ if __name__ == "__main__":
                 dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
                                                                      stimulus_train[1]*2)
 
-                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
-
-                full_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
+                full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius,
                                                  summary="none", sigma=1)
 
+                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius-1,
-                                                 summary="median", sigma=1)
+                                                 summary="mean")
+
+                temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps, stimulus_stamp=stimulus_train[0], method="mean_sub")
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
                                                                            stimulus_train[1] + int(0.2 * framerate)),
-                                                 critical_fraction=0.4)
+                                                 critical_fraction=0.5)
 
                 full_profiles[:, :, :, ~good_profiles] = np.nan
 
@@ -251,10 +253,14 @@ if __name__ == "__main__":
         cell_amp = np.full( (len(reference_coord_data), len(allFiles[loc])), np.nan)
         peak_scale = np.full_like(cell_amp, np.nan)
         indiv_fad = np.full_like(cell_amp, np.nan)
+        prestim_mean = np.full_like(cell_amp, np.nan)
 
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
                 all_cell_mean_iORG[i, cell_framestamps[c][i], c] = profile
+
+                prestimulus_idx = np.where(cell_framestamps[c][i] <= stimulus_train[0], True, False)
+                prestim_mean[c, i] = np.nanmean( profile[prestimulus_idx] )
                 #all_cell_texture_iORG[i, cell_framestamps[c][i], c] = texture_cell_profiles[c][i]
                 #all_full_cell_iORG[i, :, :, og_framestamps[c][i], c] = full_cell_profiles[c][i].reshape(all_full_cell_iORG[i, :, :, og_framestamps[c][i], c].shape, order="F")
 
@@ -265,38 +271,52 @@ if __name__ == "__main__":
 
             # What about a temporal histogram?
             indiv_fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                           filter_type="MS1", notch_filter=(1, 1.4), display=True)
+                                                           filter_type="MS1", notch_filter=None, display=False)
             indiv_fad[indiv_fad == 0] = np.nan
 
-            # if np.nanmedian(np.log10(indiv_fad[c, :]), axis=-1) <= 1.6:
+
+
+            # if np.nanstd(np.log10(indiv_fad[c, :]+1)) >= 0.125 and np.sum(np.isfinite(indiv_fad[c, :])) >= 3:
             #     plt.figure(11)
             #     plt.clf()
             #     plt.imshow(ref_im)
             #     plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
             #     plt.show(block=False)
             #     for i, profile in enumerate(mean_cell_profiles[c]):
-            #         save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
-            #                                           str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
-            #                                           full_cell_profiles[c][i])
+            #         if np.isfinite(indiv_fad[c, i]):
+            #             save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
+            #                                              str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
+            #                             full_cell_profiles[c][i])
+            #
+            #
             #     plt.waitforbuttonpress()
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
-        cell_power_fad = filtered_absolute_difference(cell_power_iORG, full_framestamp_range,
-                                                         filter_type="MS1", notch_filter=(1, 1.4))
+            cell_power_fad[c] = filtered_absolute_difference(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
+                                                          full_framestamp_range,
+                                                          filter_type="MS1", notch_filter=None, display=True)
+
         cell_power_fad[cell_power_fad == 0] = np.nan
 
         # *** MAKE THIS A PARAM ***
-        enough_data = np.sum(np.isfinite(indiv_fad), axis=1) > np.floor( len(allFiles[loc])/2 )
-        indiv_fad = np.squeeze(indiv_fad[enough_data, :])
+        enough_data = np.sum(np.isfinite(indiv_fad), axis=1) >= np.floor( len(allFiles[loc])/2 )
 
-        median_indiv_fad = np.nanmedian(np.log10(indiv_fad), axis=-1)
+        cell_power_fad = np.squeeze(cell_power_fad[enough_data])
+        indiv_fad = np.squeeze(indiv_fad[enough_data, :])
+        prestim_mean = np.squeeze(prestim_mean[enough_data, :])
+
+        plt.figure(69)
+        #plt.plot(indiv_fad[c, :], np.abs(1 - prestim_mean[c, :]), "*")
+        twodee_histbins = np.arange(start=0, stop=255, step=10.2)
+        plt.hist2d(prestim_mean[np.isfinite(indiv_fad)].flatten(), indiv_fad[np.isfinite(indiv_fad)].flatten(), bins=twodee_histbins)
+
 
         histbins = np.arange(start=0.9, stop=2.0, step=0.025)
 
         plt.figure(11)
-        plt.hist(np.nanmean(np.log10(cell_power_fad), axis=-1), 50)
+        plt.hist(np.log10(cell_power_fad), 50)
         plt.title("RMS power FAD")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_power_amp.png"))
@@ -314,7 +334,7 @@ if __name__ == "__main__":
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_75pct.png"))
 
         plt.figure(13)
-        plt.hist(np.nanmean(np.log10(indiv_fad), axis=-1), bins=histbins)
+        plt.hist(np.nanmean(np.log10(indiv_fad), axis=-1), 50)
         plt.title("Median absolute deviation")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
@@ -328,14 +348,18 @@ if __name__ == "__main__":
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
 
-        pvar = pooled_variance(np.log10(indiv_fad))
-        print(2.77 * np.sqrt(pvar))
-        print(100 * 2.77 * np.sqrt(pvar) / np.nanmean(np.log10(indiv_fad)))
+        pvar, pmean = pooled_variance(np.log10(indiv_fad))
+        print("Coefficient of Variation: " + str(10**np.sqrt(pvar)))
+        print("Coefficient of Variation: % " + str(100 * (10**np.sqrt(pvar)-1)))
+
+              #2.77 * np.sqrt(pvar) /  pmean)
+
+
+
+        outdata = pd.DataFrame(np.hstack((np.zeros_like(cell_power_fad[:,np.newaxis]), np.log10(cell_power_fad[:,np.newaxis]), np.log10(indiv_fad))))
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"))
 
         plt.waitforbuttonpress()
-
-
-
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 

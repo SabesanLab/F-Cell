@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
+from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_tiff_stack
@@ -128,7 +129,7 @@ if __name__ == "__main__":
                 dataset.load_pipelined_data()
 
                 if first:
-                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data, search_radius=1)
+                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data)
                     full_profiles = []
                     first = False
 
@@ -142,14 +143,14 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+
                 # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none")
 
-                # for c in range(len(dataset.coord_data)):
-                #      save_tiff_stack(
-                #          res_dir.joinpath(file.name[0:-4] + "cell(" + str(dataset.coord_data[c][0]) + "," +
-                #                           str(dataset.coord_data[c][1]) + ".tif"), full_profiles[:, :, :, c])
+                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data[perm, :], seg_radius=2,
+                                                 display=False, sigma=1)
 
                 temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
                                                               critical_region=np.arange(
@@ -157,8 +158,7 @@ if __name__ == "__main__":
                                                                   dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
                                                               critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
+                stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
 
 
@@ -220,6 +220,7 @@ if __name__ == "__main__":
         plt.xlim([0,  max_frmstamp/dataset.framerate])
         plt.ylim([0, 1.5])
         #plt.legend()
+
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".png"))
 

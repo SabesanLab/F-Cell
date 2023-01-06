@@ -7,6 +7,7 @@ from joblib._multiprocessing_helpers import mp
 from numpy.fft import fftshift
 from scipy import signal
 from scipy.fft import fft
+from scipy.interpolate import UnivariateSpline
 from scipy.ndimage import center_of_mass, convolve1d
 from scipy.signal import savgol_filter, convolve, freqz
 from skimage.feature import graycomatrix, graycoprops
@@ -396,14 +397,17 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=11, notch_filter=None,
+def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, notch_filter=None,
                                  display=False):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
 
     # Remove heartbeats?
     finite_data = np.isfinite(temporal_profiles)
-    #temporal_profiles[~finite_data] = 0
+
+    if np.all(~finite_data):
+        return np.full((temporal_profiles.shape[0]), np.nan)
+
 
     if notch_filter is not None:
         sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
@@ -450,7 +454,7 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     elif filter_type == "MS1":
         # Formulas from Schmid et al- these are MS1 filters.
         alpha = 4
-        n = 2
+        n = 4
         m = np.round(fwhm_size * (0.8874 + 0.3402*n + 0.129*np.log(n)) - 1 ).astype("int")
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
@@ -474,7 +478,15 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         for i in range(temporal_profiles.shape[0]):
             filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
                                                                  trunc_sinc, mode="reflect")
+    # elif filter_type == "splinefit":
 
+    spline_filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
+    for i in range(temporal_profiles.shape[0]):
+        if np.any(finite_data[i, :]):
+            maxval = 2*np.sqrt(np.nanmean(np.nanvar(temporal_profiles-filtered_profiles, axis=1),axis=0)) #np.nanmax(filtered_profiles[:, finite_data[i, :]]) # was 40 before...
+            spfit = UnivariateSpline(framestamps[finite_data[i, :]], filtered_profiles[i, finite_data[i, :]]/maxval)
+            spfit.set_smoothing_factor(0.5)
+            spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
 
     filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
     abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 50:80]), axis=1)
@@ -482,31 +494,32 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     abs_diff_profiles[abs_diff_profiles == 0] = np.nan
     fad = np.amax(abs_diff_profiles, axis=1)
 
-    # if np.nanmean(np.log10(fad), axis=-1) >= 1.5 and np.sum(np.isfinite(fad)) > 3:
-    # if display and np.sum(np.isfinite(fad)) > 3:
-    #     plt.figure(42)
-    #     plt.clf()
-    #     for i in range(temporal_profiles.shape[0]):
-    #
-    #         plt.subplot(2, 2, 1)
-    #         plt.title("Raw data")
-    #         plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-    #         # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
-    #         plt.subplot(2, 2, 2)
-    #         plt.title("Butter Filtered data")
-    #         plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         plt.subplot(2, 2, 3)
-    #         plt.title("Filtered data")
-    #         plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         # plt.title("Power spectrum of filtered signal")
-    #         # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
-    #         plt.subplot(2, 2, 4)
-    #         plt.title("AUC")
-    #         plt.plot(framestamps[50:80], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-    #         # plt.waitforbuttonpress()
-    # #
-    #     plt.waitforbuttonpress()
+    # if np.nanvar(np.log10(fad)) >= 0.035 and np.sum(np.isfinite(fad)) > 3:
+    if display and np.sum(np.isfinite(fad)) > 2: # and np.nanmean(np.log10(fad+1)) <= 1.2:
+        plt.figure(42)
+        plt.clf()
+        for i in range(temporal_profiles.shape[0]):
+
+            plt.subplot(2, 2, 1)
+            plt.title("Raw data")
+            plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
+            # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+            plt.subplot(2, 2, 2)
+            plt.title("Butter Filtered data")
+            plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.subplot(2, 2, 3)
+            plt.title("Filtered data")
+            plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            # plt.title("Power spectrum of filtered signal")
+            # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+            plt.subplot(2, 2, 4)
+            plt.title("AUC")
+            plt.plot(framestamps[50:80], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            # plt.waitforbuttonpress()
+
+        plt.waitforbuttonpress()
 
     return fad
 
@@ -516,8 +529,10 @@ def pooled_variance(data, axis=1):
     finers = np.isfinite(data)
     goodrow = np.any(finers, axis=1)
 
+    datamean = np.nanmean(data[goodrow, :], axis=axis)
     datavar = np.nanvar(data[goodrow, :], axis=axis)
-    datacount = np.nansum(finers[goodrow, :], axis=axis) - 1
 
-    return np.sum(datavar*datacount) / np.sum(datacount)
+    datacount = np.nansum(finers[goodrow, :], axis=axis)
+
+    return np.sum(datavar*datacount) / np.sum(datacount), np.sum(datamean*datacount) / np.sum(datacount)
 

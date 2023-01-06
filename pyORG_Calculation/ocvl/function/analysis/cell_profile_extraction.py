@@ -187,7 +187,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     return profile_data
 
 def exclude_profiles(temporal_profiles, framestamps,
-                     critical_region=None, critical_fraction=0.5):
+                     critical_region=None, critical_fraction=0.5, require_full_profile=True):
     """
     A bit of code used to remove cells that don't have enough data in the critical region of a signal. This is typically
     surrounding a stimulus.
@@ -197,6 +197,7 @@ def exclude_profiles(temporal_profiles, framestamps,
     :param critical_region: A set of values containing the critical region of a signal- if a cell doesn't have data here,
                             then drop its entire signal from consideration.
     :param critical_fraction: The percentage of real values required to consider the signal valid.
+    :param require_full_profile:
     :return: a NxM numpy matrix of pared-down profiles, where profiles that don't fit the criterion are dropped.
     """
 
@@ -213,7 +214,15 @@ def exclude_profiles(temporal_profiles, framestamps,
                 temporal_profiles[i, :] = np.nan
                 good_profiles[i] = False
 
-    if critical_region is not None:
+    if require_full_profile:
+        for i in range(temporal_profiles.shape[0]):
+            if np.any(~np.isfinite(temporal_profiles[i, :])) and good_profiles[i]:
+
+                temporal_profiles[i, :] = np.nan
+                good_profiles[i] = False
+                crit_remove += 1
+
+    if critical_region is not None or require_full_profile:
         print(str(crit_remove) + " cells were removed due to missing data at stimulus delivery")
 
     return temporal_profiles, good_profiles
@@ -380,8 +389,6 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
             #plt.waitforbuttonpress()
 
         plt.show(block=True)
-
-
 
     return temporal_profiles
 
