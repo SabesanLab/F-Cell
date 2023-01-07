@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
                 # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none")
 
-                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
+                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data[perm, :], seg_radius=2,
                                                  display=False, sigma=1)
