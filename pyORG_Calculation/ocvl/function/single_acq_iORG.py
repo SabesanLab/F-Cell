@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.interpolate import barycentric_interpolate, splev, make_lsq_spline
 from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy import stats
 from skimage.feature import peak_local_max
 from ssqueezepy.experimental import scale_to_freq
 
@@ -307,6 +308,11 @@ if __name__ == "__main__":
         indiv_fad = np.squeeze(indiv_fad[enough_data, :])
         prestim_mean = np.squeeze(prestim_mean[enough_data, :])
 
+        # Log transform the data... or don't.
+        cell_power_fad = np.log(cell_power_fad)
+        indiv_fad = np.log(indiv_fad)
+
+
         plt.figure(69)
         #plt.plot(indiv_fad[c, :], np.abs(1 - prestim_mean[c, :]), "*")
         twodee_histbins = np.arange(start=0, stop=255, step=10.2)
@@ -316,48 +322,46 @@ if __name__ == "__main__":
         histbins = np.arange(start=0.9, stop=2.0, step=0.025)
 
         plt.figure(11)
-        plt.hist(np.log10(cell_power_fad), 50)
+        plt.hist(cell_power_fad, 50)
         plt.title("RMS power FAD")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_power_amp.png"))
 
-        # plt.figure(11)
-        # plt.hist(np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1), 50)
-        # plt.title("25th percentile of each cell's responses")
-        # plt.show(block=False)
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_25pct.png"))
-        #
-        # plt.figure(12)
-        # plt.hist(np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1), 50)
-        # plt.title("75th percentile of each cell's responses")
-        # plt.show(block=False)
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_75pct.png"))
-
         plt.figure(13)
-        plt.hist(np.nanmean(np.log10(indiv_fad), axis=-1), 50)
-        plt.title("Median absolute deviation")
+        plt.hist(np.nanmean(indiv_fad, axis=-1), 50)
+        plt.title("Mean absolute deviation")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
         plt.figure(14)
-        plt.plot(np.nanmean(np.log10(indiv_fad), axis=-1),
-                 #np.nanquantile(np.log10(indiv_fad), 0.75, axis=-1) - np.nanquantile(np.log10(indiv_fad), 0.25, axis=-1),
-                 np.nanstd(np.log10(indiv_fad), axis=-1),
+        plt.plot(np.nanmean(indiv_fad, axis=-1),
+                 np.nanstd(indiv_fad, axis=-1),
                  'k.')
-        plt.title("MAD vs percentile width")
+        plt.title("MAD vs std dev")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
 
-        pvar, pmean = pooled_variance(np.log10(indiv_fad))
-        print("Coefficient of Variation: " + str(10**np.sqrt(pvar)))
-        print("Coefficient of Variation: % " + str(100 * (10**np.sqrt(pvar)-1)))
+        pvar, pmean = pooled_variance(indiv_fad)
 
-              #2.77 * np.sqrt(pvar) /  pmean)
+        pstddev = np.sqrt(pvar)
+        antilog_stddev = np.exp(pstddev)
+        antilog_2stddev = np.exp(2*pstddev) # Or antilog_stddev ** 2
+        print("Geometric Coefficient of Variation: " + str(antilog_stddev-1))
+        print("Geometric Coefficient of Variation: %" + str(100 * np.sqrt(np.exp(pvar)-1)) )
+
+        plusminus_ninetyfive =  np.sqrt(pvar)*2
+        print( plusminus_ninetyfive )
 
 
+        fadsplit = []
+        for j in range(indiv_fad.shape[1]):
+            if np.any(np.isfinite(indiv_fad[:, j])):
+                fadsplit.append( (indiv_fad[np.isfinite(indiv_fad[:, j]), j]+1) )
 
-        outdata = pd.DataFrame(np.hstack((np.zeros_like(cell_power_fad[:,np.newaxis]), np.log10(cell_power_fad[:,np.newaxis]), np.log10(indiv_fad))))
-        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"))
+        print(stats.anderson_ksamp(fadsplit))
+
+        outdata = pd.DataFrame(indiv_fad)
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"), index=False)
 
         plt.waitforbuttonpress()
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])

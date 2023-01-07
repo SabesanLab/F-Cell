@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
                     first = False
 
-                #dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
                 full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none"))
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="median")
@@ -170,7 +170,8 @@ if __name__ == "__main__":
                                                                            stimulus_train[1] + int(0.2 * framerate)),
                                                  critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data,
+                                                       rescaled=True)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
@@ -230,7 +231,7 @@ if __name__ == "__main__":
                 prestim_amp = np.NaN
 
             else:
-                poststim_amp = np.quantile(poststim, [0.95])
+                poststim_amp = np.nanquantile(poststim, [0.95])
                 prestim_amp = np.nanmedian(prestim)
             
 
@@ -277,7 +278,7 @@ if __name__ == "__main__":
 
         plt.figure(40) # log hist
         histbins_log = np.arange(start=-3, stop=1, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
-        log_amp[:, 0] = np.log10(simple_amp[:, 0])
+        log_amp[:, 0] = np.log(simple_amp[:, 0])
         plt.hist(log_amp, bins=histbins_log)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
@@ -340,33 +341,22 @@ if __name__ == "__main__":
 
         # output cell_power_iORG to csv (optional)
         if outputcsv:
-            import csv
 
             csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG_" + now_timestamp + ".csv")
-            print(csv_dir)
-            f = open(csv_dir, 'w', newline="")
-            writer = csv.writer(f, delimiter=',')
-            writer.writerows(cell_power_iORG)
-            f.close
-
+            outdata = pd.DataFrame(cell_power_iORG)
+            outdata.to_csv(csv_dir, index=False)
 
             amp_dir = res_dir.joinpath(this_dirname + "_cell_amplitude_" + now_timestamp + ".csv")
-            f2 = open(amp_dir, 'w', newline="")
-            writer2 = csv.writer(f2, delimiter=',')
-            writer2.writerows(simple_amp)
-            f2.close
+            outdata = pd.DataFrame(simple_amp)
+            outdata.to_csv(amp_dir, index=False)
 
             log_amp_dir = res_dir.joinpath(this_dirname + "log10_cell_amplitude_" + now_timestamp + ".csv")
-            f3 = open(log_amp_dir, 'w', newline="")
-            writer3 = csv.writer(f3, delimiter=',')
-            writer3.writerows(log_amp)
-            f3.close
+            outdata = pd.DataFrame(log_amp)
+            outdata.to_csv(log_amp_dir, index=False)
 
             log_amp_dir_p1 = res_dir.joinpath(this_dirname + "log10_cell_amplitude_plus1" + now_timestamp + ".csv")
-            f4 = open(log_amp_dir_p1, 'w', newline="")
-            writer4 = csv.writer(f4, delimiter=',')
-            writer4.writerows(amp_plus1_log)
-            f4.close
+            outdata = pd.DataFrame(amp_plus1_log)
+            outdata.to_csv(log_amp_dir_p1, index=False)
 
         print("Done!")
         print(stimulus_train)
