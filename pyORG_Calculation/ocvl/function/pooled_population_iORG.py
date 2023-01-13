@@ -11,10 +11,12 @@ from matplotlib import pyplot as plt
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
+from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+from datetime import datetime, date, time, timezone
 
 if __name__ == "__main__":
     root = Tk()
@@ -127,12 +129,12 @@ if __name__ == "__main__":
                 dataset.load_pipelined_data()
 
                 if first:
-                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data, search_radius=1)
+                    reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data)
                     full_profiles = []
                     first = False
 
-                #dataset.coord_data = reference_coord_data
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data, search_radius=3)
+                dataset.coord_data = reference_coord_data
+                #dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data, search_radius=3)
                 
                 if maxnum_cells is not None:
                     perm = np.random.permutation(len(dataset.coord_data))
@@ -141,14 +143,14 @@ if __name__ == "__main__":
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+
                 # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none")
 
-                # for c in range(len(dataset.coord_data)):
-                #      save_tiff_stack(
-                #          res_dir.joinpath(file.name[0:-4] + "cell(" + str(dataset.coord_data[c][0]) + "," +
-                #                           str(dataset.coord_data[c][1]) + ".tif"), full_profiles[:, :, :, c])
+                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1, display=False)
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data[perm, :], seg_radius=2,
+                                                 display=False, sigma=1)
 
                 temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
                                                               critical_region=np.arange(
@@ -156,8 +158,7 @@ if __name__ == "__main__":
                                                                   dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
                                                               critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
-                stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
+                stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
 
 
@@ -212,12 +213,16 @@ if __name__ == "__main__":
                 if dataset.framestamps[-1] > max_frmstamp:
                     max_frmstamp = dataset.framestamps[-1]
 
+        dt = datetime.now()
+        now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
+
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
         plt.ylim([0, 1.5])
         #plt.legend()
-        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.svg"))
-        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG.png") )
+
+        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
+        plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".png"))
 
 
         # Grab all of the
@@ -262,13 +267,13 @@ if __name__ == "__main__":
 
         pop_dFrame = pd.DataFrame(np.concatenate((all_iORG,
                                                   np.reshape(pooled_iORG, (1, len(pooled_iORG)))), axis=0))
-        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG.csv"), header=False)
+        pop_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".csv"), header=False)
 
         pop_amp_dFrame = pd.DataFrame( np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
                                                        np.array(pop_iORG_implicit, ndmin=2).transpose(),
                                                        np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
                                        columns=["Amplitude", "Implicit time", "Recovery %"] )
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats.csv"))
+        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
 
         plt.figure(1)
         plt.clf()
@@ -279,7 +284,7 @@ if __name__ == "__main__":
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
 
