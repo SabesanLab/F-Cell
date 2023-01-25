@@ -17,7 +17,7 @@ from ssqueezepy.experimental import scale_to_freq
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG, extract_texture_profiles, \
-    filtered_absolute_difference, pooled_variance
+    iORG_signal_metrics, pooled_variance
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
@@ -260,8 +260,12 @@ if __name__ == "__main__":
             for i, profile in enumerate(mean_cell_profiles[c]):
                 all_cell_mean_iORG[i, cell_framestamps[c][i], c] = profile
 
-                prestimulus_idx = np.where(cell_framestamps[c][i] <= stimulus_train[0], True, False)
-                prestim_mean[c, i] = np.nanmean( profile[prestimulus_idx] )
+                prestim_ind = np.logical_and(full_framestamp_range < stimulus_train[0],
+                                             full_framestamp_range >= (stimulus_train[0] - int(1 * framerate)))
+                poststim_ind = np.logical_and(full_framestamp_range >= stimulus_train[1],
+                                              full_framestamp_range < (stimulus_train[1] + int(1 * framerate)))
+
+                prestim_mean[c, i] = np.nanmean( profile[prestim_ind] )
                 #all_cell_texture_iORG[i, cell_framestamps[c][i], c] = texture_cell_profiles[c][i]
                 #all_full_cell_iORG[i, :, :, og_framestamps[c][i], c] = full_cell_profiles[c][i].reshape(all_full_cell_iORG[i, :, :, og_framestamps[c][i], c].shape, order="F")
 
@@ -271,8 +275,9 @@ if __name__ == "__main__":
             #
 
             # What about a temporal histogram?
-            indiv_fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                           filter_type="MS1", notch_filter=None, display=False)
+            indiv_fad[c, :] = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
+                                                  filter_type="MS1", notch_filter=None, display=False,
+                                                  prestim_idx=prestim_ind, poststim_idx=poststim_ind)
             indiv_fad[indiv_fad == 0] = np.nan
 
 
@@ -295,9 +300,9 @@ if __name__ == "__main__":
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
-            cell_power_fad[c] = filtered_absolute_difference(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
-                                                          full_framestamp_range,
-                                                          filter_type="MS1", notch_filter=None, display=True)
+            cell_power_fad[c] = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
+                                                    full_framestamp_range,
+                                                    filter_type="MS1", notch_filter=None, display=True)
 
         cell_power_fad[cell_power_fad == 0] = np.nan
 

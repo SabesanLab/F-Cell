@@ -149,8 +149,7 @@ if __name__ == "__main__":
                     ref_im = dataset.reference_im
                     full_profiles = []
 
-                    #reference_coord_data = refine_coord(ref_im, dataset.coord_data)
-
+                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])

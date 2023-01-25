@@ -397,8 +397,8 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, notch_filter=None,
-                                 display=False):
+def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=7, notch_filter=None,
+                        display=False, prestim_idx=None, poststim_idx=None):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
 
@@ -408,7 +408,7 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     if np.all(~finite_data):
         return np.full((temporal_profiles.shape[0]), np.nan)
 
-
+    # First we filter the data with a notch filter (to possibly remove artifacts from breathing or other things.
     if notch_filter is not None:
         sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
         butter_filtered_profiles = np.full_like(temporal_profiles, np.nan)
@@ -418,6 +418,8 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
     else:
         butter_filtered_profiles = temporal_profiles
 
+    # Then we filter the data to remove noise; each of these were tested and worked reasonably well, though MS1 is used
+    # currently.
     if filter_type == "savgol":
         filtered_profiles = savgol_filter(butter_filtered_profiles, window_length=fwhm_size, polyorder=4, mode="mirror",
                                           axis=1)
@@ -478,8 +480,10 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
         for i in range(temporal_profiles.shape[0]):
             filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
                                                                  trunc_sinc, mode="reflect")
-    # elif filter_type == "splinefit":
+    elif filter_type == "none" or filter_type is None:
+        filtered_profiles = butter_filtered_profiles
 
+    # Finally fit a basic spline to the data to extract info like the fad, amplitude, intrinsic time, etc.
     spline_filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
     for i in range(temporal_profiles.shape[0]):
         if np.any(finite_data[i, :]):
@@ -520,6 +524,15 @@ def filtered_absolute_difference(temporal_profiles, framestamps, filter_type="sa
             # plt.waitforbuttonpress()
 
         plt.waitforbuttonpress()
+
+    prestim = spline_filtered_profiles[:, prestim_idx]
+    poststim = spline_filtered_profiles[:, poststim_idx]
+
+    prestim_val = np.nanmedian(prestim, axis=0)
+    poststim_val = np.nanquantile(poststim, [0.95])
+    amplitude = poststim_val - prestim_val
+    whereabove = np.argwhere(poststim > poststim_val)
+    intrinsic_time = (whereabove[0] + (poststim_idx[0]-prestim_idx[-1]))
 
     return fad
 
