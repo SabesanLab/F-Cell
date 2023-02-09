@@ -558,7 +558,7 @@ def pooled_variance(data, axis=1):
     datamean = np.nanmean(data[goodrow, :], axis=axis)
     datavar = np.nanvar(data[goodrow, :], axis=axis)
 
-    datacount = np.nansum(finers[goodrow, :], axis=axis)
+    datacount = np.nansum(finers[goodrow, :], axis=axis) - 1 # -1 is Bessels correction
 
     return np.sum(datavar*datacount) / np.sum(datacount), np.sum(datamean*datacount) / np.sum(datacount)
 
