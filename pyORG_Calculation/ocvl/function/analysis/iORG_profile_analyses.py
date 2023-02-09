@@ -483,7 +483,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
     elif filter_type == "none" or filter_type is None:
         filtered_profiles = butter_filtered_profiles
 
-    # Finally fit a basic spline to the data to extract info like the fad, amplitude, intrinsic time, etc.
+    # Finally fit a basic spline to the data to extract info like the postfad, amplitude, intrinsic time, etc.
     spline_filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
     for i in range(temporal_profiles.shape[0]):
         if np.any(finite_data[i, :]):
@@ -493,13 +493,17 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
 
     filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
-    abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, 50:80]), axis=1)
 
-    abs_diff_profiles[abs_diff_profiles == 0] = np.nan
-    fad = np.amax(abs_diff_profiles, axis=1)
+    pre_abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, prestim_idx]), axis=1)
+    post_abs_diff_profiles = np.nancumsum(np.abs(filter_grad_profiles[:, poststim_idx]), axis=1)
 
-    # if np.nanvar(np.log10(fad)) >= 0.035 and np.sum(np.isfinite(fad)) > 3:
-    if display and np.sum(np.isfinite(fad)) > 2: # and np.nanmean(np.log10(fad+1)) <= 1.2:
+    pre_abs_diff_profiles[pre_abs_diff_profiles == 0] = np.nan
+    post_abs_diff_profiles[post_abs_diff_profiles == 0] = np.nan
+    prefad = np.amax(pre_abs_diff_profiles, axis=1)
+    postfad = np.amax(post_abs_diff_profiles, axis=1)
+
+    # if np.nanvar(np.log10(postfad)) >= 0.035 and np.sum(np.isfinite(postfad)) > 3:
+    if display and np.sum(np.isfinite(postfad)) > 2: # and np.nanmean(np.log10(postfad+1)) <= 1.2:
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):
@@ -507,34 +511,43 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             plt.subplot(2, 2, 1)
             plt.title("Raw data")
             plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.vlines(framestamps[poststim_idx[0]], ymin=-155, ymax=155)
             #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
             # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
             plt.subplot(2, 2, 2)
             plt.title("Butter Filtered data")
             plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.vlines(framestamps[poststim_idx[0]], ymin=-155, ymax=155)
             plt.subplot(2, 2, 3)
             plt.title("Filtered data")
             plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.vlines(framestamps[poststim_idx[0]], ymin=-155, ymax=155)
             # plt.title("Power spectrum of filtered signal")
             # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
             plt.subplot(2, 2, 4)
             plt.title("AUC")
-            plt.plot(framestamps[50:80], abs_diff_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.plot(framestamps[poststim_idx].flatten(), post_abs_diff_profiles[i, :].flatten(), color=mapper.to_rgba(i, norm=False))
+            plt.plot(framestamps[poststim_idx].flatten(), pre_abs_diff_profiles[i, :].flatten(),
+                     color=mapper.to_rgba(0, norm=False))
             # plt.waitforbuttonpress()
 
         plt.waitforbuttonpress()
 
     prestim = spline_filtered_profiles[:, prestim_idx]
-    poststim = spline_filtered_profiles[:, poststim_idx]
+    poststim = np.abs(spline_filtered_profiles[:, poststim_idx])
 
-    prestim_val = np.nanmedian(prestim, axis=0)
-    poststim_val = np.nanquantile(poststim, [0.95])
-    amplitude = poststim_val - prestim_val
-    whereabove = np.argwhere(poststim > poststim_val)
-    intrinsic_time = (whereabove[0] + (poststim_idx[0]-prestim_idx[-1]))
+    prestim_val = np.nanmedian(prestim, axis=1)
+    poststim_val = np.nanquantile(poststim, [0.95], axis=1).flatten()
+    amplitude = np.abs(poststim_val - prestim_val)
 
-    return fad
+    intrinsic_time = np.full_like(amplitude, np.nan)
+    for i in range(temporal_profiles.shape[0]):
+        whereabove = np.flatnonzero(poststim[i, :] > poststim_val[i])
+        if np.any(whereabove) and np.any(np.isfinite(whereabove)):
+            intrinsic_time[i] = (whereabove[0] + (poststim_idx[0]-prestim_idx[-1]))
+
+    return postfad
 
 
 def pooled_variance(data, axis=1):
