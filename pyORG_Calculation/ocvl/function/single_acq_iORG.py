@@ -90,15 +90,16 @@ if __name__ == "__main__":
         if "piped" in path.name:
             splitfName = path.name.split("_")
 
-            if path.parent not in allFiles and (path.parent.parent == searchpath or path.parent == searchpath):
-                allFiles[path.parent] = []
-                allFiles[path.parent].append(path)
+            if (path.parent.parent == searchpath or path.parent == searchpath):
+                if path.parent not in allFiles:
+                    allFiles[path.parent] = []
+                    allFiles[path.parent].append(path)
 
-                if "control" in path.parent.name:
-                    print("DETECTED CONTROL DATA AT: " + str(path.parent))
-                    controlpath = path.parent
-            else:
-                allFiles[path.parent].append(path)
+                    if "control" in path.parent.name:
+                        print("DETECTED CONTROL DATA AT: " + str(path.parent))
+                        controlpath = path.parent
+                else:
+                    allFiles[path.parent].append(path)
 
             totFiles += 1
 
@@ -115,10 +116,7 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
-    first = True
     outputcsv = True
-
-    segmentation_radius = None # If set to None, then try and autodetect from the data.
 
     # Before we start, get an estimate of the "noise" from the control signals.
     sig_threshold_im = None
@@ -134,6 +132,8 @@ if __name__ == "__main__":
          #   continue
 
         first = True
+        segmentation_radius = None  # If set to None, then try and autodetect from the data.
+
         res_dir = loc.joinpath(
             "Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
         res_dir.mkdir(exist_ok=True)  # actually makes the directory if it doesn't exist. if it exists it does nothing.
@@ -184,6 +184,7 @@ if __name__ == "__main__":
 
                     if not segmentation_radius:
                         segmentation_radius = np.round(np.nanmean(mindist) / 4) if np.round(np.nanmean(mindist) / 4) >= 1 else 1
+
                         segmentation_radius = int(segmentation_radius)
                         print("Detected segmentation radius: " + str(segmentation_radius))
 
@@ -207,7 +208,7 @@ if __name__ == "__main__":
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
-                                                 summary="mean")
+                                                 seg_mask="disk", summary="mean")
 
                 temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps, stimulus_stamp=stimulus_train[0], method="mean_sub")
 
@@ -277,16 +278,15 @@ if __name__ == "__main__":
                 prestim_mean[c, i] = np.nanmean( all_cell_mean_iORG[i, prestim_ind, c] )
 
             # What about a temporal histogram?
-            indiv_fad[c, :] = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
+            indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                   filter_type="MS1", notch_filter=None, display=False,
                                                   prestim_idx=prestim_ind, poststim_idx=poststim_ind)
             indiv_fad[indiv_fad == 0] = np.nan
 
-
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
-            cell_power_fad[c] = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
+            cell_power_fad[c], _, _ = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
                                                     full_framestamp_range,
                                                     filter_type="MS1", notch_filter=None, display=False,
                                                     prestim_idx=prestim_ind, poststim_idx=poststim_ind)
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         print("Geometric Coefficient of Variation: " + str(antilog_stddev-1))
         print("Geometric Coefficient of Variation: %" + str(100 * np.sqrt(np.exp(pvar)-1)) )
 
-        monte = True
+        monte = False
 
         # Monte carlo section- attempting to determine point at which there isn't much of a change between the value as
         # a function of randomly included numbers.
@@ -394,17 +394,17 @@ if __name__ == "__main__":
         print( plusminus_ninetyfive )
 
 
-        fadsplit = []
-        for j in range(indiv_fad.shape[1]):
-            if np.any(np.isfinite(indiv_fad[:, j])):
-                fadsplit.append( (indiv_fad[np.isfinite(indiv_fad[:, j]), j]+1) )
+        # fadsplit = []
+        # for j in range(indiv_fad.shape[1]):
+        #     if np.any(np.isfinite(indiv_fad[:, j])):
+        #         fadsplit.append( (indiv_fad[np.isfinite(indiv_fad[:, j]), j]+1) )
 
-        print(stats.anderson_ksamp(fadsplit))
+        # print(stats.anderson_ksamp(fadsplit))
 
         outdata = pd.DataFrame(indiv_fad)
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"), index=False)
 
-        plt.waitforbuttonpress()
+        # plt.waitforbuttonpress()
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 

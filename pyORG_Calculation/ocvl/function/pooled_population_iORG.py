@@ -1,4 +1,5 @@
 import os
+from multiprocessing import Pool
 from os import walk
 from os.path import splitext
 from pathlib import Path
@@ -10,13 +11,33 @@ from matplotlib import pyplot as plt
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
-from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
+from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, iORG_signal_metrics
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
 from datetime import datetime, date, time, timezone
+
+def pop_iORG(dataset):
+    temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1,
+                                     display=False, sigma=1)
+
+    temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
+                                                  critical_region=np.arange(
+                                                      dataset.stimtrain_frame_stamps[0] - int(0.1 * dataset.framerate),
+                                                      dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
+                                                  critical_fraction=0.4)
+
+    stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
+                                           dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
+
+    tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms")
+
+    _, amplitude, intrinsic_time = iORG_signal_metrics(tmp_iorg, dataset.framestamps,
+                                                       filter_type="MS1", display=False,
+                                                       prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+
 
 if __name__ == "__main__":
     root = Tk()
@@ -134,49 +155,69 @@ if __name__ == "__main__":
                     first = False
 
                 dataset.coord_data = reference_coord_data
-                #dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data, search_radius=3)
                 
+                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+
+                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+
                 if maxnum_cells is not None:
-                    perm = np.random.permutation(len(dataset.coord_data))
-                    perm = perm[0:maxnum_cells]
+                    numiter=10000
+                    #perm = np.random.permutation(len(dataset.coord_data))
+                    #perm = perm[0:maxnum_cells]
+
+                    # iORG_res = np.full((indiv_fad.shape[0], max_num_avg, numiter), np.nan)
+                    #
+                    # with Pool(processes=6) as pool:
+                    #     thread_res = []
+                    #     for i in range(numiter):
+                    #         # print("Submitting iteration: " + str(i))
+                    #         thread_res.append(pool.apply_async(pop_iORG, args=(dataset,)))
+                    #
+                    #     for i in range(numiter):
+                    #         # print("Recieving iteration: "+str(i))
+                    #         log_fad_avg[:, :, i] = thread_res[i].get()
+
+
                 else:
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
-
-                # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none")
-
-                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
-
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data[perm, :], seg_radius=2,
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2,
                                                  display=False, sigma=1)
 
-                temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
-                                                              critical_region=np.arange(
+                temp_profiles, valid_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
+                                                                 critical_region=np.arange(
                                                                   dataset.stimtrain_frame_stamps[0] - int(0.1 * dataset.framerate),
                                                                   dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
-                                                              critical_fraction=0.4)
+                                                                 critical_fraction=0.4)
+
+                if np.sum(~valid_profiles) == len(perm):
+                    pop_iORG_amp[r] = np.NaN
+                    pop_iORG_implicit[r] = np.NaN
+                    pop_iORG_recover[r] = np.NaN
+                    print(file.name + " was dropped due to all cells being excluded.")
 
                 stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
 
-
-                # indiv_resp = pd.DataFrame(np.concatenate((np.reshape(dataset.framestamps/dataset.framerate, (1, len(dataset.framestamps))),
-                #                                          stdize_profiles), axis=0))
-                # indiv_resp.to_csv(res_dir.joinpath(file.name + "_cell_profiles.csv"), header=False, index=False)
-
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
 
-                prestim_ind = np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
+                prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
                                              dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
-                                                 1 * dataset.framerate)))
-                poststim_ind = np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
+                                                 1 * dataset.framerate))))
+                poststim_ind = np.flatnonzero(np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
                                               dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(
-                                                  0.75 * dataset.framerate)))
+                                                  1 * dataset.framerate))))
                 poststim_loc = dataset.framestamps[poststim_ind]
                 prestim_amp = np.nanmedian(tmp_iorg[prestim_ind])
                 poststim = tmp_iorg[poststim_ind]
+
+                _, amplitude, implicit_time = iORG_signal_metrics(tmp_iorg[None, :], dataset.framestamps,
+                                                                  filter_type="MS", display=True,
+                                                                  prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+
+                print("Signal metrics based iORG Amplitude: " + str(amplitude[0]) +
+                      " Implicit time (ms): " + str(1000*implicit_time[0] / dataset.framerate))
 
                 if poststim.size == 0:
                     poststim_amp = np.NaN

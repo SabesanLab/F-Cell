@@ -406,7 +406,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
     finite_data = np.isfinite(temporal_profiles)
 
     if np.all(~finite_data):
-        return np.full((temporal_profiles.shape[0]), np.nan)
+        return np.full((temporal_profiles.shape[0]), np.nan), np.full((temporal_profiles.shape[0]), np.nan), np.full((temporal_profiles.shape[0]), np.nan)
 
     # First we filter the data with a notch filter (to possibly remove artifacts from breathing or other things.
     if notch_filter is not None:
@@ -451,7 +451,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
         for i in range(temporal_profiles.shape[0]):
             filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
-                                                                 trunc_sinc, mode="reflect", axis=1)
+                                                                 trunc_sinc, mode="reflect")
 
     elif filter_type == "MS1":
         # Formulas from Schmid et al- these are MS1 filters.
@@ -484,13 +484,13 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         filtered_profiles = butter_filtered_profiles
 
     # Finally fit a basic spline to the data to extract info like the postfad, amplitude, intrinsic time, etc.
-    spline_filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
-    for i in range(temporal_profiles.shape[0]):
-        if np.any(finite_data[i, :]):
-            maxval = 2*np.sqrt(np.nanmean(np.nanvar(temporal_profiles-filtered_profiles, axis=1),axis=0)) #np.nanmax(filtered_profiles[:, finite_data[i, :]]) # was 40 before...
-            spfit = UnivariateSpline(framestamps[finite_data[i, :]], filtered_profiles[i, finite_data[i, :]]/maxval)
-            spfit.set_smoothing_factor(0.5)
-            spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
+    # spline_filtered_profiles = np.full_like(butter_filtered_profiles, np.nan)
+    # for i in range(temporal_profiles.shape[0]):
+    #     if np.any(finite_data[i, :]):
+    #         maxval = 2*np.sqrt(np.nanmean(np.nanvar(temporal_profiles-filtered_profiles, axis=1),axis=0)) #np.nanmax(filtered_profiles[:, finite_data[i, :]]) # was 40 before...
+    #         spfit = UnivariateSpline(framestamps[finite_data[i, :]], filtered_profiles[i, finite_data[i, :]]/maxval)
+    #         spfit.set_smoothing_factor(0.5)
+    #         spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
 
     filter_grad_profiles = np.gradient(filtered_profiles, axis=1)
 
@@ -502,8 +502,21 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
     prefad = np.amax(pre_abs_diff_profiles, axis=1)
     postfad = np.amax(post_abs_diff_profiles, axis=1)
 
-    # if np.nanvar(np.log10(postfad)) >= 0.035 and np.sum(np.isfinite(postfad)) > 3:
-    if display and np.sum(np.isfinite(postfad)) > 2: # and np.nanmean(np.log10(postfad+1)) <= 1.2:
+    prestim = filter_grad_profiles[:, prestim_idx]
+    poststim = np.abs(filter_grad_profiles[:, poststim_idx])
+
+    prestim_val = np.nanmedian(prestim, axis=1)
+    poststim_val = np.nanquantile(poststim, [0.95], axis=1).flatten()
+    amplitude = np.abs(poststim_val - prestim_val)
+
+    implicit_time = np.full_like(amplitude, np.nan)
+    for i in range(temporal_profiles.shape[0]):
+        whereabove = np.flatnonzero(poststim[i, :] > poststim_val[i])
+
+        if np.any(whereabove) and np.any(np.isfinite(whereabove)):
+            implicit_time[i] = whereabove[0] + poststim_idx[0]-prestim_idx[-1]
+
+    if display: # and np.nanmean(np.log10(postfad+1)) <= 1.2:
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):
@@ -511,43 +524,27 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             plt.subplot(2, 2, 1)
             plt.title("Raw data")
             plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.vlines(framestamps[poststim_idx[0]], ymin=-155, ymax=155)
-            #plt.plot(framestamps, filtered_profiles[i, :], 'k', linewidth=2)
-            # plt.plot(framestamps, filtered_profiles_fir[i, :], "g", linewidth=2)
+            plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
             plt.subplot(2, 2, 2)
-            plt.title("Butter Filtered data")
+            plt.title("Notch Filtered data")
             plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.vlines(framestamps[poststim_idx[0]], ymin=-155, ymax=155)
+            plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
             plt.subplot(2, 2, 3)
             plt.title("Filtered data")
             plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.vlines(framestamps[poststim_idx[0]], ymin=-155, ymax=155)
-            # plt.title("Power spectrum of filtered signal")
-            # plt.plot( np.abs(fftshift(fft(filter_grad_profiles[i, :])))**2 )
+            # plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
+            plt.hlines(np.array((prestim_val, poststim_val)), 0, framestamps[whereabove[0]+poststim_idx[0]])
             plt.subplot(2, 2, 4)
             plt.title("AUC")
             plt.plot(framestamps[poststim_idx].flatten(), post_abs_diff_profiles[i, :].flatten(), color=mapper.to_rgba(i, norm=False))
-            plt.plot(framestamps[poststim_idx].flatten(), pre_abs_diff_profiles[i, :].flatten(),
+            plt.plot(framestamps[prestim_idx].flatten(), pre_abs_diff_profiles[i, :].flatten(),
                      color=mapper.to_rgba(0, norm=False))
             # plt.waitforbuttonpress()
 
         plt.waitforbuttonpress()
 
-    prestim = spline_filtered_profiles[:, prestim_idx]
-    poststim = np.abs(spline_filtered_profiles[:, poststim_idx])
-
-    prestim_val = np.nanmedian(prestim, axis=1)
-    poststim_val = np.nanquantile(poststim, [0.95], axis=1).flatten()
-    amplitude = np.abs(poststim_val - prestim_val)
-
-    intrinsic_time = np.full_like(amplitude, np.nan)
-    for i in range(temporal_profiles.shape[0]):
-        whereabove = np.flatnonzero(poststim[i, :] > poststim_val[i])
-        if np.any(whereabove) and np.any(np.isfinite(whereabove)):
-            intrinsic_time[i] = (whereabove[0] + (poststim_idx[0]-prestim_idx[-1]))
-
-    return postfad
+    return postfad, amplitude, implicit_time
 
 
 def pooled_variance(data, axis=1):
