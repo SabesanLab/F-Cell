@@ -5,6 +5,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numpy.polynomial import Polynomial
 
+from skimage.morphology import disk
+from skimage.morphology.footprints import ellipse, octagon
+
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
@@ -104,7 +107,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
     :param image_stack: a YxXxZ numpy matrix, where there are Y rows, X columns, and Z samples.
     :param coordinates: input as X/Y, these mark locations the locations that will be extracted from all S samples.
-    :param seg_mask: the mask shape that will be used to extract temporal profiles.
+    :param seg_mask: the mask shape that will be used to extract temporal profiles. Can be "box" or "disk".
     :param seg_radius: the radius of the mask shape that will be used.
     :param summary: the method used to summarize the area inside the segmentation radius. Default: "mean",
                     Options: "mean", "median"
@@ -157,6 +160,39 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                 fullcolumn = im_stack[(coord[1] - seg_radius):(coord[1] + seg_radius + 1),
                                       (coord[0] - seg_radius):(coord[0] + seg_radius + 1), :]
 
+                coldims = fullcolumn.shape
+                coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
+                #print(coord)
+                # No partial columns allowed. If there are nans in the column, wipe it out entirely.
+                nani = np.any(np.isnan(coordcolumn), axis=0)
+                coordcolumn[:, nani] = np.nan
+
+                if summary == "mean":
+                    profile_data[i, nani] = np.nan
+                    profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
+                elif summary == "median":
+                    profile_data[i, nani] = np.nan
+                    profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
+                elif summary == "sum":
+                    profile_data[i, nani] = np.nan
+                    profile_data[i, np.invert(nani)] = np.nansum(coordcolumn[:, np.invert(nani)], axis=0)
+                elif summary == "none":
+
+                    profile_data[:, :, nani, i] = 0
+                    profile_data[:, :, np.invert(nani), i] = fullcolumn[:, :, np.invert(nani)]
+
+    elif seg_mask == "disk":
+        for i in range(coordinates.shape[0]):
+            if includelist[i]:
+                coord = coordinates[i, :]
+                fullcolumn = im_stack[(coord[1] - seg_radius):(coord[1] + seg_radius + 1),
+                                      (coord[0] - seg_radius):(coord[0] + seg_radius + 1), :]
+                mask = disk(seg_radius+1, dtype=fullcolumn.dtype)
+                mask = mask[1:-1, 1:-1]
+
+                mask = np.repeat(mask[:, :, None], fullcolumn.shape[-1], axis=2)
+
+                fullcolumn = fullcolumn * mask
                 coldims = fullcolumn.shape
                 coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
                 #print(coord)

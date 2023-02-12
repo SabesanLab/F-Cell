@@ -1,4 +1,5 @@
 import os
+from multiprocessing import Pool
 from os import walk
 from os.path import splitext
 from pathlib import Path
@@ -8,16 +9,18 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
+from numpy import random, cumsum
 from scipy.interpolate import barycentric_interpolate, splev, make_lsq_spline
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy import stats
+from scipy.spatial.distance import pdist, squareform
 from skimage.feature import peak_local_max
 from ssqueezepy.experimental import scale_to_freq
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
 from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wavelet_iORG, extract_texture_profiles, \
-    filtered_absolute_difference, pooled_variance
+    iORG_signal_metrics, pooled_variance
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
@@ -31,6 +34,22 @@ def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
+
+def fast_acq_avg(fad_data):
+    max_num_avg = fad_data.shape[1]
+    fad_avg = np.full((fad_data.shape[0], max_num_avg), np.nan)
+    rng = np.random.default_rng()  # Shuffle our seed.
+    avg_order = rng.permutation(max_num_avg)
+
+    for c in range(fad_data.shape[0]):
+        fad_data[c, :] = fad_data[c, avg_order]  # reshuffle the order of the data.
+
+        valid = np.isfinite(fad_data[c, :])
+        valid_fads = fad_data[c, valid]
+        valid_range = np.arange(1, len(valid_fads) + 1)
+        fad_avg[c, valid_range - 1] = np.cumsum(valid_fads, axis=0)
+        fad_avg[c, valid_range - 1] = (fad_avg[c, valid_range - 1] / valid_range)
+    return fad_avg
 
 
 if __name__ == "__main__":
@@ -71,15 +90,16 @@ if __name__ == "__main__":
         if "piped" in path.name:
             splitfName = path.name.split("_")
 
-            if path.parent not in allFiles:
-                allFiles[path.parent] = []
-                allFiles[path.parent].append(path)
+            if (path.parent.parent == searchpath or path.parent == searchpath):
+                if path.parent not in allFiles:
+                    allFiles[path.parent] = []
+                    allFiles[path.parent].append(path)
 
-                if "control" in path.parent.name:
-                    print("DETECTED CONTROL DATA AT: " + str(path.parent))
-                    controlpath = path.parent
-            else:
-                allFiles[path.parent].append(path)
+                    if "control" in path.parent.name:
+                        print("DETECTED CONTROL DATA AT: " + str(path.parent))
+                        controlpath = path.parent
+                else:
+                    allFiles[path.parent].append(path)
 
             totFiles += 1
 
@@ -96,16 +116,7 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
-    first = True
     outputcsv = True
-
-    og_framestamps = []
-    cell_framestamps = []
-    mean_cell_profiles = []
-    texture_cell_profiles = []
-    full_cell_profiles = []
-
-    segmentation_radius = 3
 
     # Before we start, get an estimate of the "noise" from the control signals.
     sig_threshold_im = None
@@ -121,6 +132,8 @@ if __name__ == "__main__":
          #   continue
 
         first = True
+        segmentation_radius = None  # If set to None, then try and autodetect from the data.
+
         res_dir = loc.joinpath(
             "Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
         res_dir.mkdir(exist_ok=True)  # actually makes the directory if it doesn't exist. if it exists it does nothing.
@@ -151,14 +164,29 @@ if __name__ == "__main__":
 
                 # Initialize the dict for individual cells.
                 if first:
+                    og_framestamps = []
+                    cell_framestamps = []
+                    mean_cell_profiles = []
+                    texture_cell_profiles = []
+                    full_cell_profiles = []
+
                     reference_coord_data = dataset.coord_data
                     framerate = dataset.framerate
                     stimulus_train = dataset.stimtrain_frame_stamps
-                    simple_amp = np.empty((len(allFiles), len(reference_coord_data)))
-                    simple_amp[:] = np.nan
                     ref_im = dataset.reference_im
 
                     reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+
+                    coorddist = pdist(reference_coord_data, "euclidean")
+                    coorddist = squareform(coorddist)
+                    coorddist[coorddist == 0] = np.amax(coorddist.flatten())
+                    mindist = np.amin( coorddist, axis=-1)
+
+                    if not segmentation_radius:
+                        segmentation_radius = np.round(np.nanmean(mindist) / 4) if np.round(np.nanmean(mindist) / 4) >= 1 else 1
+
+                        segmentation_radius = int(segmentation_radius)
+                        print("Detected segmentation radius: " + str(segmentation_radius))
 
                     for c in range(len(dataset.coord_data)):
                         og_framestamps.append([])
@@ -174,13 +202,13 @@ if __name__ == "__main__":
                 dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
                                                                      stimulus_train[1]*2)
 
-                full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius,
+                full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius+1,
                                                  summary="none", sigma=1)
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius-1,
-                                                 summary="mean")
+                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
+                                                 seg_mask="disk", summary="mean")
 
                 temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps, stimulus_stamp=stimulus_train[0], method="mean_sub")
 
@@ -191,33 +219,17 @@ if __name__ == "__main__":
 
                 full_profiles[:, :, :, ~good_profiles] = np.nan
 
-                texture_dict = extract_texture_profiles(full_profiles, ("homogeneity", "energy"), 32,
-                                                        framestamps=dataset.framestamps, display=False)
-
-
-                # stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles, dataset.framestamps, method="lsq_spline",
-                #                                        critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
-                #                                                                  stimulus_train[1] + int(0.1 * framerate)))
-
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
                                                                                        method="L1",
                                                                                        threshold=0.3)
-                homogeneity= texture_dict["homogeneity"]
-                # homogeneity, reconst_framestamps, nummissed = reconstruct_profiles(texture_dict["homogeneity"],
-                #                                                                    dataset.framestamps)
-
-                # reconst_framestamps = dataset.framestamps
-                # stdize_profiles = temp_profiles
-                # homogeneity = texture_dict["homogeneity"]
-
 
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
                     og_framestamps[c].append(dataset.framestamps)
-                    cell_framestamps[c].append(reconst_framestamps)  # HERE IS THE PROBLEM, YO - appends extra things to the same cell, despite not being long enough
+                    cell_framestamps[c].append(reconst_framestamps)
                     mean_cell_profiles[c].append(stdize_profiles[c, :])
-                    texture_cell_profiles[c].append(homogeneity[c, :])
+                    # texture_cell_profiles[c].append(homogeneity[c, :])
                     full_cell_profiles[c].append(full_profiles[:, :, :, c])
 
                 r += 1
@@ -241,12 +253,10 @@ if __name__ == "__main__":
         all_full_cell_iORG = np.full((len(allFiles[loc]), segmentation_radius*2+1, segmentation_radius*2+1,
                                       max_frmstamp + 1, len(reference_coord_data)), np.nan)
 
-        full_framestamp_range = np.arange(max_frmstamp + 1)
+        full_framestamp_range = np.arange(max_frmstamp+1)
         cell_power_iORG = np.full((len(reference_coord_data), max_frmstamp + 1), np.nan)
         cell_power_fad = np.full((len(reference_coord_data)), np.nan)
 
-        cwt_window_start = int(-0.25*framerate)
-        cwt_window_end = int(1*framerate)
         # Make 3D matricies, where:
         # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
         # The second dimension (columns) is time
@@ -256,48 +266,30 @@ if __name__ == "__main__":
         indiv_fad = np.full_like(cell_amp, np.nan)
         prestim_mean = np.full_like(cell_amp, np.nan)
 
+        prestim_ind = np.flatnonzero(np.logical_and(full_framestamp_range < stimulus_train[0],
+                                                    full_framestamp_range >= (stimulus_train[0] - int(1 * framerate))))
+        poststim_ind = np.flatnonzero(np.logical_and(full_framestamp_range >= stimulus_train[0],
+                                                     full_framestamp_range < (stimulus_train[0] + int(1 * framerate))))
+
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
                 all_cell_mean_iORG[i, cell_framestamps[c][i], c] = profile
 
-                prestimulus_idx = np.where(cell_framestamps[c][i] <= stimulus_train[0], True, False)
-                prestim_mean[c, i] = np.nanmean( profile[prestimulus_idx] )
-                #all_cell_texture_iORG[i, cell_framestamps[c][i], c] = texture_cell_profiles[c][i]
-                #all_full_cell_iORG[i, :, :, og_framestamps[c][i], c] = full_cell_profiles[c][i].reshape(all_full_cell_iORG[i, :, :, og_framestamps[c][i], c].shape, order="F")
-
-                # save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
-                #                                   str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
-                #                                   full_cell_profiles[c][i])
-            #
+                prestim_mean[c, i] = np.nanmean( all_cell_mean_iORG[i, prestim_ind, c] )
 
             # What about a temporal histogram?
-            indiv_fad[c, :] = filtered_absolute_difference(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                           filter_type="MS1", notch_filter=None, display=False)
+            indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
+                                                  filter_type="MS1", notch_filter=None, display=False,
+                                                  prestim_idx=prestim_ind, poststim_idx=poststim_ind)
             indiv_fad[indiv_fad == 0] = np.nan
-
-
-
-            # if np.nanstd(np.log10(indiv_fad[c, :]+1)) >= 0.125 and np.sum(np.isfinite(indiv_fad[c, :])) >= 3:
-            #     plt.figure(11)
-            #     plt.clf()
-            #     plt.imshow(ref_im)
-            #     plt.plot(reference_coord_data[c][0], reference_coord_data[c][1], "r*")
-            #     plt.show(block=False)
-            #     for i, profile in enumerate(mean_cell_profiles[c]):
-            #         if np.isfinite(indiv_fad[c, i]):
-            #             save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
-            #                                              str(reference_coord_data[c][1]) + ")_vid_" + str(i) + ".tif"),
-            #                             full_cell_profiles[c][i])
-            #
-            #
-            #     plt.waitforbuttonpress()
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
-            cell_power_fad[c] = filtered_absolute_difference(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
-                                                          full_framestamp_range,
-                                                          filter_type="MS1", notch_filter=None, display=True)
+            cell_power_fad[c], _, _ = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
+                                                    full_framestamp_range,
+                                                    filter_type="MS1", notch_filter=None, display=False,
+                                                    prestim_idx=prestim_ind, poststim_idx=poststim_ind)
 
         cell_power_fad[cell_power_fad == 0] = np.nan
 
@@ -309,15 +301,13 @@ if __name__ == "__main__":
         prestim_mean = np.squeeze(prestim_mean[enough_data, :])
 
         # Log transform the data... or don't.
-        cell_power_fad = np.log(cell_power_fad)
-        indiv_fad = np.log(indiv_fad)
-
+        log_cell_power_fad = np.log(cell_power_fad)
+        log_indiv_fad = np.log(indiv_fad)
 
         plt.figure(69)
         #plt.plot(indiv_fad[c, :], np.abs(1 - prestim_mean[c, :]), "*")
         twodee_histbins = np.arange(start=0, stop=255, step=10.2)
-        plt.hist2d(prestim_mean[np.isfinite(indiv_fad)].flatten(), indiv_fad[np.isfinite(indiv_fad)].flatten(), bins=twodee_histbins)
-
+        plt.hist2d(prestim_mean[np.isfinite(log_indiv_fad)].flatten(), log_indiv_fad[np.isfinite(log_indiv_fad)].flatten(), bins=twodee_histbins)
 
         histbins = np.arange(start=0.9, stop=2.0, step=0.025)
 
@@ -327,21 +317,27 @@ if __name__ == "__main__":
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_power_amp.png"))
 
-        plt.figure(13)
-        plt.hist(np.nanmean(indiv_fad, axis=-1), 50)
-        plt.title("Mean absolute deviation")
+        plt.figure(12)
+        plt.hist((np.nanmean(indiv_fad, axis=-1)), 50)
+        plt.title("Mean absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
 
+        plt.figure(13)
+        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), 50)
+        plt.title("Log Mean absolute deviation: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))) )
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logamp.png"))
+
         plt.figure(14)
-        plt.plot(np.nanmean(indiv_fad, axis=-1),
-                 np.nanstd(indiv_fad, axis=-1),
+        plt.plot(np.nanmean(log_indiv_fad, axis=-1),
+                 np.nanstd(log_indiv_fad, axis=-1),
                  'k.')
         plt.title("MAD vs std dev")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
 
-        pvar, pmean = pooled_variance(indiv_fad)
+        pvar, pmean = pooled_variance(log_indiv_fad)
 
         pstddev = np.sqrt(pvar)
         antilog_stddev = np.exp(pstddev)
@@ -349,21 +345,66 @@ if __name__ == "__main__":
         print("Geometric Coefficient of Variation: " + str(antilog_stddev-1))
         print("Geometric Coefficient of Variation: %" + str(100 * np.sqrt(np.exp(pvar)-1)) )
 
+        monte = False
+
+        # Monte carlo section- attempting to determine point at which there isn't much of a change between the value as
+        # a function of randomly included numbers.
+        if monte:
+
+            numiter = 10000
+            max_num_avg = indiv_fad.shape[1]
+            log_fad_avg = np.full((indiv_fad.shape[0], max_num_avg, numiter), np.nan)
+
+            with Pool(processes=10) as pool:
+                thread_res = []
+                for i in range(numiter):
+                    #print("Submitting iteration: " + str(i))
+                    thread_res.append( pool.apply_async(fast_acq_avg, args=(indiv_fad,)))
+
+                for i in range(numiter):
+                    #print("Recieving iteration: "+str(i))
+                    log_fad_avg[:, :, i] = thread_res[i].get()
+
+            plt.figure()
+            plt.gcf()
+            intra_cell_fad_GCV = np.full((indiv_fad.shape[0], max_num_avg), np.nan)
+            for c in range(indiv_fad.shape[0]):
+                cellreps = np.log(log_fad_avg[c, :, :])
+                cellreps = cellreps[~np.all(np.isnan(cellreps), axis=-1), :] # Remove all nans- we don't have data here.
+
+                intra_cell_fad_GCV[c, 0:cellreps.shape[0] - 1] = np.sqrt( np.exp(np.nanvar(cellreps[0:-1,:], axis=-1))-1)
+                plt.plot( np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1) )
+                # plt.plot( np.nanmean(cellreps, axis=-1)+ 2*np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1), color="black", linewidth=3)
+            plt.draw()
+
+            intra_cell_fad_GCV = intra_cell_fad_GCV.transpose().tolist()
+            for j in range(len(intra_cell_fad_GCV)):
+                intra_cell_fad_GCV[j] = np.array(intra_cell_fad_GCV[j])
+                intra_cell_fad_GCV[j] = 100*intra_cell_fad_GCV[j][~np.isnan(intra_cell_fad_GCV[j])]
+
+            plt.figure(16)
+            plt.clf()
+            plt.boxplot(intra_cell_fad_GCV)
+            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_montecarlo_intra_gcv.png"))
+            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_montecarlo_intra_gcv.svg"))
+
+
+
         plusminus_ninetyfive =  np.sqrt(pvar)*2
         print( plusminus_ninetyfive )
 
 
-        fadsplit = []
-        for j in range(indiv_fad.shape[1]):
-            if np.any(np.isfinite(indiv_fad[:, j])):
-                fadsplit.append( (indiv_fad[np.isfinite(indiv_fad[:, j]), j]+1) )
+        # fadsplit = []
+        # for j in range(indiv_fad.shape[1]):
+        #     if np.any(np.isfinite(indiv_fad[:, j])):
+        #         fadsplit.append( (indiv_fad[np.isfinite(indiv_fad[:, j]), j]+1) )
 
-        print(stats.anderson_ksamp(fadsplit))
+        # print(stats.anderson_ksamp(fadsplit))
 
         outdata = pd.DataFrame(indiv_fad)
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"), index=False)
 
-        plt.waitforbuttonpress()
+        # plt.waitforbuttonpress()
         hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
