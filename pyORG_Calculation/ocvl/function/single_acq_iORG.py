@@ -346,7 +346,7 @@ if __name__ == "__main__":
         print("Geometric Coefficient of Variation: " + str(antilog_stddev-1))
         print("Geometric Coefficient of Variation: %" + str(100 * np.sqrt(np.exp(pvar)-1)) )
 
-        monte = False
+        monte = True
 
         # Monte carlo section- attempting to determine point at which there isn't much of a change between the value as
         # a function of randomly included numbers.
@@ -383,6 +383,9 @@ if __name__ == "__main__":
                 intra_cell_fad_GCV[j] = np.array(intra_cell_fad_GCV[j])
                 intra_cell_fad_GCV[j] = 100*intra_cell_fad_GCV[j][~np.isnan(intra_cell_fad_GCV[j])]
 
+            outdata = pd.DataFrame(intra_cell_fad_GCV)
+            outdata.to_csv(res_dir.joinpath(this_dirname + "_intracell_fad_GCV_monte.csv"), index=False)
+
             plt.figure(16)
             plt.clf()
             plt.boxplot(intra_cell_fad_GCV)
@@ -403,7 +406,7 @@ if __name__ == "__main__":
         # print(stats.anderson_ksamp(fadsplit))
 
         outdata = pd.DataFrame(indiv_fad)
-        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"), index=False)
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_FAD.csv"), index=False)
 
         plt.close()
         # plt.waitforbuttonpress()
