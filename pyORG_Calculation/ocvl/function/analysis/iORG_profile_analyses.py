@@ -433,6 +433,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
 
+        x[int(m)] = 1  # This makes that location invalid- But! No more true_divide error from dividing by zero.
         adj_sinc = np.sin( ((n+4)/2)* np.pi*x ) / (((n+4)/2)*np.pi*x)
         adj_sinc[int(m)] = 0
 
@@ -452,6 +453,14 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         for i in range(temporal_profiles.shape[0]):
             filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
                                                                  trunc_sinc, mode="reflect")
+            # The below is my attempt at making an nan-ignoring convolution.
+            # It works, but doesn't look much different than just dropping the nan values and doing the convolution
+            # as usual.
+            # padsize = int(len(trunc_sinc) / 2)
+            # paddedsig = np.pad(butter_filtered_profiles[i, :], padsize, mode="reflect")
+            # for j in range(padsize, temporal_profiles.shape[1]+padsize):
+            #     filtered_profiles[i, j-padsize] = np.nansum(paddedsig[j-padsize:j+padsize+1] * trunc_sinc)
+
 
     elif filter_type == "MS1":
         # Formulas from Schmid et al- these are MS1 filters.
@@ -462,6 +471,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
 
+        x[int(m)] = 1  # This makes that location invalid- But! No more true_divide error from dividing by zero.
         adj_sinc = np.sin( ((n+2)/2)* np.pi*x ) / (((n+2)/2)*np.pi*x)
         adj_sinc[int(m)] = 0
 
@@ -502,8 +512,8 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
     prefad = np.amax(pre_abs_diff_profiles, axis=1)
     postfad = np.amax(post_abs_diff_profiles, axis=1)
 
-    prestim = filter_grad_profiles[:, prestim_idx]
-    poststim = np.abs(filter_grad_profiles[:, poststim_idx])
+    prestim = filtered_profiles[:, prestim_idx]
+    poststim = np.abs(filtered_profiles[:, poststim_idx])
 
     prestim_val = np.nanmedian(prestim, axis=1)
     poststim_val = np.nanquantile(poststim, [0.95], axis=1).flatten()
@@ -534,7 +544,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             # plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
-            plt.hlines(np.array((prestim_val, poststim_val)), 0, framestamps[whereabove[0]+poststim_idx[0]])
+            # plt.hlines(np.array((prestim_val, poststim_val)), 0, framestamps[whereabove[0]+poststim_idx[0]])
             plt.subplot(2, 2, 4)
             plt.title("AUC")
             plt.plot(framestamps[poststim_idx].flatten(), post_abs_diff_profiles[i, :].flatten(), color=mapper.to_rgba(i, norm=False))

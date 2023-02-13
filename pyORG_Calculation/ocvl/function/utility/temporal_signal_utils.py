@@ -67,17 +67,7 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
     """
 
     fullrange = np.arange(framestamps[-1] + 1)
-
-    # framegaps = np.abs(np.diff(framestamps))
-    # biggest_framegap = np.where(framegaps == np.max(framegaps))[0][0]+1
-    #
-    # # Remove the frame gap we can find just for fitting, then add it back in at the end.
-    # clean_frmstamp = np.concatenate( (framestamps[0:(biggest_framegap+1)],
-    #                                   framestamps[(biggest_framegap+1):] - np.max(framegaps)), axis=0)
-    # clean_fullrange = np.arange(clean_frmstamp[-1] + 1)
-
     finers = np.isfinite(temporal_profiles[c, :])
-
     nummissing = ((framestamps[-1] +1) - len(framestamps)) + np.sum(np.invert(finers))
 
     if threshold is None or nummissing/framestamps[-1] <= threshold:
@@ -95,25 +85,65 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
                                      norm="ortho", orthogonalize=True) * sigstd + sigmean
 
         reconstruction[ reconstruction == 0 ] = np.nan
-        # filled_recon = densify_temporal_matrix(reconstruction, framestamps)
-
-        # plt.figure(0)
-        # plt.subplot(2, 1, 1)
-        # plt.plot(framestamps[finers], temporal_profiles[c, finers], "-d")
-        # plt.figure(0)
-        # plt.subplot(2, 1, 2)
-        # plt.plot(fullrange, reconstruction, "-d")
-        # plt.waitforbuttonpress()
 
         return reconstruction, nummissing
     else:
         #print( "Missing " + str(100*(nummissing/framestamps[-1])) + "% of data from this profile. Removing...")
         reconstruction = densify_temporal_matrix(temporal_profiles[c, :], framestamps)
         reconstruction[:] = np.nan
+        nummissing = np.nan
         return reconstruction, nummissing
 
+def MS1_interp(temporal_profiles, framestamps, c, threshold=None, fwhm_size = 7):
 
-def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=0.2, critical_region=None):
+    fullrange = np.arange(framestamps[-1] + 1)
+    finers = np.isfinite(temporal_profiles[c, :])
+    nummissing = ((framestamps[-1] +1) - len(framestamps)) + np.sum(np.invert(finers))
+    reconstruction = np.full((len(fullrange),), np.nan)
+
+    if threshold is None or nummissing/framestamps[-1] <= threshold:
+
+        # Formulas from Schmid et al- these are MS1 filters.
+        alpha = 4
+        n = 4
+        m = np.round(fwhm_size * (0.8874 + 0.3402 * n + 0.129 * np.log(n)) - 1).astype("int")
+        x = np.linspace(-m, m, (2 * m + 1)) / (m + 1)
+        window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
+                 - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
+
+        x[int(m)] = 1 # This makes that location invalid- But! No more true_divide error from dividing by zero.
+        adj_sinc = np.sin( ((n + 2) / 2) * np.pi * x) / (((n + 2) / 2) * np.pi * x)
+        adj_sinc[int(m)] = 0
+
+        if n == 4:
+            j = 0
+            k = 0.02194 + 0.05028 / (0.76562 - m) ** 3
+            correction = np.zeros_like(adj_sinc)
+            for i in range(len(x)):
+                correction[i] = np.sum(k * x[i] * np.sin((j + 1) * np.pi * x[i]))
+            adj_sinc += correction
+
+        trunc_sinc = adj_sinc * window
+        trunc_sinc /= np.sum(trunc_sinc)
+
+        padsize = int(len(trunc_sinc) / 2)
+
+        finers = np.isfinite(temporal_profiles[c, :])
+
+        reconstruction[framestamps] = temporal_profiles[c, :]
+        paddedsig = np.pad(reconstruction, padsize, mode="reflect")
+        for j in range(padsize, len(fullrange) + padsize):
+            reconstruction[j - padsize] = np.nansum(paddedsig[j - padsize:j + padsize + 1] * trunc_sinc)
+
+    else:
+        nummissing = np.nan
+
+    return reconstruction, nummissing
+
+
+
+
+def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=0.2, critical_region=None, ms_fwhm=7):
     """
     This function reconstructs the missing profile data using compressed sensing techniques.
 
@@ -143,6 +173,14 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
             for c, result in enumerate(res):
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
+
+                # plt.figure(66)
+                # plt.clf()
+                # plt.plot(framestamps, temporal_profiles[c, :])
+                # plt.plot(reconstruction[c, :])
+                # plt.waitforbuttonpress()
+
+
 
     elif method == "NUFFT":
         Nufft = NUFFT()
@@ -208,12 +246,26 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
                 # plt.plot(fullrange, reconstruction[c, :])
                 # plt.waitforbuttonpress()
 
+    elif method == "MS1_interp":
 
 
-    # plt.figure(9001)
-    # plt.hist(nummissing, len(fullrange))
-    # plt.show(block=False)
+        with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
-    print(str(100 * np.mean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
+            reconst = pool.starmap_async(MS1_interp, zip(repeat(temporal_profiles), repeat(framestamps),
+                                                         range(temporal_profiles.shape[0]), repeat(threshold),
+                                                         repeat(ms_fwhm)))
+            res = reconst.get()
+            for c, result in enumerate(res):
+                reconstruction[c, :] = np.array(result[0])
+                nummissing[c] = np.array(result[1])
+
+                # plt.figure(66)
+                # plt.clf()
+                # plt.plot(framestamps, temporal_profiles[c, :])
+                # plt.plot(reconstruction[c, :])
+                # plt.waitforbuttonpress()
+
+
+    print(str(100 * np.nanmean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")
 
     return reconstruction, fullrange, nummissing

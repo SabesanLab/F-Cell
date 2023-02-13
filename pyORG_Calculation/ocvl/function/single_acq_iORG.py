@@ -1,7 +1,5 @@
 import os
 from multiprocessing import Pool
-from os import walk
-from os.path import splitext
 from pathlib import Path
 from tkinter import Tk, filedialog, ttk, HORIZONTAL
 
@@ -9,13 +7,9 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
-from numpy import random, cumsum
-from scipy.interpolate import barycentric_interpolate, splev, make_lsq_spline
-from scipy.spatial import Voronoi, voronoi_plot_2d
-from scipy import stats
+from numpy import random
+
 from scipy.spatial.distance import pdist, squareform
-from skimage.feature import peak_local_max
-from ssqueezepy.experimental import scale_to_freq
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
@@ -24,8 +18,6 @@ from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wave
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
-from ocvl.function.utility.pycoordclip import coordclip
-from ocvl.function.utility.resources import save_video, save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix, trim_video
 
 
@@ -221,7 +213,7 @@ if __name__ == "__main__":
 
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
-                                                                                       method="L1",
+                                                                                       method="MS1_interp",
                                                                                        threshold=0.3)
 
                 # Put the profile of each cell into its own array
@@ -279,7 +271,7 @@ if __name__ == "__main__":
 
             # What about a temporal histogram?
             indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                  filter_type="MS1", notch_filter=None, display=False,
+                                                  filter_type="none", notch_filter=None, display=False,
                                                   prestim_idx=prestim_ind, poststim_idx=poststim_ind)
             indiv_fad[indiv_fad == 0] = np.nan
 
@@ -288,7 +280,7 @@ if __name__ == "__main__":
 
             cell_power_fad[c], _, _ = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
                                                     full_framestamp_range,
-                                                    filter_type="MS1", notch_filter=None, display=False,
+                                                    filter_type="none", notch_filter=None, display=False,
                                                     prestim_idx=prestim_ind, poststim_idx=poststim_ind)
 
         cell_power_fad[cell_power_fad == 0] = np.nan
@@ -331,11 +323,20 @@ if __name__ == "__main__":
 
         plt.figure(14)
         plt.plot(np.nanmean(log_indiv_fad, axis=-1),
-                 np.nanstd(log_indiv_fad, axis=-1),
-                 'k.')
-        plt.title("MAD vs std dev")
+                 np.nanstd(log_indiv_fad, axis=-1),".")
+        plt.title("logFAD mean vs logFAD std dev")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logamp_vs_stddev.svg"))
+
+        plt.figure(15)
+        plt.plot(np.nanmean(indiv_fad, axis=-1),
+                 np.nanstd(indiv_fad, axis=-1),".")
+        plt.title("FAD vs std dev")
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.svg"))
+
+        overoneforty = np.flatnonzero(np.nanmean(indiv_fad, axis=-1) > 140)
+
 
         pvar, pmean = pooled_variance(log_indiv_fad)
 
@@ -404,9 +405,10 @@ if __name__ == "__main__":
         outdata = pd.DataFrame(indiv_fad)
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_MAD.csv"), index=False)
 
+        plt.close()
         # plt.waitforbuttonpress()
-        hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
-        hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
+        # hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
+        # hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
         # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
 
