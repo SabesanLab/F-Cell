@@ -88,7 +88,7 @@ if __name__ == "__main__":
                     allFiles[path.parent].append(path)
 
                     if "control" in path.parent.name:
-                        print("DETECTED CONTROL DATA AT: " + str(path.parent))
+                        # print("DETECTED CONTROL DATA AT: " + str(path.parent))
                         controlpath = path.parent
                 else:
                     allFiles[path.parent].append(path)
@@ -191,8 +191,8 @@ if __name__ == "__main__":
 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
-                dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
-                                                                     stimulus_train[1]*2)
+                # dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
+                #                                                      stimulus_train[1]*2)
 
                 full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius+1,
                                                  summary="none", sigma=1)
@@ -214,6 +214,7 @@ if __name__ == "__main__":
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
                                                                                        method="MS1_interp",
+                                                                                       ms_fwhm=14,
                                                                                        threshold=0.3)
 
                 # Put the profile of each cell into its own array

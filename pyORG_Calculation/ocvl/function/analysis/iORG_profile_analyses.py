@@ -427,7 +427,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         # Formulas from Schmid et al- these are MS filters.
         alpha = 4
         n = 6
-        m = np.round(fwhm_size * (0.8874 + 0.3402*n + 0.129*np.log(n)) - 1 ).astype("int") #(filter_size - 1)/2
+        m = np.round(fwhm_size * (0.5739 + 0.1850*n + 0.1495*np.log(n)) - 1 ).astype("int") #(filter_size - 1)/2
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
 
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
@@ -466,7 +466,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         # Formulas from Schmid et al- these are MS1 filters.
         alpha = 4
         n = 4
-        m = np.round(fwhm_size * (0.8874 + 0.3402*n + 0.129*np.log(n)) - 1 ).astype("int")
+        m = np.round(fwhm_size * (-0.1516 + 0.2791 * n + 0.2704 *np.log(n)) - 1 ).astype("int")
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)

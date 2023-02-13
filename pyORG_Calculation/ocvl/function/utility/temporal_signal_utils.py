@@ -5,6 +5,7 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 from scipy.interpolate import make_lsq_spline
+from scipy.ndimage import convolve1d
 from sklearn import linear_model
 from pynufft import NUFFT
 
@@ -106,7 +107,8 @@ def MS1_interp(temporal_profiles, framestamps, c, threshold=None, fwhm_size = 7)
         # Formulas from Schmid et al- these are MS1 filters.
         alpha = 4
         n = 4
-        m = np.round(fwhm_size * (0.8874 + 0.3402 * n + 0.129 * np.log(n)) - 1).astype("int")
+        m = np.round(fwhm_size * (-0.1516 + 0.2791 * n + 0.2704 * np.log(n)) - 1).astype("int")
+
         x = np.linspace(-m, m, (2 * m + 1)) / (m + 1)
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
@@ -128,12 +130,16 @@ def MS1_interp(temporal_profiles, framestamps, c, threshold=None, fwhm_size = 7)
 
         padsize = int(len(trunc_sinc) / 2)
 
-        finers = np.isfinite(temporal_profiles[c, :])
-
         reconstruction[framestamps] = temporal_profiles[c, :]
+        # reconstruction = convolve1d(reconstruction,trunc_sinc, mode="reflect")
         paddedsig = np.pad(reconstruction, padsize, mode="reflect")
-        for j in range(padsize, len(fullrange) + padsize):
-            reconstruction[j - padsize] = np.nansum(paddedsig[j - padsize:j + padsize + 1] * trunc_sinc)
+        trunc_sinc = np.flip(trunc_sinc)
+        for j in range(padsize, len(fullrange)+padsize):
+            roi = paddedsig[j - padsize:j + padsize + 1]
+            # weightedavg = np.nansum(window*roi)/np.sum(window[np.isfinite(roi)])
+            # roi[~np.isfinite(roi)] = weightedavg
+
+            reconstruction[j - padsize] = np.nansum(roi * trunc_sinc)
 
     else:
         nummissing = np.nan
@@ -174,11 +180,12 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
 
-                # plt.figure(66)
-                # plt.clf()
-                # plt.plot(framestamps, temporal_profiles[c, :])
-                # plt.plot(reconstruction[c, :])
-                # plt.waitforbuttonpress()
+                # if ~np.isnan(nummissing[c]):
+                #     plt.figure(66)
+                #     plt.clf()
+                #     plt.plot(framestamps, temporal_profiles[c, :])
+                #     plt.plot(reconstruction[c, :])
+                #     plt.waitforbuttonpress()
 
 
 
@@ -197,13 +204,13 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
 
             resto = Nufft.solve(freqy, "L1TVOLS", maxiter=30, rho=1)
 
-            plt.figure(0)
-            plt.subplot(2, 1, 1)
-            plt.plot(framestamps[finers], temporal_profiles[c, finers], "-d")
-            plt.figure(0)
-            plt.subplot(2, 1, 2)
-            plt.plot(fullrange, resto, "-d")
-            plt.waitforbuttonpress()
+            # plt.figure(0)
+            # plt.subplot(2, 1, 1)
+            # plt.plot(framestamps[finers], temporal_profiles[c, finers], "-d")
+            # plt.figure(0)
+            # plt.subplot(2, 1, 2)
+            # plt.plot(fullrange, resto, "-d")
+            # plt.waitforbuttonpress()
     elif method == "lsq_spline":
 
         for c in range(temporal_profiles.shape[0]):
@@ -259,11 +266,12 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
                 reconstruction[c, :] = np.array(result[0])
                 nummissing[c] = np.array(result[1])
 
-                # plt.figure(66)
-                # plt.clf()
-                # plt.plot(framestamps, temporal_profiles[c, :])
-                # plt.plot(reconstruction[c, :])
-                # plt.waitforbuttonpress()
+                # if ~np.isnan(nummissing[c]):
+                #     plt.figure(66)
+                #     plt.clf()
+                #     plt.plot(framestamps, temporal_profiles[c, :])
+                #     plt.plot(reconstruction[c, :])
+                #     plt.waitforbuttonpress()
 
 
     print(str(100 * np.nanmean(nummissing) / len(fullrange)) + "% signal reconstructed on average.")

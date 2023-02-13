@@ -8,6 +8,7 @@ from tkinter import Tk, filedialog, ttk, HORIZONTAL, simpledialog
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from scipy.spatial.distance import pdist, squareform
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
@@ -88,11 +89,16 @@ if __name__ == "__main__":
         if "piped" in path.name:
             splitfName = path.name.split("_")
 
-            if path.parent not in allFiles:
-                allFiles[path.parent] = []
-                allFiles[path.parent].append(path)
-            else:
-                allFiles[path.parent].append(path)
+            if (path.parent.parent == searchpath or path.parent == searchpath):
+                if path.parent not in allFiles:
+                    allFiles[path.parent] = []
+                    allFiles[path.parent].append(path)
+
+                    if "control" in path.parent.name:
+                        # print("DETECTED CONTROL DATA AT: " + str(path.parent))
+                        controlpath = path.parent
+                else:
+                    allFiles[path.parent].append(path)
 
             totFiles += 1
 
@@ -109,9 +115,10 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
-    first = True
+
     reference_coord_data = None
     maxnum_cells = None
+
     skipnum = 0
 
     for loc in allFiles:
@@ -134,8 +141,9 @@ if __name__ == "__main__":
         max_frmstamp = 0
         plt.figure(0)
         plt.clf()
-
+        first = True
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])))
+        segmentation_radius = None
 
         for file in allFiles[loc]:
 
@@ -151,6 +159,17 @@ if __name__ == "__main__":
 
                 if first:
                     reference_coord_data = refine_coord(dataset.reference_im, dataset.coord_data)
+                    coorddist = pdist(reference_coord_data, "euclidean")
+                    coorddist = squareform(coorddist)
+                    coorddist[coorddist == 0] = np.amax(coorddist.flatten())
+                    mindist = np.amin( coorddist, axis=-1)
+
+                    if not segmentation_radius:
+                        segmentation_radius = np.round(np.nanmean(mindist) / 4) if np.round(np.nanmean(mindist) / 4) >= 1 else 1
+
+                        segmentation_radius = int(segmentation_radius)
+                        print("Detected segmentation radius: " + str(segmentation_radius))
+
                     full_profiles = []
                     first = False
 
@@ -162,27 +181,12 @@ if __name__ == "__main__":
 
                 if maxnum_cells is not None:
                     numiter=10000
-                    #perm = np.random.permutation(len(dataset.coord_data))
-                    #perm = perm[0:maxnum_cells]
-
-                    # iORG_res = np.full((indiv_fad.shape[0], max_num_avg, numiter), np.nan)
-                    #
-                    # with Pool(processes=6) as pool:
-                    #     thread_res = []
-                    #     for i in range(numiter):
-                    #         # print("Submitting iteration: " + str(i))
-                    #         thread_res.append(pool.apply_async(pop_iORG, args=(dataset,)))
-                    #
-                    #     for i in range(numiter):
-                    #         # print("Recieving iteration: "+str(i))
-                    #         log_fad_avg[:, :, i] = thread_res[i].get()
-
 
                 else:
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
 
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2,
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=segmentation_radius,
                                                  display=False, sigma=1)
 
                 temp_profiles, valid_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
@@ -200,14 +204,15 @@ if __name__ == "__main__":
                 stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
 
-                stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
-                                                                                       dataset.framestamps,
-                                                                                       method="MS1_interp",
-                                                                                       ms_fwhm=3,
-                                                                                       threshold=0.3)
+                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=3)
 
-                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms")
-
+                # tmp_iorg, dataset.framestamps, nummissed = reconstruct_profiles(tmp_iorg[None, :],
+                #                                                                 dataset.framestamps,
+                #                                                                 method="MS1_interp",
+                #                                                                 ms_fwhm=5,
+                #                                                                 threshold=0.3)
+                #
+                # tmp_iorg = tmp_iorg.flatten()
 
                 prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
                                              dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
@@ -264,7 +269,7 @@ if __name__ == "__main__":
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
-        plt.ylim([0, 1.5])
+        #plt.ylim([0, 1.5])
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -283,6 +288,8 @@ if __name__ == "__main__":
         # plt.title("AMP vs std dev")
         # plt.show(block=False)
         # plt.savefig(res_dir.joinpath(this_dirname + "_pop_iORG_amp_vs_stddev.svg"))
+        print("Pop mean iORG amplitude: " + str(np.nanmean(pop_iORG_amp, axis=-1)) +
+              "Pop stddev iORG amplitude: " + str(np.nanmean(pop_iORG_amp, axis=-1)) )
 
 
         pop_amp_dFrame = pd.DataFrame(np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
