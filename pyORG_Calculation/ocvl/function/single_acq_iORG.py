@@ -38,9 +38,10 @@ def fast_acq_avg(fad_data):
 
         valid = np.isfinite(fad_data[c, :])
         valid_fads = fad_data[c, valid]
-        valid_range = np.arange(1, len(valid_fads) + 1)
-        fad_avg[c, valid_range - 1] = np.cumsum(valid_fads, axis=0)
-        fad_avg[c, valid_range - 1] = (fad_avg[c, valid_range - 1] / valid_range)
+        if np.sum(valid) > 10: # Only include cells with more than 10 samples- otherwise drop them as they're probably noisy.
+            valid_range = np.arange(1, len(valid_fads) + 1)
+            fad_avg[c, valid_range - 1] = np.cumsum(valid_fads, axis=0)
+            fad_avg[c, valid_range - 1] = (fad_avg[c, valid_range - 1] / valid_range)
     return fad_avg
 
 
@@ -344,10 +345,10 @@ if __name__ == "__main__":
         pstddev = np.sqrt(pvar)
         antilog_stddev = np.exp(pstddev)
         antilog_2stddev = np.exp(2*pstddev) # Or antilog_stddev ** 2
-        print("Geometric Coefficient of Variation: " + str(antilog_stddev-1))
+        print("Geometric Standard Deviation: " + str(antilog_stddev-1))
         print("Geometric Coefficient of Variation: %" + str(100 * np.sqrt(np.exp(pvar)-1)) )
 
-        monte = True
+        monte = False
 
         # Monte carlo section- attempting to determine point at which there isn't much of a change between the value as
         # a function of randomly included numbers.
@@ -357,7 +358,7 @@ if __name__ == "__main__":
             max_num_avg = indiv_fad.shape[1]
             log_fad_avg = np.full((indiv_fad.shape[0], max_num_avg, numiter), np.nan)
 
-            with Pool(processes=10) as pool:
+            with Pool(processes=6) as pool:
                 thread_res = []
                 for i in range(numiter):
                     #print("Submitting iteration: " + str(i))
@@ -373,9 +374,9 @@ if __name__ == "__main__":
             for c in range(indiv_fad.shape[0]):
                 cellreps = np.log(log_fad_avg[c, :, :])
                 cellreps = cellreps[~np.all(np.isnan(cellreps), axis=-1), :] # Remove all nans- we don't have data here.
-
-                intra_cell_fad_GCV[c, 0:cellreps.shape[0] - 1] = np.sqrt( np.exp(np.nanvar(cellreps[0:-1,:], axis=-1))-1)
-                plt.plot( np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1) )
+                if cellreps.size != 0:
+                    intra_cell_fad_GCV[c, 0:cellreps.shape[0] - 1] = np.sqrt( np.exp(np.nanvar(cellreps[0:-1,:], axis=-1))-1)
+                    plt.plot( np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1) )
                 # plt.plot( np.nanmean(cellreps, axis=-1)+ 2*np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1), color="black", linewidth=3)
             plt.draw()
 
@@ -406,8 +407,8 @@ if __name__ == "__main__":
 
         # print(stats.anderson_ksamp(fadsplit))
 
-        outdata = pd.DataFrame(indiv_fad)
-        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_FAD.csv"), index=False)
+        outdata = pd.DataFrame(log_indiv_fad)
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_logFAD.csv"), index=False)
 
         plt.close()
         # plt.waitforbuttonpress()
