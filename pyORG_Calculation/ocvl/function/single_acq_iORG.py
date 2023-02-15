@@ -125,7 +125,7 @@ if __name__ == "__main__":
          #   continue
 
         first = True
-        segmentation_radius = None  # If set to None, then try and autodetect from the data.
+        segmentation_radius = None # If set to None, then try and autodetect from the data.
 
         res_dir = loc.joinpath(
             "Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
@@ -214,8 +214,7 @@ if __name__ == "__main__":
 
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
-                                                                                       method="MS1_interp",
-                                                                                       ms_fwhm=14,
+                                                                                       method="L1",
                                                                                        threshold=0.3)
 
                 # Put the profile of each cell into its own array
@@ -273,9 +272,11 @@ if __name__ == "__main__":
 
             # What about a temporal histogram?
             indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                  filter_type="none", notch_filter=None, display=False,
-                                                  prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+                                                  filter_type="MS", notch_filter=None, display=True, fwhm_size=14,
+                                                  prestim_idx=prestim_ind, poststim_idx=poststim_ind-3) # np.arange(0,117))
             indiv_fad[indiv_fad == 0] = np.nan
+            # plt.figure(42)
+            # plt.savefig(res_dir.joinpath(this_dirname + "_iORG_cellfilt.svg"))
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
@@ -300,28 +301,34 @@ if __name__ == "__main__":
 
         plt.figure(69)
         #plt.plot(indiv_fad[c, :], np.abs(1 - prestim_mean[c, :]), "*")
-        twodee_histbins = np.arange(start=0, stop=255, step=10.2)
-        plt.hist2d(prestim_mean[np.isfinite(log_indiv_fad)].flatten(), log_indiv_fad[np.isfinite(log_indiv_fad)].flatten(), bins=twodee_histbins)
+        # twodee_histbins = np.arange(start=0, stop=255, step=10.2)
+        # plt.hist2d(prestim_mean[np.isfinite(log_indiv_fad)].flatten(), log_indiv_fad[np.isfinite(log_indiv_fad)].flatten(), bins=twodee_histbins)
 
         histbins = np.arange(start=0.9, stop=2.0, step=0.025)
 
-        plt.figure(11)
-        plt.hist(cell_power_fad, 50)
-        plt.title("RMS power FAD")
+        plt.figure(10)
+        plt.hist((cell_power_fad), bins=np.arange(0, 255, 5), density=True)
+        plt.title("RMS power MAD")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_power_amp.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_mad.png"))
+
+        plt.figure(11)
+        plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True)
+        plt.title("RMS power logMAD")
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad.png"))
 
         plt.figure(12)
-        plt.hist((np.nanmean(indiv_fad, axis=-1)), 50)
-        plt.title("Mean absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
+        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 255, 5), density=True)
+        plt.title("Maximum absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad.png"))
 
         plt.figure(13)
-        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), 50)
-        plt.title("Log Mean absolute deviation: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))) )
+        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(3, 6, 0.05), density=True)
+        plt.title("Log Maximum absolute deviation: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))) )
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logamp.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad.png"))
 
         plt.figure(14)
         plt.plot(np.nanmean(log_indiv_fad, axis=-1),

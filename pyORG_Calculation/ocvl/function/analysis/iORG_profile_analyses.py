@@ -429,7 +429,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         n = 6
         m = np.round(fwhm_size * (0.5739 + 0.1850*n + 0.1495*np.log(n)) - 1 ).astype("int") #(filter_size - 1)/2
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
-
+        print(m)
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
 
@@ -526,7 +526,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         if np.any(whereabove) and np.any(np.isfinite(whereabove)):
             implicit_time[i] = whereabove[0] + poststim_idx[0]-prestim_idx[-1]
 
-    if display: # and np.nanmean(np.log10(postfad+1)) <= 1.2:
+    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=0) > 5):
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):
@@ -534,16 +534,19 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             plt.subplot(2, 2, 1)
             plt.title("Raw data")
             plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
+            plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
+            plt.ylim((-175, 175))
             plt.subplot(2, 2, 2)
             plt.title("Notch Filtered data")
             plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
+            plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
+            plt.ylim((-175, 175))
             plt.subplot(2, 2, 3)
             plt.title("Filtered data")
             plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             # plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.vlines(framestamps[poststim_idx[0]], ymin=plt.gca().get_ylim()[0], ymax=plt.gca().get_ylim()[1], color="black")
+            plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
+            plt.ylim((-175, 175))
             # plt.hlines(np.array((prestim_val, poststim_val)), 0, framestamps[whereabove[0]+poststim_idx[0]])
             plt.subplot(2, 2, 4)
             plt.title("AUC")
@@ -551,6 +554,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             plt.plot(framestamps[prestim_idx].flatten(), pre_abs_diff_profiles[i, :].flatten(),
                      color=mapper.to_rgba(0, norm=False))
             # plt.waitforbuttonpress()
+
 
         plt.waitforbuttonpress()
 
