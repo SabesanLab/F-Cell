@@ -429,7 +429,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
         n = 6
         m = np.round(fwhm_size * (0.5739 + 0.1850*n + 0.1495*np.log(n)) - 1 ).astype("int") #(filter_size - 1)/2
         x = np.linspace(-m, m, (2*m+1)) / (m + 1)
-        print(m)
+
         window = np.exp(-alpha * (x ** 2)) + np.exp(-alpha * ((x + 2) ** 2)) + np.exp(-alpha * ((x - 2) ** 2)) \
                  - 2 * np.exp(-alpha) - np.exp(-9 * alpha)
 

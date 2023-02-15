@@ -272,11 +272,10 @@ if __name__ == "__main__":
 
             # What about a temporal histogram?
             indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                  filter_type="MS", notch_filter=None, display=True, fwhm_size=14,
+                                                  filter_type="MS", notch_filter=None, display=False, fwhm_size=14,
                                                   prestim_idx=prestim_ind, poststim_idx=poststim_ind-3) # np.arange(0,117))
             indiv_fad[indiv_fad == 0] = np.nan
-            # plt.figure(42)
-            # plt.savefig(res_dir.joinpath(this_dirname + "_iORG_cellfilt.svg"))
+
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
@@ -285,6 +284,10 @@ if __name__ == "__main__":
                                                     full_framestamp_range,
                                                     filter_type="none", notch_filter=None, display=False,
                                                     prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+
+        # plt.figure(42)
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_iORG_allcellfilt.svg"))
 
         cell_power_fad[cell_power_fad == 0] = np.nan
 
@@ -312,23 +315,40 @@ if __name__ == "__main__":
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_mad.png"))
 
-        plt.figure(11)
+        plt.figure(111)
         plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True)
         plt.title("RMS power logMAD")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad.svg"))
+
+        plt.figure(112)
+        plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True, histtype="step",
+                 cumulative=True, label=loc.name)
+        plt.title("RMS power logMAD cumulative")
+        plt.legend(loc="best")
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad_cumulative.svg"))
+
 
         plt.figure(12)
-        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 255, 5), density=True)
+        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 400, 5), density=True)
         plt.title("Maximum absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad.png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad.svg"))
 
-        plt.figure(13)
-        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(3, 6, 0.05), density=True)
-        plt.title("Log Maximum absolute deviation: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))) )
+        plt.figure(131)
+        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(3, 6, 0.05), density=True, label=loc.name)
+        plt.title("Log Maximum absolute deviation: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))))
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad.png"))
+        plt.legend(loc="best")
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad.svg"))
+
+        plt.figure(132)
+        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(3, 6, 0.05), density=True, histtype="step",
+                 cumulative=True, label=loc.name)
+        plt.title("Log Maximum absolute deviation cumulative: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))) )
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad_cumulative.svg"))
 
         plt.figure(14)
         plt.plot(np.nanmean(log_indiv_fad, axis=-1),
@@ -354,6 +374,23 @@ if __name__ == "__main__":
         antilog_2stddev = np.exp(2*pstddev) # Or antilog_stddev ** 2
         print("Geometric Standard Deviation: " + str(antilog_stddev-1))
         print("Geometric Coefficient of Variation: %" + str(100 * np.sqrt(np.exp(pvar)-1)) )
+
+        # This bit is to output data for ISER.
+        numsamples = np.nansum(np.isfinite(log_indiv_fad), axis=-1)
+        weighted_var = np.nanvar(log_indiv_fad, axis=-1) * numsamples
+
+        iserdata = {"Pooled Variance": [pvar], "Geometric Coefficient of Variation:" : [np.sqrt(np.exp(pvar)-1)],
+                    "Weighted Sum of Variances": [np.nansum(weighted_var.flatten())],
+                   "Total Samples": [np.nansum(np.isfinite(log_indiv_fad.flatten()))],
+                    "Num Cells": [np.nansum(numsamples>1)]}
+
+        outdata = pd.DataFrame(iserdata)
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_iser2023_data.csv"))
+
+        outdata = pd.DataFrame(log_indiv_fad)
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_logFAD.csv"), index=False)
+        outdata = pd.DataFrame(np.log(cell_power_fad))
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_RMS_logFAD.csv"), index=False)
 
         monte = False
 
@@ -414,8 +451,7 @@ if __name__ == "__main__":
 
         # print(stats.anderson_ksamp(fadsplit))
 
-        outdata = pd.DataFrame(log_indiv_fad)
-        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_logFAD.csv"), index=False)
+
 
         plt.close()
         # plt.waitforbuttonpress()
