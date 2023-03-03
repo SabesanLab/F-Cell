@@ -204,7 +204,8 @@ if __name__ == "__main__":
                 stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
 
-                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=3)
+                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms",
+                                                       window_size=1)
 
                 # tmp_iorg, dataset.framestamps, nummissed = reconstruct_profiles(tmp_iorg[None, :],
                 #                                                                 dataset.framestamps,
@@ -269,7 +270,7 @@ if __name__ == "__main__":
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
-        #plt.ylim([0, 1.5])
+        plt.ylim([0, 60])
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -345,7 +346,7 @@ if __name__ == "__main__":
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0, max_frmstamp / dataset.framerate])
-        plt.ylim([0, 1.5])
+        plt.ylim([0, 60])
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)

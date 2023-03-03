@@ -192,7 +192,9 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
                 mask = np.repeat(mask[:, :, None], fullcolumn.shape[-1], axis=2)
 
+                mask[mask == 0] = np.nan
                 fullcolumn = fullcolumn * mask
+
                 coldims = fullcolumn.shape
                 coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
                 #print(coord)
@@ -202,7 +204,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
                 if summary == "mean":
                     profile_data[i, nani] = np.nan
-                    profile_data[i, np.invert(nani)] = np.mean(coordcolumn[:, np.invert(nani)], axis=0)
+                    profile_data[i, np.invert(nani)] = np.nanmean(coordcolumn[:, np.invert(nani)], axis=0)
                 elif summary == "median":
                     profile_data[i, nani] = np.nan
                     profile_data[i, np.invert(nani)] = np.nanmedian(coordcolumn[:, np.invert(nani)], axis=0)
