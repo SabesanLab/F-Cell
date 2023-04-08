@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                               summary_method="rms", window_size=1)
+                                                               summary_method="rms", window_size=1, display=False)
 
             cell_power_fad[c], _, _ = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
                                                     full_framestamp_range,
