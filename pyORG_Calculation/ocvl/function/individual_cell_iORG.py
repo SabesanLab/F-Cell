@@ -332,10 +332,19 @@ if __name__ == "__main__":
         plt.close(plt.gcf())
 
         plt.figure(22)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=segmentation_radius,
-                    cmap=hist_mapper.to_rgba(simple_amp[:, 0]), alpha=0.5)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=7, alpha=0.5)
         plt.gca().invert_yaxis()
-        plt.show()
+        plt.show(block=False)
+        #plt.close(plt.gcf())
+
+        plt.figure(24)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+segmentation_radius*2), alpha=0.5)
+        #color=hist_mapper.to_rgba(simple_amp[c, 0]
+        plt.gca().invert_yaxis()
+        plt.show(block=False)
+        #plt.close(plt.gcf())
+
+
 
         # plotting the cells with the min/med/max amplitude
         #plt.figure(300)
