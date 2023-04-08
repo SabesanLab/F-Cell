@@ -27,6 +27,37 @@ def find_nearest(array, value):
     return array[idx]
 
 
+def fast_rms_avg(all_iORG, framestamp_range, stiminds):
+
+    max_num_sig = all_iORG.shape[0]
+    cell_rms_amp = np.full((all_iORG.shape[-1], max_num_sig), np.nan)
+
+    for cellind in range(all_iORG.shape[-1]):
+        this_cell_iORG = all_iORG[:, :, cellind]
+
+        rngesus = np.random.default_rng()  # Shuffle our seed, and reorder the signals.
+        avg_order = rngesus.permutation(max_num_sig)
+        this_cell_iORG = this_cell_iORG[avg_order, :]
+
+        valid = np.any(np.isfinite(this_cell_iORG), axis=1)
+
+        if np.sum(valid) > 10:
+            this_cell_iORG = this_cell_iORG[valid, :]  # Only analyze valid signals- lets not waste our time with nans.
+            cell_rms_iORG = np.full_like(this_cell_iORG, np.nan)
+
+            # After the rando reorder, then determine the RMS signals of ever increasing numbers of samples
+            for ind in range(0, this_cell_iORG.shape[0]):
+
+                cell_rms_iORG[ind, :], _ = signal_power_iORG(this_cell_iORG[0:ind+1, :], framestamp_range,
+                                                          summary_method="rms", window_size=1)
+
+                _, cell_rms_amp[cellind, ind], _ = iORG_signal_metrics(cell_rms_iORG[ind, :].reshape((1, cell_rms_iORG.shape[1])),
+                                                              framestamp_range,
+                                                              filter_type="none", notch_filter=None, display=False,
+                                                              prestim_idx=stiminds[0], poststim_idx=stiminds[1])
+    return cell_rms_amp
+
+
 def fast_acq_avg(fad_data):
     max_num_avg = fad_data.shape[1]
     fad_avg = np.full((fad_data.shape[0], max_num_avg), np.nan)
@@ -109,7 +140,7 @@ if __name__ == "__main__":
     root.geometry('%dx%d+%d+%d' % (w, h, x, y))
     root.update()
 
-    outputcsv = True
+    outputcsv = False
 
     # Before we start, get an estimate of the "noise" from the control signals.
     sig_threshold_im = None
@@ -127,8 +158,7 @@ if __name__ == "__main__":
         first = True
         segmentation_radius = None # If set to None, then try and autodetect from the data.
 
-        res_dir = loc.joinpath(
-            "Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
+        res_dir = loc.joinpath("Results")  # creates a results folder within loc ex: R:\00-23045\MEAOSLO1\20220325\Functional\Processed\Functional Pipeline\(1,0)\Results
         res_dir.mkdir(exist_ok=True)  # actually makes the directory if it doesn't exist. if it exists it does nothing.
 
         this_dirname = res_dir.parent.name
@@ -192,25 +222,23 @@ if __name__ == "__main__":
 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
-                # dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
-                #                                                      stimulus_train[1]*2)
-
-                full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius+1,
-                                                 summary="none", sigma=1)
+                # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius+1,
+                #                                  summary="none", sigma=1)
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
                                                  seg_mask="disk", summary="mean")
 
-                temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps, stimulus_stamp=stimulus_train[0], method="mean_sub")
+                temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
+                                                     stimulus_stamp=stimulus_train[0], method="mean_sub")
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                  critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
                                                                            stimulus_train[1] + int(0.2 * framerate)),
                                                  critical_fraction=0.5)
 
-                full_profiles[:, :, :, ~good_profiles] = np.nan
+                # full_profiles[:, :, :, ~good_profiles] = np.nan
 
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
                                                                                        dataset.framestamps,
@@ -223,7 +251,7 @@ if __name__ == "__main__":
                     cell_framestamps[c].append(reconst_framestamps)
                     mean_cell_profiles[c].append(stdize_profiles[c, :])
                     # texture_cell_profiles[c].append(homogeneity[c, :])
-                    full_cell_profiles[c].append(full_profiles[:, :, :, c])
+                    # full_cell_profiles[c].append(full_profiles[:, :, :, c])
 
                 r += 1
 
@@ -235,7 +263,7 @@ if __name__ == "__main__":
         # Rows: Acquisitions
         # Cols: Framestamps
         # Depth: Coordinates
-        all_cell_mean_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
+        all_cell_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
         all_cell_texture_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
 
         # This nightmare fuel of a matrix is arranged:
@@ -266,18 +294,18 @@ if __name__ == "__main__":
 
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
-                all_cell_mean_iORG[i, cell_framestamps[c][i], c] = profile
+                all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
-                prestim_mean[c, i] = np.nanmean( all_cell_mean_iORG[i, prestim_ind, c] )
+                prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
 
             # What about a temporal histogram?
-            indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_mean_iORG[:, :, c], full_framestamp_range,
-                                                  filter_type="MS", notch_filter=None, display=False, fwhm_size=14,
-                                                  prestim_idx=prestim_ind, poststim_idx=poststim_ind-3) # np.arange(0,117))
+            indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
+                                                        filter_type="MS", notch_filter=None, display=False, fwhm_size=11,
+                                                        prestim_idx=prestim_ind, poststim_idx=poststim_ind-3) # np.arange(0,117))
             indiv_fad[indiv_fad == 0] = np.nan
 
 
-            cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_mean_iORG[:, :, c], full_framestamp_range,
+            cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
 
             cell_power_fad[c], _, _ = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
@@ -285,35 +313,33 @@ if __name__ == "__main__":
                                                     filter_type="none", notch_filter=None, display=False,
                                                     prestim_idx=prestim_ind, poststim_idx=poststim_ind)
 
-        # plt.figure(42)
-        # plt.show(block=False)
-        # plt.savefig(res_dir.joinpath(this_dirname + "_iORG_allcellfilt.svg"))
-
         cell_power_fad[cell_power_fad == 0] = np.nan
 
         # *** MAKE THIS A PARAM ***
         enough_data = np.sum(np.isfinite(indiv_fad), axis=1) >= np.floor( len(allFiles[loc])/2 )
 
-        cell_power_fad = np.squeeze(cell_power_fad[enough_data])
-        indiv_fad = np.squeeze(indiv_fad[enough_data, :])
-        prestim_mean = np.squeeze(prestim_mean[enough_data, :])
+        # If we have more than 1 dataset we're analyzing, then we'll need to squeeze it after removing low-dataset counts
+        if len(cell_power_fad.shape) > 2:
+            cell_power_fad = np.squeeze(cell_power_fad[enough_data])
+            indiv_fad = np.squeeze(indiv_fad[enough_data, :])
+            prestim_mean = np.squeeze(prestim_mean[enough_data, :])
 
         # Log transform the data... or don't.
         log_cell_power_fad = np.log(cell_power_fad)
         log_indiv_fad = np.log(indiv_fad)
 
-        plt.figure(69)
+        #plt.figure(69)
         #plt.plot(indiv_fad[c, :], np.abs(1 - prestim_mean[c, :]), "*")
         # twodee_histbins = np.arange(start=0, stop=255, step=10.2)
         # plt.hist2d(prestim_mean[np.isfinite(log_indiv_fad)].flatten(), log_indiv_fad[np.isfinite(log_indiv_fad)].flatten(), bins=twodee_histbins)
 
         histbins = np.arange(start=0.9, stop=2.0, step=0.025)
 
-        plt.figure(10)
-        plt.hist((cell_power_fad), bins=np.arange(0, 255, 5), density=True)
-        plt.title("RMS power MAD")
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_mad.png"))
+        # plt.figure(10)
+        # plt.hist((cell_power_fad), bins=np.arange(0, 255, 5), density=True)
+        # plt.title("RMS power MAD")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad_3coordprofiles.svg"))
 
         plt.figure(111)
         plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True)
@@ -331,8 +357,9 @@ if __name__ == "__main__":
 
 
         plt.figure(12)
-        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 400, 5), density=True)
+        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 500, 5), density=True)
         plt.title("Maximum absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
+        plt.xlim((0, 500))
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad.svg"))
 
@@ -350,12 +377,12 @@ if __name__ == "__main__":
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad_cumulative.svg"))
 
-        plt.figure(14)
-        plt.plot(np.nanmean(log_indiv_fad, axis=-1),
-                 np.nanstd(log_indiv_fad, axis=-1),".")
-        plt.title("logFAD mean vs logFAD std dev")
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logamp_vs_stddev.svg"))
+        # plt.figure(14)
+        # plt.plot(np.nanmean(log_indiv_fad, axis=-1),
+        #          np.nanstd(log_indiv_fad, axis=-1),".")
+        # plt.title("logFAD mean vs logFAD std dev")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logamp_vs_stddev.svg"))
 
         plt.figure(15)
         plt.plot(np.nanmean(indiv_fad, axis=-1),
@@ -365,7 +392,6 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_vs_stddev.svg"))
 
         overoneforty = np.flatnonzero(np.nanmean(indiv_fad, axis=-1) > 140)
-
 
         pvar, pmean = pooled_variance(log_indiv_fad)
 
@@ -384,25 +410,26 @@ if __name__ == "__main__":
                    "Total Samples": [np.nansum(np.isfinite(log_indiv_fad.flatten()))],
                     "Num Cells": [np.nansum(numsamples>1)]}
 
-        outdata = pd.DataFrame(iserdata)
-        outdata.to_csv(res_dir.joinpath(this_dirname + "_iser2023_data.csv"))
+        # outdata = pd.DataFrame(iserdata)
+        # outdata.to_csv(res_dir.joinpath(this_dirname + "_iser2023_data.csv"))
 
         outdata = pd.DataFrame(log_indiv_fad)
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_logFAD.csv"), index=False)
         outdata = pd.DataFrame(np.log(cell_power_fad))
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_RMS_logFAD.csv"), index=False)
 
-        monte = False
+        monte = True
 
         # Monte carlo section- attempting to determine point at which there isn't much of a change between the value as
         # a function of randomly included numbers.
         if monte:
 
-            numiter = 10000
+            # Do the Monte Carlo of the individual acquisition data.
+            numiter = 200
             max_num_avg = indiv_fad.shape[1]
             log_fad_avg = np.full((indiv_fad.shape[0], max_num_avg, numiter), np.nan)
 
-            with Pool(processes=6) as pool:
+            with Pool(processes=10) as pool:
                 thread_res = []
                 for i in range(numiter):
                     #print("Submitting iteration: " + str(i))
@@ -412,7 +439,7 @@ if __name__ == "__main__":
                     #print("Recieving iteration: "+str(i))
                     log_fad_avg[:, :, i] = thread_res[i].get()
 
-            plt.figure()
+            plt.figure(16)
             plt.gcf()
             intra_cell_fad_GCV = np.full((indiv_fad.shape[0], max_num_avg), np.nan)
             for c in range(indiv_fad.shape[0]):
@@ -432,58 +459,57 @@ if __name__ == "__main__":
             outdata = pd.DataFrame(intra_cell_fad_GCV)
             outdata.to_csv(res_dir.joinpath(this_dirname + "_intracell_fad_GCV_monte.csv"), index=False)
 
-            plt.figure(16)
+            plt.figure(17)
             plt.clf()
             plt.boxplot(intra_cell_fad_GCV)
-            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_montecarlo_intra_gcv.png"))
-            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_montecarlo_intra_gcv.svg"))
+            plt.ylim((0, 150))
+            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_monte_fad_intra_gcv.png"))
+            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_monte_fad_intra_gcv.svg"))
 
+            # ***************************************
+            # * Do the Monte Carlo of the RMS data. *
+            # ***************************************
+            log_rms_avg = np.full((all_cell_iORG.shape[-1], max_num_avg, numiter), np.nan)
+            intra_cell_rms_GCV = np.full((all_cell_iORG.shape[-1], max_num_avg), np.nan)
 
+            print("Heya, heyaaaah")
+            with Pool(processes=10) as pool:
+                thread_res = []
+                for i in range(numiter):
+                    print("Submitting iteration: " + str(i))
+                    thread_res.append(pool.apply_async(fast_rms_avg, args=(all_cell_iORG,
+                                                                           full_framestamp_range,
+                                                                           (prestim_ind, poststim_ind),) ))
 
-        plusminus_ninetyfive =  np.sqrt(pvar)*2
-        print( plusminus_ninetyfive )
+                for i in range(numiter):
+                    print("Recieving iteration: "+str(i))
+                    log_rms_avg[:, :, i] = thread_res[i].get()
 
+            plt.figure(18)
+            plt.gcf()
+            for c in range(indiv_fad.shape[0]):
+                cellreps = np.log(log_rms_avg[c, :, :])
+                cellreps = cellreps[~np.all(np.isnan(cellreps), axis=-1), :] # Remove all nans- we don't have data here.
+                if cellreps.size != 0:
+                    intra_cell_rms_GCV[c, 0:cellreps.shape[0] - 1] = np.sqrt( np.exp(np.nanvar(cellreps[0:-1,:], axis=-1))-1)
+                    plt.plot( np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1) )
+                # plt.plot( np.nanmean(cellreps, axis=-1)+ 2*np.sqrt( np.exp(np.nanvar(cellreps, axis=-1))-1), color="black", linewidth=3)
+            plt.draw()
 
-        # fadsplit = []
-        # for j in range(indiv_fad.shape[1]):
-        #     if np.any(np.isfinite(indiv_fad[:, j])):
-        #         fadsplit.append( (indiv_fad[np.isfinite(indiv_fad[:, j]), j]+1) )
+            intra_cell_rms_GCV = intra_cell_rms_GCV.transpose().tolist()
+            for j in range(len(intra_cell_rms_GCV)):
+                intra_cell_rms_GCV[j] = np.array(intra_cell_rms_GCV[j])
+                intra_cell_rms_GCV[j] = 100*intra_cell_rms_GCV[j][~np.isnan(intra_cell_rms_GCV[j])]
 
-        # print(stats.anderson_ksamp(fadsplit))
+            outdata = pd.DataFrame(intra_cell_rms_GCV)
+            outdata.to_csv(res_dir.joinpath(this_dirname + "_intracell_rms_GCV_monte.csv"), index=False)
 
+            plt.figure(19)
+            plt.clf()
+            plt.boxplot(intra_cell_rms_GCV)
+            plt.ylim((0, 150))
+            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_monte_rms_intra_gcv.png"))
+            plt.savefig(res_dir.joinpath(this_dirname + "_iORG_monte_rms_intra_gcv.svg"))
+            plt.draw()
 
-
-        plt.close()
-        # plt.waitforbuttonpress()
-        # hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
-        # hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
-
-        # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
-
-        # plt.figure(2)
-        # vor = Voronoi(reference_coord_data)
-        # voronoi_plot_2d(vor, show_vertices=False, show_points=False)
-        # for c, cell in enumerate(vor.regions[1:]):
-        #     if not -1 in cell:
-        #         poly = [vor.vertices[i] for i in cell]
-        #         plt.fill(*zip(*poly), color=hist_mapper.to_rgba(median_indiv_fad[c]))
-        # ax = plt.gca()
-        # ax.set_aspect("equal", adjustable="box")
-        # plt.show(block=False)
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.png"))
-        # # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
-        # plt.close(plt.gcf())
-
-        # # output cell_power_iORG to csv (optional)
-        # if outputcsv:
-        #     import csv
-        #
-        #     csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG.csv")
-        #     print(csv_dir)
-        #     f = open(csv_dir, 'w', newline="")
-        #     writer = csv.writer(f, delimiter=',')
-        #     writer.writerows(cell_power_iORG)
-        #     f.close
-        #
-        # print("Done!")
-        # print(stimulus_train)
+            # plt.waitforbuttonpress()
