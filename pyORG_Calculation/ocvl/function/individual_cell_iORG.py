@@ -338,24 +338,31 @@ if __name__ == "__main__":
         ColorTest = hist_mapper.to_rgba(simple_amp[:, 0])
 
         plt.figure(22)
-        #plt.imshow()
+        plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
         plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)),
                     c=simple_amp, cmap="magma", alpha=0.5)
         #plt.gca().invert_yaxis()
         plt.show(block=False)
-        #plt.close(plt.gcf())
-
-        plt.figure(24)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)), c=simple_amp,
-                    cmap="magma", alpha=0.5)
-        #color=hist_mapper.to_rgba(simple_amp[c, 0]
-        plt.gca().invert_yaxis()
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_" + now_timestamp + ".png"),
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImage_" + now_timestamp + ".png"),
                     transparent=True)
         #plt.close(plt.gcf())
 
 
+        plt.figure(24)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
+                    c=simple_amp,
+                    cmap="magma", alpha=0.5)
+        # color=hist_mapper.to_rgba(simple_amp[c, 0]
+        plt.xlim([0, np.size(ref_im, 0)])
+        plt.ylim([0, np.size(ref_im, 1)])
+        plt.gca().invert_yaxis()
+        ax = plt.gca()
+        ax.set_aspect('equal', adjustable='box')
+        ax.axis('off')
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_" + now_timestamp + ".png"),
+                    transparent=True)
+        # plt.close(plt.gcf())
 
         # plotting the cells with the min/med/max amplitude
         #plt.figure(300)
