@@ -10,6 +10,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy.spatial.distance import pdist, squareform
 
 from ocvl.function.analysis.cell_profile_extraction import extract_profiles, norm_profiles, standardize_profiles, \
     refine_coord, refine_coord_to_stack, exclude_profiles
@@ -117,6 +118,7 @@ if __name__ == "__main__":
         pb["maximum"] = len(allFiles[loc])
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])).reversed())
         max_frmstamp = 0
+        segmentation_radius = None
 
         # Loops through all the files within this location
         for file in allFiles[loc]:
@@ -149,7 +151,18 @@ if __name__ == "__main__":
                     ref_im = dataset.reference_im
                     full_profiles = []
 
+                    coorddist = pdist(reference_coord_data, "euclidean")
+                    coorddist = squareform(coorddist)
+                    coorddist[coorddist == 0] = np.amax(coorddist.flatten())
+                    mindist = np.amin(coorddist, axis=-1)
+
                     reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+
+                    if not segmentation_radius:
+                        segmentation_radius = np.round(np.nanmean(mindist) / 4) if np.round(np.nanmean(mindist) / 4) >= 1 else 1
+
+                        segmentation_radius = int(segmentation_radius)
+                        print("Detected segmentation radius: " + str(segmentation_radius))
 
                     for c in range(len(dataset.coord_data)):
                         cell_framestamps.append([])
@@ -159,8 +172,8 @@ if __name__ == "__main__":
 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, ref_im, reference_coord_data)
 
-                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="none"))
-                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=2, summary="median")
+                full_profiles.append(extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="none"))
+                temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius, summary="median")
 
                 # print(str((stimulus_train[0] - int(0.15 * framerate)) / framerate) + " to " + str(
                 #    (stimulus_train[1] + int(0.2 * framerate)) / framerate))
@@ -317,6 +330,12 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi_" + now_timestamp + ".png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
+
+        plt.figure(22)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=segmentation_radius,
+                    cmap=hist_mapper.to_rgba(simple_amp[:, 0]), alpha=0.5)
+        plt.gca().invert_yaxis()
+        plt.show()
 
         # plotting the cells with the min/med/max amplitude
         #plt.figure(300)

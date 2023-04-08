@@ -21,7 +21,7 @@ from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, tr
 from datetime import datetime, date, time, timezone
 
 def pop_iORG(dataset):
-    temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=1,
+    temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=2,
                                      display=False, sigma=1)
 
     temp_profiles, num_removed = exclude_profiles(temp_profiles, dataset.framestamps,
@@ -177,7 +177,7 @@ if __name__ == "__main__":
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
-                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
 
                 # Clip out data beyond two seconds before and after.
                 dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
@@ -274,7 +274,7 @@ if __name__ == "__main__":
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
-        plt.ylim([0, 60])
+        plt.ylim([0, 1]) #was 60
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -350,7 +350,7 @@ if __name__ == "__main__":
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0, max_frmstamp / dataset.framerate])
-        plt.ylim([0, 60])
+        plt.ylim([0, 1]) #was 1, 60
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
