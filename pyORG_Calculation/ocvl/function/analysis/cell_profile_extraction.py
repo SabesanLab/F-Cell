@@ -189,17 +189,20 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                                       (coord[0] - seg_radius):(coord[0] + seg_radius + 1), :]
                 mask = disk(seg_radius+1, dtype=fullcolumn.dtype)
                 mask = mask[1:-1, 1:-1]
-
                 mask = np.repeat(mask[:, :, None], fullcolumn.shape[-1], axis=2)
-
-                mask[mask == 0] = np.nan
-                fullcolumn = fullcolumn * mask
 
                 coldims = fullcolumn.shape
                 coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
-                #print(coord)
-                # No partial columns allowed. If there are nans in the column, wipe it out entirely.
+                mask = np.reshape(mask, (coldims[0] * coldims[1], coldims[2]), order="F")
+
+                maskedout = np.where(mask == 0)
+                coordcolumn[maskedout] = 0 # Areas that are masked shouldn't be considered in the partial column test below.
+                # No partial columns allowed. If there are nans in the column, mark it to be wiped out entirely.
                 nani = np.any(np.isnan(coordcolumn), axis=0)
+
+                # Make our mask 0s into nans
+                mask[mask == 0] = np.nan
+                coordcolumn = coordcolumn * mask
                 coordcolumn[:, nani] = np.nan
 
                 if summary == "mean":
@@ -231,7 +234,7 @@ def exclude_profiles(temporal_profiles, framestamps,
     surrounding a stimulus.
 
     :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
-    :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_profiles.
+    :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_data.
     :param critical_region: A set of values containing the critical region of a signal- if a cell doesn't have data here,
                             then drop its entire signal from consideration.
     :param critical_fraction: The percentage of real values required to consider the signal valid.
@@ -281,7 +284,7 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
     if norm_method == "mean":
         all_norm = np.nanmean(temporal_profiles[:])
         # plt.figure()
-        # tmp = np.nanmean(temporal_profiles, axis=0)
+        # tmp = np.nanmean(temporal_data, axis=0)
         # plt.plot(tmp/np.amax(tmp))
         if video_ref is None:
             framewise_norm = np.nanmean(temporal_profiles, axis=0)
@@ -336,7 +339,7 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
     arguments.
 
     :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
-    :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_profiles.
+    :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_data.
     :param stimulus_stamp: The framestamp at which to limit the standardization. For functional studies, this is often
                             the stimulus framestamp.
     :param method: The method used to standardize. Default is "linear_std", which subtracts a linear fit to

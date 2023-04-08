@@ -17,7 +17,7 @@ from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
 from ocvl.function.utility.resources import save_tiff_stack
-from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles
+from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, trim_video
 from datetime import datetime, date, time, timezone
 
 def pop_iORG(dataset):
@@ -178,6 +178,10 @@ if __name__ == "__main__":
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
                 dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+
+                # Clip out data beyond two seconds before and after.
+                dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
+                                                                     dataset.stimtrain_frame_stamps[0] + int(2 * dataset.framerate))
 
                 if maxnum_cells is not None:
                     numiter=10000
