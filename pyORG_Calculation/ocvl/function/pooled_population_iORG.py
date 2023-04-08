@@ -143,7 +143,7 @@ if __name__ == "__main__":
         plt.clf()
         first = True
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])))
-        segmentation_radius = 2#None
+        segmentation_radius = None
 
         for file in allFiles[loc]:
 
