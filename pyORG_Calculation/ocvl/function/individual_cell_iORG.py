@@ -142,12 +142,6 @@ if __name__ == "__main__":
                     reference_coord_data = dataset.coord_data
                     framerate = dataset.framerate
                     stimulus_train = dataset.stimtrain_frame_stamps
-                    simple_amp = np.empty((len(reference_coord_data), 1))
-                    simple_amp[:] = np.nan
-                    log_amp = np.empty((len(reference_coord_data), 1))
-                    log_amp[:] = np.nan
-                    amp_plus1_log = np.empty((len(reference_coord_data), 1))
-                    amp_plus1_log[:] = np.nan
                     ref_im = dataset.reference_im
                     full_profiles = []
 
@@ -157,6 +151,13 @@ if __name__ == "__main__":
                     mindist = np.amin(coorddist, axis=-1)
 
                     reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+
+                    simple_amp = np.empty((len(reference_coord_data), 1))
+                    simple_amp[:] = np.nan
+                    log_amp = np.empty((len(reference_coord_data), 1))
+                    log_amp[:] = np.nan
+                    amp_plus1_log = np.empty((len(reference_coord_data), 1))
+                    amp_plus1_log[:] = np.nan
 
                     if not segmentation_radius:
                         segmentation_radius = np.round(np.nanmean(mindist) / 4) if np.round(np.nanmean(mindist) / 4) >= 1 else 1
@@ -249,6 +250,9 @@ if __name__ == "__main__":
 
             simple_amp[c, 0] = poststim_amp - prestim_amp
 
+
+
+
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
         # clippedcoords = coordclip(coord_data, 10, 100, 'i')
 
@@ -331,17 +335,24 @@ if __name__ == "__main__":
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
+        ColorTest = hist_mapper.to_rgba(simple_amp[:, 0])
+
         plt.figure(22)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=7, alpha=0.5)
-        plt.gca().invert_yaxis()
+        #plt.imshow()
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)),
+                    c=simple_amp, cmap="magma", alpha=0.5)
+        #plt.gca().invert_yaxis()
         plt.show(block=False)
         #plt.close(plt.gcf())
 
         plt.figure(24)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+segmentation_radius*2), alpha=0.5)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)), c=simple_amp,
+                    cmap="magma", alpha=0.5)
         #color=hist_mapper.to_rgba(simple_amp[c, 0]
         plt.gca().invert_yaxis()
         plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_" + now_timestamp + ".png"),
+                    transparent=True)
         #plt.close(plt.gcf())
 
 
