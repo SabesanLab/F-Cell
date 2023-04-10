@@ -20,12 +20,13 @@ from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
-def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1, fraction_thresh=0.25):
+def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1, fraction_thresh=0.25, display=False):
     """
     Calculates the iORG on a supplied dataset, using a variety of power based summary methods published in
     Cooper et. al. 2020, and Cooper et. al. 2017.
 
-    :param temporal_profiles: A NxM numpy matrix with N cells and M temporal samples of some signal.
+    :param temporal_profiles: A NxM numpy matrix with N cells OR acquisitions from a single cell,
+                                and M temporal samples of some signal.
     :param framestamps: A 1xM numpy matrix containing the associated frame stamps for temporal_data.
     :param summary_method: The method used to summarize the population at each sample. Current options include:
                             "var", "std", and "moving_rms". Default: "var"
@@ -146,6 +147,24 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             num_incl = num_incl[framestamps]
         else:
             raise Exception("Window size must be less than half of the number of samples")
+
+    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= 1:
+        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
+        plt.figure(42)
+        plt.clf()
+        for i in range(temporal_profiles.shape[0]):
+            plt.subplot(1, 2, 1)
+            plt.title("Raw data")
+            plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.ylim((-175, 175))
+            plt.xlim((0, framestamps[-1]))
+        plt.subplot(1, 2, 2)
+        plt.title("Signal power iORG")
+        plt.plot(framestamps, iORG, color='black')
+        plt.ylim((-175, 175))
+        plt.xlim((0, framestamps[-1]))
+        plt.waitforbuttonpress()
+
 
     return iORG, num_incl
 
@@ -561,8 +580,8 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
             #plt.show(block=False)
 
             #For displaying just post fad
-            plt.figure(43)
-            plt.plot(framestamps[poststim_idx], cum_post_abs_diff_profiles[i, :])
+            # plt.figure(43)
+            # plt.plot(framestamps[poststim_idx], cum_post_abs_diff_profiles[i, :])
             #plt.plot(framestamps, np.nancumsum(np.abs(grad_profiles[i, :])))
 
             # plt.plot(framestamps[poststim_idx].flatten(), cum_post_abs_diff_profiles[i, :].flatten()-cum_pre_abs_diff_profiles[i, :].flatten(),
