@@ -129,15 +129,14 @@ if __name__ == "__main__":
                     del x, y, xv, yv
                     first = False
 
-                temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=1)
+                temp_profiles = extract_profiles(dataset.video_data, coord_data, seg_radius=0)
                 norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", rescaled=True)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
                 #plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
 
-
-                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
+                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=3)
 
                 prestim_amp = np.nanmedian(tmp_iorg[0:dataset.stimtrain_frame_stamps[0]])
                 poststim = tmp_iorg[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
@@ -189,18 +188,21 @@ if __name__ == "__main__":
         for i, iorg in enumerate(pop_iORG):
             all_incl[i, framestamps[i]] = pop_iORG_num[i]
             all_iORG[i, framestamps[i]] = iorg
+
             profile_data[i][np.isnan(profile_data[i])] = 0
             all_profiles[:, framestamps[i]] += profile_data[i] * profile_data[i]
             num_profiles[0, framestamps[i]] += 1
 
         all_profiles /= num_profiles
         all_profiles = np.sqrt(all_profiles)
+        all_profiles = np.log(all_profiles)
         video_profiles = np.reshape(all_profiles, (height, width, max_frmstamp+1))
 
         hist_normie = Normalize(vmin=0, vmax=np.nanpercentile(video_profiles[:], 99))
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("inferno"), norm=hist_normie)
 
-        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_" + now_timestamp + ".avi").as_posix(), video_profiles, 29.4,
+        save_video(res_dir.joinpath(this_dirname + "_log_pooled_pixelpop_iORG_" + now_timestamp + ".avi").as_posix(),
+                   video_profiles, dataset.framerate,
                    scalar_mapper=hist_mapper)
 
         print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 5)))
@@ -261,18 +263,18 @@ if __name__ == "__main__":
 
             pooled_incl += 1
 
-    plt.figure(40)
-    plt.ylim(0, 1)
-
-    plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
-            all_trial_pooled[1,], range(len(all_trial_pooled[2,])), all_trial_pooled[2,],
-           range(len(all_trial_pooled[3,])), all_trial_pooled[3,])
-
+    # plt.figure(40)
+    # plt.ylim(0, 1)
+    #
     # plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
-    #         all_trial_pooled[1,])
-    stim_rect = matplotlib.patches.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
-                                             (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
-    plt.gca().add_patch(stim_rect)
-    plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG_" + now_timestamp + ".png"))
-    plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG_" + now_timestamp + ".svg"))
+    #         all_trial_pooled[1,], range(len(all_trial_pooled[2,])), all_trial_pooled[2,],
+    #        range(len(all_trial_pooled[3,])), all_trial_pooled[3,])
+    #
+    # # plt.plot(range(len(all_trial_pooled[0,])), all_trial_pooled[0,], range(len(all_trial_pooled[1,])),
+    # #         all_trial_pooled[1,])
+    # stim_rect = matplotlib.patches.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
+    #                                          (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
+    # plt.gca().add_patch(stim_rect)
+    # plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG_" + now_timestamp + ".png"))
+    # plt.savefig(searchpath.joinpath(splitfName[0] + "_all_trials_pooled_pixelpop_iORG_" + now_timestamp + ".svg"))
 

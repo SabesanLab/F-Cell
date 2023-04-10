@@ -573,7 +573,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
 
         plt.waitforbuttonpress()
 
-    return postfad, amplitude, implicit_time
+    return postfad, amplitude, implicit_time, grad_profiles
 
 
 def pooled_variance(data, axis=1):
