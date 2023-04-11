@@ -264,7 +264,7 @@ def exclude_profiles(temporal_profiles, framestamps,
                 crit_remove += 1
 
     if critical_region is not None or require_full_profile:
-        print(str(crit_remove) + " cells were removed due to missing data at stimulus delivery")
+        print(str(crit_remove) + " cells were cleared due to missing data at stimulus delivery")
 
     return temporal_profiles, good_profiles
 

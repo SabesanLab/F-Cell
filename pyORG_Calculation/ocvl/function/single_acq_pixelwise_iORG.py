@@ -18,6 +18,7 @@ from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wave
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.resources import save_video
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix, trim_video
 
 
@@ -137,7 +138,7 @@ if __name__ == "__main__":
                     texture_cell_profiles = []
                     full_cell_profiles = []
 
-                    reference_coord_data = dataset.coord_data
+
                     framerate = dataset.framerate
                     stimulus_train = dataset.stimtrain_frame_stamps
                     ref_im = dataset.reference_im
@@ -151,10 +152,10 @@ if __name__ == "__main__":
                     xv = np.reshape(xv, (xv.size, 1))
                     yv = np.reshape(yv, (yv.size, 1))
 
-                    coord_data = np.hstack((xv, yv))
+                    reference_coord_data = np.hstack((xv, yv))
                     del x, y, xv, yv
 
-                    for c in range(len(dataset.coord_data)):
+                    for c in range(len(reference_coord_data)):
                         og_framestamps.append([])
                         cell_framestamps.append([])
                         mean_cell_profiles.append([])
@@ -165,7 +166,7 @@ if __name__ == "__main__":
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
-                temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=0,
+                temp_profiles = extract_profiles(norm_video_data, reference_coord_data, seg_radius=0,
                                                  seg_mask="disk", summary="mean")
 
                 temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
@@ -182,7 +183,7 @@ if __name__ == "__main__":
                                                                                        threshold=0.3)
 
                 # Put the profile of each cell into its own array
-                for c in range(len(dataset.coord_data)):
+                for c in range(len(reference_coord_data)):
                     og_framestamps[c].append(dataset.framestamps)
                     cell_framestamps[c].append(reconst_framestamps)
                     mean_cell_profiles[c].append(stdize_profiles[c, :])
@@ -200,18 +201,12 @@ if __name__ == "__main__":
         # Cols: Framestamps
         # Depth: Coordinates
         all_cell_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
+
         all_cell_texture_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
 
-        # This nightmare fuel of a matrix is arranged:
-        # Dim 1: Profile number
-        # Dim 2/3: Intensity profile
-        # Dim 4: Temporal framestamp
-        # Dim 5: Cell number
-        all_full_cell_iORG = np.full((len(allFiles[loc]), 1, 1,
-                                      max_frmstamp + 1, len(reference_coord_data)), np.nan)
-
         full_framestamp_range = np.arange(max_frmstamp+1)
-        indiv_mad_iORG = np.full((len(reference_coord_data), max_frmstamp + 1), np.nan)
+
+        indiv_mad_iORG = np.full( (len(reference_coord_data), max_frmstamp + 1), np.nan)
 
         # Make 3D matricies, where:
         # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
@@ -234,14 +229,23 @@ if __name__ == "__main__":
                 prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
 
             # What about a temporal histogram?
-            indiv_fad[c, :], _, _, indiv_mad_iORG[c, :]  = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
+            indiv_fad[c, :], _, _, indiv_mad = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
                                                             filter_type="MS", notch_filter=None, display=False, fwhm_size=11,
                                                             prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)
+
+            prestim_deriv= np.gradient(np.nanmean(indiv_mad[:, 0:prestim_ind[-1]], axis=0))
+
+            prestim_gradient=np.nancumsum(np.repeat(np.nanmean(prestim_deriv),indiv_mad.shape[1]))
+
+            indiv_mad_iORG[c, :] = np.squeeze(np.nanmean(indiv_mad, axis=0))-prestim_gradient
             indiv_fad[indiv_fad == 0] = np.nan
 
 
         # Log transform the data... or don't.
+        log_indiv_mad_iORG = np.log(indiv_mad_iORG)
         log_indiv_fad = np.log(indiv_fad)
+
+
 
         histbins = np.arange(start=0.9, stop=2.0, step=0.025)
 
@@ -253,14 +257,14 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad.svg"))
 
 
-        video_profiles = np.reshape(all_profiles, (height, width, max_frmstamp + 1))
+        video_profiles = np.reshape(log_indiv_mad_iORG, (height, width, max_frmstamp + 1))
 
-        print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 5)))
+        print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 1)))
         print("Video 99th percentile: " + str(np.nanpercentile(video_profiles[:], 99)))
 
-        hist_normie = Normalize(vmin=0, vmax=np.nanpercentile(video_profiles[:], 99))
+        hist_normie = Normalize(vmin=np.nanpercentile(video_profiles[:], 1), vmax=np.nanpercentile(video_profiles[:], 99))
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("inferno"), norm=hist_normie)
 
         save_video(res_dir.joinpath(this_dirname + "_logmad_pixelpop_iORG.avi").as_posix(),
-                   video_profiles, dataset.framerate,
+                   video_profiles, 15.9,
                    scalar_mapper=hist_mapper)
