@@ -38,7 +38,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
     :return: a 1xM population iORG signal
     """
 
-    temporal_data = temporal_profiles
+    temporal_data = temporal_profiles.copy()
 
     if window_size != 0:
         if window_size % 2 < 1:
@@ -110,7 +110,7 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             num_incl = np.sum(np.isfinite(temporal_data), axis=0)
 
         elif window_size < (num_samples / 2):
-            temporal_data = temporal_profiles.copy() #Make a copy so this doesn't manipulate the supplied arg.
+
             temporal_data *= temporal_data  # Square first
             for i in range(window_radius, num_samples - window_radius):
 
@@ -428,7 +428,8 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
     finite_data = np.isfinite(temporal_profiles)
 
     if np.all(~finite_data):
-        return np.full((temporal_profiles.shape[0]), np.nan), np.full((temporal_profiles.shape[0]), np.nan), np.full((temporal_profiles.shape[0]), np.nan)
+        return np.full((temporal_profiles.shape[0]), np.nan), np.full((temporal_profiles.shape[0]), np.nan), \
+               np.full((temporal_profiles.shape[0]), np.nan), np.full(temporal_profiles.shape, np.nan)
 
     # First we filter the data with a notch filter (to possibly remove artifacts from breathing or other things.
     if notch_filter is not None:
@@ -592,7 +593,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fw
 
         plt.waitforbuttonpress()
 
-    return postfad, amplitude, implicit_time
+    return postfad, amplitude, implicit_time, np.nancumsum(np.abs(grad_profiles), axis=1)
 
 
 def pooled_variance(data, axis=1):

@@ -177,7 +177,7 @@ if __name__ == "__main__":
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
-                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
+                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 # Clip out data beyond two seconds before and after.
                 dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
@@ -197,7 +197,7 @@ if __name__ == "__main__":
                                                                  critical_region=np.arange(
                                                                   dataset.stimtrain_frame_stamps[0] - int(0.1 * dataset.framerate),
                                                                   dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
-                                                                 critical_fraction=0.4)
+                                                                 critical_fraction=0.1)
 
                 if np.sum(~valid_profiles) == len(perm):
                     pop_iORG_amp[r] = np.NaN
