@@ -299,19 +299,19 @@ if __name__ == "__main__":
                 prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
 
             # What about a temporal histogram?
-            indiv_fad[c, :], _, _ = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
+            indiv_fad[c, :] = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
                                                         filter_type="MS", notch_filter=None, display=False, fwhm_size=11,
-                                                        prestim_idx=prestim_ind, poststim_idx=poststim_ind-3) # np.arange(0,117))
+                                                        prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)[0]
             indiv_fad[indiv_fad == 0] = np.nan
 
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1, display=False)
 
-            cell_power_fad[c], _, _ = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
+            cell_power_fad[c] = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
                                                     full_framestamp_range,
                                                     filter_type="none", notch_filter=None, display=False,
-                                                    prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+                                                    prestim_idx=prestim_ind, poststim_idx=poststim_ind)[0]
 
         cell_power_fad[cell_power_fad == 0] = np.nan
 
