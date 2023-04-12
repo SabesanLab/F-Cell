@@ -351,19 +351,19 @@ if __name__ == "__main__":
 
 
         plt.figure(24)
-        plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
-        ax = plt.gca()
-        plt.clf()
+        #plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
+        #ax = plt.gca()
+        #plt.clf()
         plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
                     c=simple_amp,
                     cmap="magma", alpha=0.5)
         del ax.plt[0]
         # color=hist_mapper.to_rgba(simple_amp[c, 0]
-        #plt.xlim([0, np.size(ref_im, 0)])
-        #plt.ylim([0, np.size(ref_im, 1)])
-        #plt.gca().invert_yaxis()
-        #ax = plt.gca()
-        #ax.set_aspect('equal', adjustable='box')
+        plt.xlim([0, np.size(ref_im, 0)])
+        plt.ylim([0, np.size(ref_im, 1)])
+        plt.gca().invert_yaxis()
+        ax = plt.gca()
+        ax.set_aspect('equal', adjustable='box')
         ax.axis('off')
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_test_" + now_timestamp + ".png"),
