@@ -138,6 +138,10 @@ if __name__ == "__main__":
 
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=3)
 
+                tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
+                                                dataset.stimtrain_frame_stamps[0], method="mean_sub")
+                tmp_iorg = np.squeeze(tmp_iorg)
+
                 prestim_amp = np.nanmedian(tmp_iorg[0:dataset.stimtrain_frame_stamps[0]])
                 poststim = tmp_iorg[dataset.stimtrain_frame_stamps[1]:(dataset.stimtrain_frame_stamps[1] + 15)]
                 if poststim.size == 0:
@@ -195,20 +199,28 @@ if __name__ == "__main__":
 
         all_profiles /= num_profiles
         all_profiles = np.sqrt(all_profiles)
-        all_profiles = np.log(all_profiles)
+
+        prestimRMS = np.nanmedian(all_profiles[:, 0:dataset.stimtrain_frame_stamps[0]], axis=0)
+
+        all_profiles[:, 0:dataset.stimtrain_frame_stamps[0]] -= prestimRMS
+
+       # all_profiles = np.log(all_profiles)
+
+        all_profiles[~np.isfinite(all_profiles)] = 0
         video_profiles = np.reshape(all_profiles, (height, width, max_frmstamp+1))
 
-        hist_normie = Normalize(vmin=0, vmax=np.nanpercentile(video_profiles[:], 99))
+        hist_normie = Normalize(vmin=np.nanpercentile(video_profiles[:], 2.5), vmax=np.nanpercentile(video_profiles[:], 99))
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("inferno"), norm=hist_normie)
 
-        save_video(res_dir.joinpath(this_dirname + "_log_pooled_pixelpop_iORG_" + now_timestamp + ".avi").as_posix(),
+        save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_" + now_timestamp + ".avi").as_posix(),
                    video_profiles, dataset.framerate,
                    scalar_mapper=hist_mapper)
 
-        print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 5)))
+        print("Video 5th percentile: " + str(np.nanpercentile(video_profiles[:], 2.5)))
         print("Video 99th percentile: " + str(np.nanpercentile(video_profiles[:], 99)))
         # video_profiles -= np.nanpercentile(video_profiles[:], 5)
-        video_profiles /= hist_normie.vmax
+        video_profiles -= hist_normie.vmin
+        video_profiles /= (hist_normie.vmax - hist_normie.vmin)
 
         video_profiles[video_profiles < 0] = 0
         video_profiles[video_profiles > 1] = 1

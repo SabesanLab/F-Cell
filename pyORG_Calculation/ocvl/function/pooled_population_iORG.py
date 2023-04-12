@@ -211,13 +211,16 @@ if __name__ == "__main__":
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms",
                                                        window_size=1)
 
+                tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
+                                                dataset.stimtrain_frame_stamps[0], method="mean_sub")
+
                 # tmp_iorg, dataset.framestamps, nummissed = reconstruct_profiles(tmp_iorg[None, :],
                 #                                                                 dataset.framestamps,
                 #                                                                 method="MS1_interp",
                 #                                                                 ms_fwhm=5,
                 #                                                                 threshold=0.3)
                 #
-                # tmp_iorg = tmp_iorg.flatten()
+                tmp_iorg = np.squeeze(tmp_iorg)
 
                 prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
                                              dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
@@ -244,10 +247,10 @@ if __name__ == "__main__":
                     pop_iORG.append(tmp_iorg)
                     pop_iORG_num.append(tmp_incl)
 
-                    _, pop_iORG_amp[r], pop_iORG_implicit[r] = iORG_signal_metrics(tmp_iorg[None, :], dataset.framestamps,
+                    pop_iORG_amp[r], pop_iORG_implicit[r] = iORG_signal_metrics(tmp_iorg[None, :], dataset.framestamps,
                                                                       filter_type="none", display=False,
                                                                       prestim_idx=prestim_ind,
-                                                                      poststim_idx=poststim_ind)
+                                                                      poststim_idx=poststim_ind)[1:3]
 
                     pop_iORG_recover[r] = 1 - ((final_val - prestim_amp) / pop_iORG_amp[r])
                     pop_iORG_implicit[r] = 1000*pop_iORG_implicit[r] / dataset.framerate
@@ -274,7 +277,7 @@ if __name__ == "__main__":
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  max_frmstamp/dataset.framerate])
-        plt.ylim([0, 1]) #was 60
+        plt.ylim([-5, 15]) #was 60
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -350,7 +353,7 @@ if __name__ == "__main__":
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0, max_frmstamp / dataset.framerate])
-        plt.ylim([0, 1]) #was 1, 60
+        plt.ylim([-5, 15]) #was 1, 60
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)

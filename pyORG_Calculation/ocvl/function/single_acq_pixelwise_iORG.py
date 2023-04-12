@@ -200,9 +200,7 @@ if __name__ == "__main__":
         # Rows: Acquisitions
         # Cols: Framestamps
         # Depth: Coordinates
-        all_cell_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
-
-        all_cell_texture_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1, len(reference_coord_data)), np.nan)
+        all_cell_iORG = np.full((len(allFiles[loc]), max_frmstamp + 1), np.nan)
 
         full_framestamp_range = np.arange(max_frmstamp+1)
 
@@ -223,13 +221,14 @@ if __name__ == "__main__":
                                                      full_framestamp_range < (stimulus_train[0] + int(1 * framerate))))
 
         for c in range(len(reference_coord_data)):
+            all_cell_iORG = np.full_like(all_cell_iORG, np.nan)
             for i, profile in enumerate(mean_cell_profiles[c]):
-                all_cell_iORG[i, cell_framestamps[c][i], c] = profile
+                all_cell_iORG[i, cell_framestamps[c][i]] = profile
 
-                prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
+                prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind])
 
             # What about a temporal histogram?
-            indiv_fad[c, :], _, _, indiv_mad = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
+            indiv_fad[c, :], _, _, indiv_mad = iORG_signal_metrics(all_cell_iORG[:, :], full_framestamp_range,
                                                             filter_type="MS", notch_filter=None, display=False, fwhm_size=11,
                                                             prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)
 
