@@ -347,7 +347,7 @@ if __name__ == "__main__":
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImage_" + now_timestamp + ".svg"),
                     transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
-        #plt.close(plt.gcf())
+        plt.close(plt.gcf())
 
 
         plt.figure(24)
@@ -368,7 +368,7 @@ if __name__ == "__main__":
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_test_" + now_timestamp + ".svg"),
                     transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
-        #plt.close(plt.gcf())
+        plt.close(plt.gcf())
 
         # plotting the cells with the min/med/max amplitude
         #plt.figure(300)
