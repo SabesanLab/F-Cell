@@ -345,7 +345,7 @@ if __name__ == "__main__":
         ax = plt.gca()
         ax.axis('off')
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImage_" + now_timestamp + ".png"),
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImage_" + now_timestamp + ".svg"),
                     transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
         #plt.close(plt.gcf())
 
@@ -357,7 +357,7 @@ if __name__ == "__main__":
         plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
                     c=simple_amp,
                     cmap="magma", alpha=0.5)
-        del ax.plt[0]
+
         # color=hist_mapper.to_rgba(simple_amp[c, 0]
         plt.xlim([0, np.size(ref_im, 0)])
         plt.ylim([0, np.size(ref_im, 1)])
@@ -366,7 +366,7 @@ if __name__ == "__main__":
         ax.set_aspect('equal', adjustable='box')
         ax.axis('off')
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_test_" + now_timestamp + ".png"),
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_test_" + now_timestamp + ".svg"),
                     transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
         #plt.close(plt.gcf())
 
