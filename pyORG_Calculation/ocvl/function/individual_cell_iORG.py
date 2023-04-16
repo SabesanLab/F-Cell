@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
+from matplotlib import patches as ptch
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial.distance import pdist, squareform
 
@@ -316,7 +317,7 @@ if __name__ == "__main__":
         plt.close(plt.gcf())
 
 
-        hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
+        hist_normie = Normalize(vmin=-0.25, vmax=1)
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
         # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
@@ -340,23 +341,46 @@ if __name__ == "__main__":
         plt.figure(22)
         plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
         plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)),
-                    c=simple_amp, cmap="magma", alpha=0.5)
+                    c=log_amp, cmap="magma", alpha=0.5)
+
+
         #plt.gca().invert_yaxis()
         ax = plt.gca()
         ax.axis('off')
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImage_" + now_timestamp + ".svg"),
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImage" + now_timestamp + ".svg"),
                     transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
         plt.close(plt.gcf())
 
+        plt.figure(26)
+        plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
+                    c=log_amp, cmap="magma", alpha=0.5)
+        ax = plt.gca()
+        plt.show(block=False)
+        plt.savefig(
+            res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_wImagewAxes" + now_timestamp + ".svg"),
+            transparent=True, dpi=72, bbox_inches="tight", pad_inches=0)
+        plt.close(plt.gcf())
+
+        plt.figure(28)
+        plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
+        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
+                    c=log_amp, cmap="magma", alpha=0.5)
+        ax = plt.gca()
+        plt.colorbar(cax=ax)
+        plt.show(block=False)
+        plt.savefig(
+            res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_colorbar" + now_timestamp + ".svg"),
+            transparent=True, dpi=72, bbox_inches="tight", pad_inches=0)
+        plt.close(plt.gcf())
 
         plt.figure(24)
         #plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
         #ax = plt.gca()
         #plt.clf()
         plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
-                    c=simple_amp,
-                    cmap="magma", alpha=0.5)
+                    c=log_amp, cmap="magma", alpha=0.5)
 
         # color=hist_mapper.to_rgba(simple_amp[c, 0]
         plt.xlim([0, np.size(ref_im, 0)])
@@ -366,27 +390,35 @@ if __name__ == "__main__":
         ax.set_aspect('equal', adjustable='box')
         ax.axis('off')
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_test_" + now_timestamp + ".svg"),
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay" + now_timestamp + ".svg"),
                     transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
         plt.close(plt.gcf())
 
-        # plotting the cells with the min/med/max amplitude
-        #plt.figure(300)
-        # plt.plot(np.reshape(full_framestamp_range,(1,176)).astype('float64'),cell_power_iORG[min_amp_col,:])
-        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-        #          np.transpose(cell_power_iORG[min_amp_col, :]))
-        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-        #          np.transpose(cell_power_iORG[med_amp_col, :]))
-        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-        #          np.transpose(cell_power_iORG[max_amp_col, :]))
-        # This also works...
-        # plt.plot(full_framestamp_range.astype('float64'),
-        #         np.ravel(cell_power_iORG[min_amp_col, :]))
 
-        # should really be the cell_framestamps that correspond to the cells on the x axis
-        # need to fix the bug with the framstamps being empty first though
-        # plt.plot(cell_framestamps[min_amp_col, :],cell_power_iORG[min_amp_col, :])
-        # plt.savefig(res_dir.joinpath(this_dirname + "_MinMedMax_amp_cones_" + now_timestamp + ".png"))
+
+        # shifting axes
+        norm_cell_power_iORG = cell_power_iORG.copy()
+        for c in range(norm_cell_power_iORG.shape[0]):
+            norm_cell_power_iORG[c,:] -= norm_cell_power_iORG[c,0]
+
+
+        # plotting the cells with the min/med/max amplitude
+        # plt.figure(300)
+        # plt.ylim(-0.5, 1)
+        #
+        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        #           np.transpose(norm_cell_power_iORG[266, :]),'b')
+        #
+        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        #          np.transpose(norm_cell_power_iORG[235, :]), 'g')
+        #
+        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+        #          np.transpose(norm_cell_power_iORG[539, :]),'r')
+        # stim_rect = ptch.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
+        #               (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
+        # plt.gca().add_patch(stim_rect)
+        #
+        # plt.savefig(res_dir.joinpath(this_dirname + "norm_min_med_max" + now_timestamp + ".svg"))
         # plt.show(block=False)
         # plt.close(plt.gcf())
 
