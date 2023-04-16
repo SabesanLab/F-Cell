@@ -251,6 +251,8 @@ if __name__ == "__main__":
 
             simple_amp[c, 0] = poststim_amp - prestim_amp
 
+        log_amp[:, 0] = np.log(simple_amp[:, 0])
+
 
 
 
@@ -285,7 +287,7 @@ if __name__ == "__main__":
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.figure(1)
-        histbins = np.arange(start=-0.2, stop=1.5, step=0.01) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
+        histbins = np.arange(start=0, stop=5.5, step=0.01) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
         plt.hist(simple_amp[:, 0], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
@@ -293,9 +295,9 @@ if __name__ == "__main__":
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
 
+
         plt.figure(40) # log hist
-        histbins_log = np.arange(start=-3, stop=1, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
-        log_amp[:, 0] = np.log(simple_amp[:, 0])
+        histbins_log = np.arange(start=0, stop=5.5, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01 stop=round(np.nanmax(log_amp))
         plt.hist(log_amp, bins=histbins_log)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
@@ -305,7 +307,7 @@ if __name__ == "__main__":
 
 
         plt.figure(41)  # log hist +1
-        histbins_logp1 = np.arange(start=-0.2, stop=1.5, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
+        histbins_logp1 = np.arange(start=0, stop=5.5, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
         amp_plus1_log[:, 0] = np.log10(simple_amp[:, 0]+1)
         print("min ", np.nanmin(amp_plus1_log))
         print("max ", np.nanmax(amp_plus1_log))
