@@ -246,7 +246,7 @@ if __name__ == "__main__":
 
             else:
                 poststim_amp = np.nanquantile(poststim, [0.95])
-                prestim_amp = np.nanmedian(prestim)
+                prestim_amp = np.nanquantile(prestim, [0.95])
             
 
             simple_amp[c, 0] = poststim_amp - prestim_amp
@@ -319,7 +319,7 @@ if __name__ == "__main__":
         plt.close(plt.gcf())
 
 
-        hist_normie = Normalize(vmin=-0.25, vmax=1)
+        hist_normie = Normalize(vmin=0.25, vmax=5.5)
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
         # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
@@ -338,13 +338,17 @@ if __name__ == "__main__":
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
         plt.close(plt.gcf())
 
-        ColorTest = hist_mapper.to_rgba(simple_amp[:, 0])
+        fin_log_amp = np.isfinite(log_amp[:, 0].copy())
+        ColorTest = hist_mapper.to_rgba(log_amp[fin_log_amp, 0])
+        #ColorTest = hist_mapper.to_rgba(log_amp[:, 0])
+
 
         plt.figure(22)
         plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)),
-                    c=log_amp, cmap="magma", alpha=0.5)
-
+        #plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1+(segmentation_radius*2)),
+        #            c=ColorTest, alpha=0.5)
+        plt.scatter(reference_coord_data[fin_log_amp, 0], reference_coord_data[fin_log_amp, 1], s=(1+(segmentation_radius*2)),
+                   c=ColorTest, alpha=0.5)
 
         #plt.gca().invert_yaxis()
         ax = plt.gca()
@@ -356,8 +360,8 @@ if __name__ == "__main__":
 
         plt.figure(26)
         plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
-                    c=log_amp, cmap="magma", alpha=0.5)
+        plt.scatter(reference_coord_data[fin_log_amp, 0], reference_coord_data[fin_log_amp, 1], s=(1 + (segmentation_radius * 2)),
+                    c=ColorTest, alpha=0.5)
         ax = plt.gca()
         plt.show(block=False)
         plt.savefig(
@@ -367,8 +371,8 @@ if __name__ == "__main__":
 
         plt.figure(28)
         plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
-                    c=log_amp, cmap="magma", alpha=0.5)
+        plt.scatter(reference_coord_data[fin_log_amp, 0], reference_coord_data[fin_log_amp, 1], s=(1 + (segmentation_radius * 2)),
+                    c=ColorTest, alpha=0.5)
         ax = plt.gca()
         plt.colorbar(cax=ax)
         plt.show(block=False)
@@ -381,8 +385,8 @@ if __name__ == "__main__":
         #plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
         #ax = plt.gca()
         #plt.clf()
-        plt.scatter(reference_coord_data[:, 0], reference_coord_data[:, 1], s=(1 + (segmentation_radius * 2)),
-                    c=log_amp, cmap="magma", alpha=0.5)
+        plt.scatter(reference_coord_data[fin_log_amp, 0], reference_coord_data[fin_log_amp, 1], s=(1 + (segmentation_radius * 2)),
+                    c=ColorTest, alpha=0.5)
 
         # color=hist_mapper.to_rgba(simple_amp[c, 0]
         plt.xlim([0, np.size(ref_im, 0)])
