@@ -419,7 +419,7 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def iORG_signal_metrics(temporal_profiles, framestamps, filter_type="savgol", fwhm_size=14, notch_filter=None,
+def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_size=14, notch_filter=None,
                         display=False, prestim_idx=None, poststim_idx=None):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))

@@ -136,7 +136,7 @@ if __name__ == "__main__":
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
                 #plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
 
-                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=3)
+                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
 
                 tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
                                                 dataset.stimtrain_frame_stamps[0], method="mean_sub")
@@ -200,9 +200,9 @@ if __name__ == "__main__":
         all_profiles /= num_profiles
         all_profiles = np.sqrt(all_profiles)
 
-        prestimRMS = np.nanmedian(all_profiles[:, 0:dataset.stimtrain_frame_stamps[0]], axis=0)
+        prestimRMS = np.nanmedian(all_profiles[:, 0:dataset.stimtrain_frame_stamps[0]])
 
-        all_profiles[:, 0:dataset.stimtrain_frame_stamps[0]] -= prestimRMS
+        all_profiles -= prestimRMS
 
        # all_profiles = np.log(all_profiles)
 
@@ -227,8 +227,6 @@ if __name__ == "__main__":
         video_profiles *= 255
         save_video(res_dir.joinpath(this_dirname + "_pooled_pixelpop_iORG_gray_" + now_timestamp + ".avi").as_posix(),
                    video_profiles, 29.4)
-
-
 
         # Pooled variance calc
 

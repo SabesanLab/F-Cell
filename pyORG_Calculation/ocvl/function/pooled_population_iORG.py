@@ -180,8 +180,8 @@ if __name__ == "__main__":
                 dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 # Clip out data beyond two seconds before and after.
-                dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
-                                                                     dataset.stimtrain_frame_stamps[0] + int(2 * dataset.framerate))
+                # dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
+                #                                                      dataset.stimtrain_frame_stamps[0] + int(2 * dataset.framerate))
 
                 if maxnum_cells is not None:
                     numiter=10000
@@ -192,6 +192,7 @@ if __name__ == "__main__":
 
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=segmentation_radius,
                                                  display=False, sigma=1)
+
 
                 temp_profiles, valid_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                                  critical_region=np.arange(
@@ -208,18 +209,19 @@ if __name__ == "__main__":
                 stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub")
 
+                # plt.figure(1)
+                # plt.clf()
+                # for i in range(stdize_profiles.shape[0]):
+                #     plt.plot(dataset.framestamps, stdize_profiles[i, :])
+                # plt.show(block=False)
+                # plt.waitforbuttonpress()
+
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms",
                                                        window_size=1)
 
                 tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
                                                 dataset.stimtrain_frame_stamps[0], method="mean_sub")
 
-                # tmp_iorg, dataset.framestamps, nummissed = reconstruct_profiles(tmp_iorg[None, :],
-                #                                                                 dataset.framestamps,
-                #                                                                 method="MS1_interp",
-                #                                                                 ms_fwhm=5,
-                #                                                                 threshold=0.3)
-                #
                 tmp_iorg = np.squeeze(tmp_iorg)
 
                 prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
@@ -276,8 +278,8 @@ if __name__ == "__main__":
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
-        plt.xlim([0,  max_frmstamp/dataset.framerate])
-        plt.ylim([-5, 15]) #was 60
+        plt.xlim([0,  6])
+        plt.ylim([-5, 60]) #was 60
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -300,11 +302,11 @@ if __name__ == "__main__":
               "Pop stddev iORG amplitude: " + str(np.nanmean(pop_iORG_amp, axis=-1)) )
 
 
-        pop_amp_dFrame = pd.DataFrame(np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
-                                                      np.array(pop_iORG_implicit, ndmin=2).transpose(),
-                                                      np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
-                                      columns=["Amplitude", "Implicit time", "Recovery %"])
-        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
+        # pop_amp_dFrame = pd.DataFrame(np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
+        #                                               np.array(pop_iORG_implicit, ndmin=2).transpose(),
+        #                                               np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
+        #                               columns=["Amplitude", "Implicit time", "Recovery %"])
+        # pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
 
         # Grab all of the
         all_iORG = np.empty((len(pop_iORG), max_frmstamp+1))
@@ -323,7 +325,7 @@ if __name__ == "__main__":
         prestim_ind = np.logical_and(all_frmstamps < dataset.stimtrain_frame_stamps[0],
                                      all_frmstamps >= (dataset.stimtrain_frame_stamps[0] - int(1 * dataset.framerate)))
         poststim_ind = np.logical_and(all_frmstamps >= dataset.stimtrain_frame_stamps[1],
-                                      all_frmstamps < (dataset.stimtrain_frame_stamps[1] + int(0.75 * dataset.framerate)))
+                                      all_frmstamps < (dataset.stimtrain_frame_stamps[1] + int(1 * dataset.framerate)))
         poststim_loc = all_frmstamps[poststim_ind]
         prestim_amp = np.nanmedian(pooled_iORG[prestim_ind])
         poststim = pooled_iORG[poststim_ind]
@@ -346,18 +348,23 @@ if __name__ == "__main__":
         print("Pooled iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
               " Recovery fraction: " + str(pop_iORG_recover[r]))
 
-
+        pop_amp_dFrame = pd.DataFrame(np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
+                                                      np.array(pop_iORG_implicit, ndmin=2).transpose(),
+                                                      np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
+                                      columns=["Amplitude", "Implicit time", "Recovery %"])
+        pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
 
         plt.figure(1)
-        plt.clf()
+
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
-        plt.xlim([0, max_frmstamp / dataset.framerate])
-        plt.ylim([-5, 15]) #was 1, 60
+        plt.xlim([0, 6])
+        plt.ylim([-5, 60]) #was 1, 60
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
+        plt.waitforbuttonpress()
 

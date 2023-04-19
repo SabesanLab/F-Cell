@@ -41,20 +41,20 @@ def fast_rms_avg(all_iORG, framestamp_range, stiminds):
 
         valid = np.any(np.isfinite(this_cell_iORG), axis=1)
 
-        if np.sum(valid) > 10:
+        if np.sum(valid) > 5:
             this_cell_iORG = this_cell_iORG[valid, :]  # Only analyze valid signals- lets not waste our time with nans.
             cell_rms_iORG = np.full_like(this_cell_iORG, np.nan)
 
             # After the rando reorder, then determine the RMS signals of ever increasing numbers of samples
             for ind in range(0, this_cell_iORG.shape[0]):
 
-                cell_rms_iORG[ind, :], _ = signal_power_iORG(this_cell_iORG[0:ind+1, :], framestamp_range,
-                                                          summary_method="rms", window_size=1)
+                cell_rms_iORG[ind, :] = signal_power_iORG(this_cell_iORG[0:ind+1, :], framestamp_range,
+                                                          summary_method="rms", window_size=1)[0]
 
-                _, cell_rms_amp[cellind, ind], _ = iORG_signal_metrics(cell_rms_iORG[ind, :].reshape((1, cell_rms_iORG.shape[1])),
+                cell_rms_amp[cellind, ind] = iORG_signal_metrics(cell_rms_iORG[ind, :].reshape((1, cell_rms_iORG.shape[1])),
                                                               framestamp_range,
                                                               filter_type="none", notch_filter=None, display=False,
-                                                              prestim_idx=stiminds[0], poststim_idx=stiminds[1])
+                                                              prestim_idx=stiminds[0], poststim_idx=stiminds[1])[0]
     return cell_rms_amp
 
 
@@ -69,7 +69,7 @@ def fast_acq_avg(fad_data):
 
         valid = np.isfinite(fad_data[c, :])
         valid_fads = fad_data[c, valid]
-        if np.sum(valid) > 10: # Only include cells with more than 10 samples- otherwise drop them as they're probably noisy.
+        if np.sum(valid) > 5: # Only include cells with more than 10 samples- otherwise drop them as they're probably noisy.
             valid_range = np.arange(1, len(valid_fads) + 1)
             fad_avg[c, valid_range - 1] = np.cumsum(valid_fads, axis=0)
             fad_avg[c, valid_range - 1] = (fad_avg[c, valid_range - 1] / valid_range)
@@ -277,6 +277,7 @@ if __name__ == "__main__":
         full_framestamp_range = np.arange(max_frmstamp+1)
         cell_power_iORG = np.full((len(reference_coord_data), max_frmstamp + 1), np.nan)
         cell_power_fad = np.full((len(reference_coord_data)), np.nan)
+        cell_power_amp = np.full((len(reference_coord_data)), np.nan)
 
         # Make 3D matricies, where:
         # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
@@ -308,10 +309,10 @@ if __name__ == "__main__":
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1, display=False)
 
-            cell_power_fad[c] = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
+            cell_power_fad[c], cell_power_amp[c] = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
                                                     full_framestamp_range,
                                                     filter_type="none", notch_filter=None, display=False,
-                                                    prestim_idx=prestim_ind, poststim_idx=poststim_ind)[0]
+                                                    prestim_idx=prestim_ind, poststim_idx=poststim_ind)[0:2]
 
         cell_power_fad[cell_power_fad == 0] = np.nan
 
@@ -341,19 +342,33 @@ if __name__ == "__main__":
         # plt.show(block=False)
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad_3coordprofiles.svg"))
 
+        # plt.figure(111)
+        # plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True)
+        # plt.title("RMS power logMAD")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad.svg"))
+        #
+        # plt.figure(112)
+        # plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True, histtype="step",
+        #          cumulative=True, label=loc.name)
+        # plt.title("RMS power logMAD cumulative")
+        # plt.legend(loc="best")
+        # plt.show(block=False)
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad_cumulative.svg"))
+
         plt.figure(111)
-        plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True)
-        plt.title("RMS power logMAD")
+        plt.hist(np.log(cell_power_amp), bins=np.arange(0, 5.5, 0.1), density=True)
+        plt.title("RMS power log amplitude")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logamp.svg"))
 
         plt.figure(112)
-        plt.hist(np.log(cell_power_fad), bins=np.arange(2.25, 5.25, 0.05), density=True, histtype="step",
+        plt.hist(np.log(cell_power_amp), bins=np.arange(0, 5.5, 0.1), density=True, histtype="step",
                  cumulative=True, label=loc.name)
-        plt.title("RMS power logMAD cumulative")
+        plt.title("RMS power log amplitude cumulative")
         plt.legend(loc="best")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad_cumulative.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logamp_cumulative.svg"))
 
 
         plt.figure(12)
@@ -417,8 +432,11 @@ if __name__ == "__main__":
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_logFAD.csv"), index=False)
         outdata = pd.DataFrame(np.log(cell_power_fad))
         outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_RMS_logFAD.csv"), index=False)
+        outdata = pd.DataFrame(np.log(cell_power_amp))
+        outdata.to_csv(res_dir.joinpath(this_dirname + "_allcell_iORG_RMS_logamp.csv"), index=False)
 
-        monte = True
+        monte = False
+        plt.waitforbuttonpress()
 
         # Monte carlo section- attempting to determine point at which there isn't much of a change between the value as
         # a function of randomly included numbers.
