@@ -184,8 +184,7 @@ if __name__ == "__main__":
                                                                            stimulus_train[1] + int(0.2 * framerate)),
                                                  critical_fraction=0.4)
 
-                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data,
-                                                       rescaled=True)
+                norm_temporal_profiles = norm_profiles(temp_profiles, norm_method="mean", video_ref=dataset.video_data)
                 stdize_profiles = standardize_profiles(norm_temporal_profiles, dataset.framestamps, stimulus_train[0],
                                                        method="mean_sub")
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles,
@@ -230,31 +229,11 @@ if __name__ == "__main__":
         for c in range(len(reference_coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
                                                                summary_method="rms", window_size=1)
-            prestim_ind = np.logical_and(full_framestamp_range < dataset.stimtrain_frame_stamps[0],
-                                         full_framestamp_range >= (dataset.stimtrain_frame_stamps[0] - int(
-                                             0.75 * dataset.framerate)))
-            poststim_ind = np.logical_and(full_framestamp_range >= dataset.stimtrain_frame_stamps[1],
-                                          full_framestamp_range < (dataset.stimtrain_frame_stamps[1] + int(
-                                              0.75 * dataset.framerate)))
-            poststim = cell_power_iORG[c, poststim_ind]
-            prestim = cell_power_iORG[c, prestim_ind]
 
+            prestim_amp = np.nanmean(cell_power_iORG[c, 0:stimulus_train[0]])
+            poststim_amp = np.nanmax(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1] + 10)])
 
-            if poststim.size == 0:
-                poststim_amp = np.NaN
-                prestim_amp = np.NaN
-
-            else:
-                poststim_amp = np.nanquantile(poststim, [0.95])
-                prestim_amp = np.nanquantile(prestim, [0.95])
-            
-
-            simple_amp[c, 0] = poststim_amp - prestim_amp
-
-        log_amp[:, 0] = np.log(simple_amp[:, 0])
-
-
-
+            simple_amp[l, c] = poststim_amp - prestim_amp
 
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
         # clippedcoords = coordclip(coord_data, 10, 100, 'i')
@@ -287,42 +266,40 @@ if __name__ == "__main__":
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.figure(1)
-        histbins = np.arange(start=0, stop=5.5, step=0.05) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
-        plt.hist(simple_amp[:, 0], bins=histbins, density=True, histtype='step', cumulative=True)
-        plt.ylim([0, 1])
+        histbins = np.arange(start=-0.1, stop=0.3, step=0.01) #Humans: -0.2, 1.5, 0.025
+        plt.hist(simple_amp[l, :], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_" + now_timestamp + ".png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_cumhist.svg"))
-        plt.close(plt.gcf())
-
-
-        plt.figure(40) # log hist
-        histbins_log = np.arange(start=0, stop=5.5, step=0.05)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01 stop=round(np.nanmax(log_amp))
-        plt.hist(log_amp, bins=histbins_log, density=True, histtype='step', cumulative=True)
-        plt.ylim([0, 1])
-        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_hist_" + now_timestamp + ".png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_cumhist.svg"))
-        plt.close(plt.gcf())
-
-
-        plt.figure(41)  # log hist +1
-        histbins_logp1 = np.arange(start=0, stop=5.5, step=0.05)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01
-        amp_plus1_log[:, 0] = np.log10(simple_amp[:, 0]+1)
-        print("min ", np.nanmin(amp_plus1_log))
-        print("max ", np.nanmax(amp_plus1_log))
-        plt.hist(amp_plus1_log, bins=histbins_logp1, density=True, histtype='step', cumulative=True)
-        plt.ylim([0, 1])
-        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
-        plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_plus1_amp_cumhist_" + now_timestamp + ".png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
 
 
-        hist_normie = Normalize(vmin=0.25, vmax=5.5)
+
+        plt.figure(40) # log hist
+        histbins_log = np.arange(start=-3, stop=-0.6, step=0.01)  # Humans: -0.2, 1.5, 0.025
+        log_amp = np.log10(simple_amp[l,:])
+        plt.hist(log_amp, bins=histbins_log)
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_hist_" + now_timestamp + ".png"))
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        plt.close(plt.gcf())
+
+
+        plt.figure(41)  # log hist +1
+        histbins_logp1 = np.arange(start=0, stop=0.3, step=0.01)  # Humans: -0.2, 1.5, 0.025
+        amp_plus1_log = np.log10(simple_amp[l, :] + 1)
+        print("min ", np.nanmin(amp_plus1_log))
+        print("max ", np.nanmax(amp_plus1_log))
+        plt.hist(amp_plus1_log, bins=histbins_logp1)
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_plus1_amp_hist_" + now_timestamp + ".png"))
+        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        plt.close(plt.gcf())
+
+        hist_normie = Normalize(vmin=histbins[0], vmax=histbins[-1])
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
         # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
@@ -333,7 +310,7 @@ if __name__ == "__main__":
         for c, cell in enumerate(vor.regions[1:]):
             if not -1 in cell:
                 poly = [vor.vertices[i] for i in cell]
-                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[c, 0]))
+                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[l, c]))
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
@@ -433,6 +410,7 @@ if __name__ == "__main__":
 
         # output cell_power_iORG to csv (optional)
         if outputcsv:
+            import csv
 
             csv_dir = res_dir.joinpath(this_dirname + "_cell_power_iORG_" + now_timestamp + ".csv")
             outdata = pd.DataFrame(cell_power_iORG)
