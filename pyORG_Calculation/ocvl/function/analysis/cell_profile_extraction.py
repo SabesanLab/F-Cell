@@ -88,15 +88,15 @@ def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=2):
             match_reg = cv2.matchTemplate(stack_im, ref_template, cv2.TM_CCOEFF_NORMED)
             minV, maxV, minL, maxL = cv2.minMaxLoc(match_reg)
             maxL = np.array(maxL) - search_radius  # Make relative to the center.
-            #print(coord)
+            # print(coord)
             coordinates[i, :] = coord + maxL
-            #print(coordinates[i, :])
+            # print(coordinates[i, :])
             # plt.figure(10)
             # plt.imshow(stack_im)
             # plt.figure(11)
             # plt.imshow(match_reg)
             # plt.show(block=False)
-            #print(maxL)
+            # print(maxL)
     return coordinates
 
 
@@ -162,7 +162,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
 
                 coldims = fullcolumn.shape
                 coordcolumn = np.reshape(fullcolumn, (coldims[0]*coldims[1], coldims[2]), order="F")
-                #print(coord)
+
                 # No partial columns allowed. If there are nans in the column, wipe it out entirely.
                 nani = np.any(np.isnan(coordcolumn), axis=0)
                 coordcolumn[:, nani] = np.nan
@@ -284,7 +284,7 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
     if norm_method == "mean":
         all_norm = np.nanmean(temporal_profiles[:])
         # plt.figure()
-        # tmp = np.nanmean(temporal_data, axis=0)
+        # tmp = np.nanmean(temporal_profiles, axis=0)
         # plt.plot(tmp/np.amax(tmp))
         if video_ref is None:
             framewise_norm = np.nanmean(temporal_profiles, axis=0)
@@ -447,6 +447,6 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
 #     stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
 #
 #
-#     pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_methods="std", window_size=0)
+#     pop_iORG = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="std", window_size=0)
 #     plt.plot(dataset.framestamps, pop_iORG)
 #     plt.show()
