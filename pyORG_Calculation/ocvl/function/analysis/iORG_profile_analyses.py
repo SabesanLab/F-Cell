@@ -3,6 +3,7 @@ from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
+import scipy
 from joblib._multiprocessing_helpers import mp
 from numpy.fft import fftshift
 from scipy import signal
@@ -419,7 +420,7 @@ def extract_texture_profiles(full_profiles, summary_methods=("all"), numlevels=3
     #         # glcmmean[f] = np.sqrt(np.sum(com[f]**2))
 
 
-def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_size=14, notch_filter=None,
+def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type=None, fwhm_size=14, notch_filter=None,
                         display=False, prestim_idx=None, poststim_idx=None):
 
     mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_profiles.shape[0]))
@@ -435,7 +436,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
     if notch_filter is not None:
         # sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
         # sos = signal.iirdesign([1.45, 2.15], [1.5, 2.1], gpass=1, gstop=60, fs=29.5, output='sos')
-        sos = signal.iirdesign([1.35, 2], [1.4, 1.95], gpass=0.1, gstop=60, fs=91, output='sos')
+        sos = signal.iirdesign([1.35, 2], [1.4, 1.95], gpass=0.1, gstop=60, fs=framerate, output='sos')
         # sos = signal.iirdesign(1.1, 1, gpass=0.1, gstop=60, fs=91, output='sos')
         butter_filtered_profiles = np.full_like(temporal_profiles, np.nan)
         for i in range(temporal_profiles.shape[0]):
@@ -516,6 +517,8 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
         for i in range(temporal_profiles.shape[0]):
             filtered_profiles[i, finite_data[i, :]] = convolve1d(butter_filtered_profiles[i, finite_data[i, :]],
                                                                  trunc_sinc, mode="reflect")
+    elif filter_type == "movmean":
+        filtered_profiles = scipy.ndimage.convolve1d(butter_filtered_profiles, weights=np.ones((5))/5, axis=1)
     elif filter_type == "none" or filter_type is None:
         filtered_profiles = butter_filtered_profiles
 
@@ -528,7 +531,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
     #         spfit.set_smoothing_factor(0.5)
     #         spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
 
-    grad_profiles = np.gradient(filtered_profiles, axis=1)
+    grad_profiles = np.gradient(filtered_profiles, axis=1) # Don't need to factor in the dx, because it gets removed anyway in the next step.
 
     pre_abs_diff_profiles = np.abs(grad_profiles[:, prestim_idx])
     cum_pre_abs_diff_profiles = np.nancumsum(pre_abs_diff_profiles, axis=1)
@@ -553,9 +556,9 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
         whereabove = np.flatnonzero(poststim[i, :] > poststim_val[i])
 
         if np.any(whereabove) and np.any(np.isfinite(whereabove)):
-            implicit_time[i] = whereabove[0] + poststim_idx[0]-prestim_idx[-1]
+            implicit_time[i] = (whereabove[0] + poststim_idx[0]-prestim_idx[-1])/framerate
 
-    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= (temporal_profiles.shape[0]/2):
+    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= (temporal_profiles.shape[0]/2) and np.nanmean(postfad) <=15:
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):
@@ -567,11 +570,14 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
             plt.ylim((-175, 175))
             # plt.ylim((-2, 2))
             plt.subplot(2, 2, 2)
-            plt.title("Notch Filtered data")
-            plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+
+            # plt.title("Notch Filtered data")
+            # plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
+            plt.plot(framestamps,grad_profiles[i,:], color=mapper.to_rgba(i, norm=False))
             plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
-            plt.ylim((-175, 175))
+            # plt.ylim((-175, 175))
             # plt.ylim((-2, 2))
+            plt.ylim((-15, 15))
             plt.subplot(2, 2, 3)
             plt.title("Filtered data")
             plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
@@ -587,7 +593,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
             plt.plot(framestamps[prestim_idx].flatten(), cum_pre_abs_diff_profiles[i, :].flatten(), color=mapper.to_rgba(i, norm=False))
 
             plt.show(block=False)
-
+            # plt.waitforbuttonpress()
             #For displaying just post fad
 
             # plt.plot(framestamps[poststim_idx], cum_post_abs_diff_profiles[i, :])

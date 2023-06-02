@@ -299,13 +299,13 @@ if __name__ == "__main__":
         prestim_ind = np.flatnonzero(np.logical_and(full_framestamp_range < stimulus_train[0],
                                                     full_framestamp_range >= (stimulus_train[0] - int(0.5 * framerate))))
         poststim_ind = np.flatnonzero(np.logical_and(full_framestamp_range >= stimulus_train[0],
-                                                     full_framestamp_range < (stimulus_train[0] + int(0.5 * framerate))))
+                                                     full_framestamp_range <= (stimulus_train[0] + int(0.5 * framerate))))
 
         # For Ram comparison 05/10/23
-        opl_vals = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
-                               delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
-        opl_vals=opl_vals.flatten()
-        low_responders = (opl_vals<150)
+        # opl_vals = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
+        #                        delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
+        # opl_vals=opl_vals.flatten()
+        # low_responders = (opl_vals<150)
         #
         # opl_full = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_full.csv",
         #                        delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
@@ -329,11 +329,11 @@ if __name__ == "__main__":
                 #     todisp = False
                 # else:
                 #     todisp = True
-                todisp = False
+                todisp = True
 
                 indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                            filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=16,
-                                                            prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)
+                                                            framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=14,
+                                                            prestim_idx=prestim_ind, poststim_idx=poststim_ind)
                 # Have used 1-2 before.
                 indiv_fad[indiv_fad == 0] = np.nan
                 fad_profiles[fad_profiles == 0] = np.nan
@@ -418,7 +418,7 @@ if __name__ == "__main__":
                                                                summary_method="rms", window_size=1, display=False)
 
             cell_power_fad[c], cell_power_amp[c] = iORG_signal_metrics(cell_power_iORG[c, :].reshape((1, cell_power_iORG.shape[1])),
-                                                    full_framestamp_range,
+                                                    full_framestamp_range, framerate,
                                                     filter_type="none", notch_filter=None, display=False,
                                                     prestim_idx=prestim_ind, poststim_idx=poststim_ind)[0:2]
 
@@ -426,12 +426,12 @@ if __name__ == "__main__":
 
 
 
-        plt.figure(42)
-        plt.clf()
-        # plt.plot(indiv_fad_iORG[:, prestim_ind[0]:poststim_ind[-1]].transpose())
-        plt.hist(np.nanmean(indiv_fad[~low_responders,:], axis=-1),color="orange",bins=100)
-        plt.hist(np.nanmean(indiv_fad[low_responders, :], axis=-1), color="b",bins=100)
-        plt.show(block=False)
+        # plt.figure(42)
+        # plt.clf()
+        # # plt.plot(indiv_fad_iORG[:, prestim_ind[0]:poststim_ind[-1]].transpose())
+        # plt.hist(np.nanmean(indiv_fad[~low_responders,:], axis=-1),color="orange",bins=100)
+        # plt.hist(np.nanmean(indiv_fad[low_responders, :], axis=-1), color="b",bins=100)
+        # plt.show(block=False)
 
         plt.figure(44)
         plt.clf()
