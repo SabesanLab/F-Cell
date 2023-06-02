@@ -18,6 +18,7 @@ from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wave
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
+from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix, trim_video
 
 
@@ -198,7 +199,8 @@ if __name__ == "__main__":
                     stimulus_train = dataset.stimtrain_frame_stamps
                     ref_im = dataset.reference_im
 
-                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)
+                    # reference_coord_data = refine_coord(ref_im, dataset.coord_data) # REINSTATE MEEEEE
+                    reference_coord_data = dataset.coord_data-1
 
                     coorddist = pdist(reference_coord_data, "euclidean")
                     coorddist = squareform(coorddist)
@@ -245,6 +247,11 @@ if __name__ == "__main__":
                                                                                        method="L1",
                                                                                        threshold=0.3)
 
+                # proffft = np.fft.fft(stdize_profiles, axis=1)
+                # avgfft = np.nanmean(proffft, axis=0)
+                # plt.plot((reconst_framestamps / (reconst_framestamps[-1]+1)) / (1 / framerate), (np.abs(avgfft) ** 2))
+                # plt.waitforbuttonpress()
+
                 # Put the profile of each cell into its own array
                 for c in range(len(dataset.coord_data)):
                     og_framestamps[c].append(dataset.framestamps)
@@ -278,6 +285,7 @@ if __name__ == "__main__":
         cell_power_iORG = np.full((len(reference_coord_data), max_frmstamp + 1), np.nan)
         cell_power_fad = np.full((len(reference_coord_data)), np.nan)
         cell_power_amp = np.full((len(reference_coord_data)), np.nan)
+        indiv_fad_iORG = np.full((len(reference_coord_data), max_frmstamp + 1), np.nan)
 
         # Make 3D matricies, where:
         # The first dimension (rows) is individual acquisitions, where NaN corresponds to missing data
@@ -289,21 +297,121 @@ if __name__ == "__main__":
         prestim_mean = np.full_like(cell_amp, np.nan)
 
         prestim_ind = np.flatnonzero(np.logical_and(full_framestamp_range < stimulus_train[0],
-                                                    full_framestamp_range >= (stimulus_train[0] - int(1 * framerate))))
+                                                    full_framestamp_range >= (stimulus_train[0] - int(0.5 * framerate))))
         poststim_ind = np.flatnonzero(np.logical_and(full_framestamp_range >= stimulus_train[0],
-                                                     full_framestamp_range < (stimulus_train[0] + int(1 * framerate))))
+                                                     full_framestamp_range < (stimulus_train[0] + int(0.5 * framerate))))
 
+        # For Ram comparison 05/10/23
+        opl_vals = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
+                               delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
+        opl_vals=opl_vals.flatten()
+        low_responders = (opl_vals<150)
+        #
+        # opl_full = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_full.csv",
+        #                        delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
+
+
+        # plt.figure(43)
+        # # plt.clf()
+        # plt.imshow(ref_im, cmap="gray")
+        # plt.plot(reference_coord_data[low_responders,0], reference_coord_data[low_responders,1], "*")
+        # plt.show(block=False)
+
+        mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", all_cell_iORG.shape[0]))
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
                 all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
                 prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
 
-            # What about a temporal histogram?
-            indiv_fad[c, :] = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                        filter_type="MS", notch_filter=None, display=False, fwhm_size=11,
-                                                        prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)[0]
-            indiv_fad[indiv_fad == 0] = np.nan
+            if np.sum(np.any(np.isfinite(all_cell_iORG[:, :, c]), axis=1)) >= (all_cell_iORG[:, :, c].shape[0]/2):
+                # if ~low_responders[c]:
+                #     todisp = False
+                # else:
+                #     todisp = True
+                todisp = False
+
+                indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
+                                                            filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=16,
+                                                            prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)
+                # Have used 1-2 before.
+                indiv_fad[indiv_fad == 0] = np.nan
+                fad_profiles[fad_profiles == 0] = np.nan
+
+
+
+            # if todisp and np.sum(np.any(np.isfinite(all_cell_iORG[:, :, c]), axis=1)) >= 1 and np.nanmean(indiv_fad[c, :], axis=-1) < 30:
+                # print("OPL: "+ str(opl_vals[c]))
+                # mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", 60))
+                # print(c)
+                # plt.figure(43)
+                # # plt.clf()
+                # # plt.imshow(ref_im, cmap="gray")
+                # plt.plot(reference_coord_data[c,0], reference_coord_data[c,1], "r*",
+                #          color=mapper.to_rgba(int(np.nanmean(indiv_fad[c, :], axis=-1)), norm=False))
+                # plt.waitforbuttonpress()
+
+                #save_tiff_stack("ex.tif", full_cell_profiles[c][0][:,:,:])
+
+                # print("iORG: " + str(np.nanmean(indiv_fad[c, :], axis=-1)))
+                #full_cell_profiles[:,:,:,c]
+
+                # plt.waitforbuttonpress()
+
+                # proffft = np.fft.fft(all_cell_iORG[:, :, c], axis=1)
+                # avgfft = np.nanmean(proffft, axis=0)
+                # plt.figure(9000)
+                # plt.clf()
+                # plt.plot((full_framestamp_range / (full_framestamp_range[-1]+1)) / (1 / framerate), (np.abs(avgfft) ** 2))
+                # plt.waitforbuttonpress()
+
+
+            # if np.sum(np.any(np.isfinite(fad_profiles), axis=1)) >= 8: # Only include cells that have data for each acquisition.
+            #     prestim_avg = np.nanmedian(fad_profiles[:, 0:prestim_ind[-1]], axis=0)
+            #     prestim_deriv = np.abs(np.gradient(prestim_avg))
+            #
+            #     prestim_gradient = np.nancumsum(np.repeat(np.nanmean(prestim_deriv), fad_profiles.shape[1]))
+            #
+            #     prestim_indiv_deriv = np.abs(np.gradient(fad_profiles[:, 0:prestim_ind[-1]-4], axis=1))
+            #     prestim_indiv_med_derv = np.nanmean(prestim_indiv_deriv, axis=1)
+            #     prestim_indiv_gradient = np.repeat(prestim_indiv_med_derv[:,None], fad_profiles.shape[1], axis=1)
+            #     prestim_indiv_gradient = np.nancumsum(prestim_indiv_gradient, axis=1)
+            #
+            #     tmp = prestim_indiv_gradient[:, (prestim_ind[0] - 4)]
+            #     prestim_indiv_gradient -= np.repeat(tmp[:,None], fad_profiles.shape[1], axis=1)
+            #     tmp = fad_profiles[:, (prestim_ind[0] - 4)]
+            #     prestim_indiv_gradient += np.repeat(tmp[:,None], fad_profiles.shape[1], axis=1)
+            #
+            #     test_iORG = np.squeeze(np.nanmean((fad_profiles - prestim_indiv_gradient), axis=0))
+            #
+            #     indiv_fad_iORG[c, :] = np.squeeze(np.nanmean(fad_profiles, axis=0)) - prestim_gradient
+            #
+            #     # For usurping everything and running the tweaked approach on whole datasets.
+            #     # indiv_fad[c, :] = np.nan
+            #     # indiv_fad[c, 0] = np.nanmax(test_iORG[poststim_ind[-1]-4]) - test_iORG[poststim_ind[0]-4]
+            #
+            #     # if np.sum(np.any(np.isfinite(fad_profiles), axis=1)) >= fad_profiles.shape[0]/2:
+            #     if todisp and (np.nanmean(indiv_fad[c, :]) <= 15):
+            #         plt.figure(43)
+            #         plt.clf()
+            #         for i in range(fad_profiles.shape[0]):
+            #             plt.subplot(2, 2, 1)
+            #             plt.plot(fad_profiles[i,:],color=mapper.to_rgba(i, norm=False))
+            #             plt.plot(prestim_avg, color="k")
+            #             plt.plot(prestim_gradient, color="k", alpha=0.3)
+            #             plt.subplot(2, 2, 2)
+            #             plt.plot((fad_profiles[i,:]- prestim_gradient),color=mapper.to_rgba(i, norm=False))
+            #             plt.plot(indiv_fad_iORG[c, :], color="k")
+            #             plt.subplot(2, 2, 3)
+            #             plt.plot(fad_profiles[i,:],color=mapper.to_rgba(i, norm=False))
+            #             plt.plot(prestim_indiv_gradient[i,:], color="k", alpha=0.3)
+            #             plt.subplot(2, 2, 4)
+            #             plt.plot((fad_profiles[i,:] - prestim_indiv_gradient[i,:]),color=mapper.to_rgba(i, norm=False))
+            #             plt.plot(test_iORG, color="k")
+            #             plt.show(block=False)
+            #             print("iORG: " + str(np.nanmean(indiv_fad[c, :])))
+            #             print(indiv_fad[c, :])
+            #         plt.waitforbuttonpress()
 
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
@@ -315,6 +423,23 @@ if __name__ == "__main__":
                                                     prestim_idx=prestim_ind, poststim_idx=poststim_ind)[0:2]
 
         cell_power_fad[cell_power_fad == 0] = np.nan
+
+
+
+        plt.figure(42)
+        plt.clf()
+        # plt.plot(indiv_fad_iORG[:, prestim_ind[0]:poststim_ind[-1]].transpose())
+        plt.hist(np.nanmean(indiv_fad[~low_responders,:], axis=-1),color="orange",bins=100)
+        plt.hist(np.nanmean(indiv_fad[low_responders, :], axis=-1), color="b",bins=100)
+        plt.show(block=False)
+
+        plt.figure(44)
+        plt.clf()
+        plt.hist(np.nanmean(indiv_fad, axis=-1),bins=100)
+        plt.show(block=False)
+        plt.waitforbuttonpress()
+
+
 
         # *** MAKE THIS A PARAM ***
         enough_data = np.sum(np.isfinite(indiv_fad), axis=1) >= np.floor( len(allFiles[loc])/2 )
@@ -372,21 +497,21 @@ if __name__ == "__main__":
 
 
         plt.figure(12)
-        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 500, 5), density=True)
+        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(-500, 800, 10), density=True)
         plt.title("Maximum absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
-        plt.xlim((0, 500))
+        #plt.xlim((0, 500))
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad.svg"))
 
         plt.figure(131)
-        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(3, 6, 0.05), density=True, label=loc.name)
+        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(-3, 6, 0.1), density=True, label=loc.name)
         plt.title("Log Maximum absolute deviation: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))))
         plt.show(block=False)
         plt.legend(loc="best")
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logmad.svg"))
 
         plt.figure(132)
-        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(3, 6, 0.05), density=True, histtype="step",
+        plt.hist(np.log(np.nanmean(indiv_fad, axis=-1)), bins=np.arange(0, 6, 0.05), density=True, histtype="step",
                  cumulative=True, label=loc.name)
         plt.title("Log Maximum absolute deviation cumulative: Median:" + str(np.log(np.nanmedian(indiv_fad.flatten()))) )
         plt.show(block=False)

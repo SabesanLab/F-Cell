@@ -9,7 +9,7 @@ from scipy.signal import fftconvolve
 from numpy.polynomial import Polynomial
 
 
-def flat_field_frame(dataframe, sigma):
+def flat_field_frame(dataframe, sigma, rescale=False):
     kernelsize = 3 * sigma
     if (kernelsize % 2) == 0:
         kernelsize += 1
@@ -23,24 +23,27 @@ def flat_field_frame(dataframe, sigma):
     flat_fielded = (dataframe.astype("float64") / blurred_frame)
 
     flat_fielded *= mask
-    flat_fielded -= np.amin(flat_fielded)
-    flat_fielded = np.divide(flat_fielded, np.amax(flat_fielded), where=flat_fielded != 0)
-    if dataframe.dtype == "uint8":
-        flat_fielded *= 255
-    elif dataframe.dtype == "uint16":
-        flat_fielded *= 65535
 
-    return flat_fielded.astype(dataframe.dtype)
+    if rescale:
+        flat_fielded -= np.amin(flat_fielded)
+        flat_fielded = np.divide(flat_fielded, np.amax(flat_fielded), where=flat_fielded != 0)
+
+        if dataframe.dtype == "uint8":
+            flat_fielded *= 255
+        elif dataframe.dtype == "uint16":
+            flat_fielded *= 65535
+
+    return flat_fielded
 
 
-def flat_field(dataset, sigma=20):
+def flat_field(dataset, sigma=31, rescale=False):
 
     if len(dataset.shape) > 2:
-        flat_fielded_dataset = np.zeros(dataset.shape, dtype=dataset.dtype)
+        flat_fielded_dataset = np.zeros(dataset.shape)
         for i in range(dataset.shape[-1]):
-            flat_fielded_dataset[..., i] = flat_field_frame(dataset[..., i], sigma)
+            flat_fielded_dataset[..., i] = flat_field_frame(dataset[..., i], sigma, rescale)
 
-        return flat_fielded_dataset.astype(dataset.dtype)
+        return flat_fielded_dataset
     else:
         return flat_field_frame(dataset, sigma)
 
@@ -76,7 +79,10 @@ def norm_video(video_data, norm_method="mean", rescaled=False):
             frm[frm == 0] = np.nan
             framewise_norm[f] = np.nanmedian(frm)
         all_norm = np.nanmean(framewise_norm)
-
+    elif norm_method == "flatfield":
+        if rescaled:
+            warnings.warn("Flat-field based video normalization ignores the \"rescaled\" parameter.")
+        return flat_field(video_data)
     else:
         # Determine each frame's mean.
         framewise_norm = np.empty([video_data.shape[-1]])

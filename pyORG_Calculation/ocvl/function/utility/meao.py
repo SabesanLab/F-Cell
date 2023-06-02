@@ -43,14 +43,19 @@ class MEAODataset:
 
                 # If we don't have an image specific to this dataset, search for the all acq avg
                 if not imname:
-                    for filename in glob.glob(path.join(p_name,"*"+self.analysis_modality + "_ALL_ACQ_AVG.tif")):
+                    for filename in glob.glob(path.join(p_name, "*"+self.analysis_modality + "_ALL_ACQ_AVG.tif")):
+                        # print(filename)
+                        imname = filename
+
+                if not imname:
+                    for filename in glob.glob(path.join(p_name, "*_ALL_ACQ_AVG.tif")):
                         # print(filename)
                         imname = filename
             else:
                 imname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
 
         if not imname:
-            #warnings.warn("Unable to detect viable average image file. Dataset functionality may be limited.")
+            warnings.warn("Unable to detect viable average image file. Dataset functionality may be limited.")
             self.image_path = None
         else:
             self.image_path = path.join(p_name, imname)

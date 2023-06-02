@@ -433,7 +433,10 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
 
     # First we filter the data with a notch filter (to possibly remove artifacts from breathing or other things.
     if notch_filter is not None:
-        sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
+        # sos = signal.butter(10, notch_filter, "bandstop", fs=29.5, output='sos')
+        # sos = signal.iirdesign([1.45, 2.15], [1.5, 2.1], gpass=1, gstop=60, fs=29.5, output='sos')
+        sos = signal.iirdesign([1.35, 2], [1.4, 1.95], gpass=0.1, gstop=60, fs=91, output='sos')
+        # sos = signal.iirdesign(1.1, 1, gpass=0.1, gstop=60, fs=91, output='sos')
         butter_filtered_profiles = np.full_like(temporal_profiles, np.nan)
         for i in range(temporal_profiles.shape[0]):
             if np.any(finite_data[i, :]):
@@ -536,7 +539,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
     cum_pre_abs_diff_profiles[cum_pre_abs_diff_profiles == 0] = np.nan
     cum_post_abs_diff_profiles[cum_post_abs_diff_profiles == 0] = np.nan
     prefad = np.amax(cum_pre_abs_diff_profiles, axis=1)
-    postfad = np.amax(cum_post_abs_diff_profiles, axis=1)
+    postfad = np.amax(cum_post_abs_diff_profiles, axis=1)-prefad
 
     prestim = filtered_profiles[:, prestim_idx]
     poststim = np.abs(filtered_profiles[:, poststim_idx])
@@ -552,7 +555,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
         if np.any(whereabove) and np.any(np.isfinite(whereabove)):
             implicit_time[i] = whereabove[0] + poststim_idx[0]-prestim_idx[-1]
 
-    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= 1:
+    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= (temporal_profiles.shape[0]/2):
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):
@@ -562,35 +565,41 @@ def iORG_signal_metrics(temporal_profiles, framestamps, filter_type=None, fwhm_s
             plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
             plt.ylim((-175, 175))
+            # plt.ylim((-2, 2))
             plt.subplot(2, 2, 2)
             plt.title("Notch Filtered data")
             plt.plot(framestamps, butter_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
             plt.ylim((-175, 175))
+            # plt.ylim((-2, 2))
             plt.subplot(2, 2, 3)
             plt.title("Filtered data")
             plt.plot(framestamps, filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             # plt.plot(framestamps, spline_filtered_profiles[i, :], color=mapper.to_rgba(i, norm=False))
             plt.vlines(framestamps[poststim_idx[0]], ymin=-200, ymax=200, color="black")
             plt.ylim((-175, 175))
+            # plt.ylim((-2, 2))
             # plt.hlines(np.array((prestim_val, poststim_val)), 0, framestamps[whereabove[0]+poststim_idx[0]])
             plt.subplot(2, 2, 4)
             plt.title("AUC")
-            plt.plot(framestamps[poststim_idx].flatten(), cum_post_abs_diff_profiles[i, :].flatten(), color=mapper.to_rgba(i, norm=False))
+            plt.plot(framestamps[poststim_idx].flatten(), cum_post_abs_diff_profiles[i, :].flatten(),
+                     color=mapper.to_rgba(i, norm=False))
             plt.plot(framestamps[prestim_idx].flatten(), cum_pre_abs_diff_profiles[i, :].flatten(), color=mapper.to_rgba(i, norm=False))
-            #plt.show(block=False)
+
+            plt.show(block=False)
 
             #For displaying just post fad
-            # plt.figure(43)
+
             # plt.plot(framestamps[poststim_idx], cum_post_abs_diff_profiles[i, :])
             #plt.plot(framestamps, np.nancumsum(np.abs(grad_profiles[i, :])))
 
             # plt.plot(framestamps[poststim_idx].flatten(), cum_post_abs_diff_profiles[i, :].flatten()-cum_pre_abs_diff_profiles[i, :].flatten(),
             #          color=mapper.to_rgba(i, norm=False))
             #plt.show(block=False)
-            # plt.waitforbuttonpress()
 
 
+        # plt.plot(framestamps[poststim_idx], np.nanmean(cum_post_abs_diff_profiles,axis=0),color="k")
+        print(str(postfad))
         plt.waitforbuttonpress()
 
     return postfad, amplitude, implicit_time, np.nancumsum(np.abs(grad_profiles), axis=1)

@@ -24,8 +24,8 @@ def refine_coord(ref_image, coordinates, search_radius=1, numiter=2):
     del pluscoord
 
     minuscoord = coordinates - search_radius
-    includelist &= minuscoord[:, 0] > 0
-    includelist &= minuscoord[:, 1] > 0
+    includelist &= minuscoord[:, 0] >= 0
+    includelist &= minuscoord[:, 1] >= 0
     del minuscoord
 
     coordinates = np.round(coordinates[includelist, :]).astype("int")
