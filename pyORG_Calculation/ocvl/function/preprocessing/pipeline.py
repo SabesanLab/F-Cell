@@ -39,7 +39,7 @@ def initialize_and_load_meao(file, a_mode, ref_mode):
     print(file)
     dataset = MEAODataset(file, analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PROCESSED)
 
-    dataset.load_unpipelined_data()
+    dataset.load_processed_data()
 
     imp, wp = weighted_z_projection(dataset.video_data, dataset.mask_data)
 
@@ -95,7 +95,7 @@ def run_generic_pipeline(pName, tkroot):
             dataset = GenericDataset(toload, stage=PipeStages.RAW)
 
             dataset.load_data()
-            dataset.video_data = flat_field(dataset.video_data[47:-48, 47:-48])
+            dataset.video_data = flat_field(dataset.video_data)
 
             dataset.save_data("_ff")
             r += 1
@@ -414,6 +414,6 @@ if __name__ == "__main__":
             w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
     root.update()
 
-    #run_ff_pipeline(pName, tkroot=root)
+    run_generic_pipeline(pName, tkroot=root)
 
-    run_meao_pipeline(pName, tkroot=root)
+    # run_meao_pipeline(pName, tkroot=root)

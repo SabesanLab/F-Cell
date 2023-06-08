@@ -108,7 +108,7 @@ class GenericDataset:
             else:
                 self.stimtrain_frame_stamps = self.num_frames-1
 
-    def load_unpipelined_data(self, force=False):
+    def load_processed_data(self, force=False):
         # Establish our unpipelined filenames
         if self.stage is not PipeStages.RAW or force:
             resource = load_video(self.video_path)

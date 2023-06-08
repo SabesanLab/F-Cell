@@ -191,7 +191,7 @@ class MEAODataset:
 
 
 
-    def load_unpipelined_data(self, force=False):
+    def load_processed_data(self, force=False):
 
         # Establish our unpipelined filenames
         if self.stage is not PipeStages.RAW or force:
