@@ -140,7 +140,7 @@ if __name__ == "__main__":
         framestamps = []
         max_frmstamp = 0
         plt.figure(0)
-        plt.clf()
+
         first = True
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])))
         segmentation_radius = None
@@ -261,11 +261,11 @@ if __name__ == "__main__":
                           " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
-                    plt.figure(0)
+                    plt.figure(r - skipnum)
 
                     plt.xlabel("Time (seconds)")
                     plt.ylabel("Response")
-                    plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
+                    plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum]/ np.amax(pop_iORG[0]), color=mapper.to_rgba(r - skipnum, norm=False),
                              label=file.name)
                     plt.show(block=False)
                     #plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
@@ -278,8 +278,8 @@ if __name__ == "__main__":
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
-        plt.xlim([0,  6])
-        plt.ylim([-5, 60]) #was 60
+        plt.xlim([0,  4])
+        plt.ylim([-0.1, 1.2]) #was 60
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -354,7 +354,7 @@ if __name__ == "__main__":
                                       columns=["Amplitude", "Implicit time", "Recovery %"])
         pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
 
-        plt.figure(1)
+        plt.figure(10)
 
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
