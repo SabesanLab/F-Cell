@@ -277,7 +277,7 @@ def simple_image_stack_align(im_stack, mask_stack, ref_idx):
     return shifts
 
 
-def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial_shifts=False, dropthresh=None, transformtype="affine"):
+def optimizer_stack_align(im_stack, mask_stack, reference_idx, determine_initial_shifts=False, dropthresh=None, transformtype="rigid"):
     num_frames = im_stack.shape[-1]
 
     reg_stack = np.zeros(im_stack.shape)

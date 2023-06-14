@@ -33,6 +33,11 @@ def load_video(video_path):
         ret, frm = vid.read()
 
         video_data = np.empty([height, width, num_frames], dtype=frm.dtype)
+        # video_data = np.empty([440, 600, num_frames], dtype=frm.dtype)
+        # tmp = frm[..., 0]
+        # hdif = int((tmp.shape[0]-440) / 2)
+        # wdif = int((tmp.shape[1]-600) / 2)
+        # video_data[..., 0] = tmp[hdif:-hdif,wdif:-wdif]
         video_data[..., 0] = frm[..., 0]
     else:
         warnings.warn("Failed to open video: "+video_path)
@@ -41,6 +46,11 @@ def load_video(video_path):
     while vid.isOpened():
         ret, frm = vid.read()
         if ret:
+            # tmp = frm[..., 0]
+            # hdif = int((tmp.shape[0] - 440) / 2)
+            # wdif = int((tmp.shape[1] - 600) / 2)
+            #
+            # video_data[..., i] = tmp[hdif:-hdif,wdif:-wdif]
             video_data[..., i] = frm[..., 0]
             i += 1
         else:

@@ -136,7 +136,7 @@ if __name__ == "__main__":
                 #stdize_profiles, dataset.framestamps, nummissed = reconstruct_profiles(stdize_profiles, dataset.framestamps)
                 #plt.savefig(res_dir.joinpath(this_dirname +  "_all_std_profiles.svg"))
 
-                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=1)
+                tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms", window_size=3)
 
                 tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
                                                 dataset.stimtrain_frame_stamps[0], method="mean_sub")
