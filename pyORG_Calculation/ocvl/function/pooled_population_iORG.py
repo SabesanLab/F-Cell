@@ -206,10 +206,17 @@ if __name__ == "__main__":
                     pop_iORG_recover[r] = np.NaN
                     print(file.name + " was dropped due to all cells being excluded.")
 
-                stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
-                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub")
+                prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
+                                             dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
+                                                 1 * dataset.framerate))))
+                poststim_ind = np.flatnonzero(np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
+                                              dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(
+                                                  1 * dataset.framerate))))
 
-                # plt.figure(1)
+                stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
+                                                       dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
+
+                # plt.figure(9)
                 # plt.clf()
                 # for i in range(stdize_profiles.shape[0]):
                 #     plt.plot(dataset.framestamps, stdize_profiles[i, :])
@@ -220,16 +227,10 @@ if __name__ == "__main__":
                                                        window_size=1)
 
                 tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
-                                                dataset.stimtrain_frame_stamps[0], method="mean_sub")
+                                                dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
 
                 tmp_iorg = np.squeeze(tmp_iorg)
 
-                prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
-                                             dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
-                                                 1 * dataset.framerate))))
-                poststim_ind = np.flatnonzero(np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
-                                              dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(
-                                                  1 * dataset.framerate))))
                 poststim_loc = dataset.framestamps[poststim_ind]
                 prestim_amp = np.nanmedian(tmp_iorg[prestim_ind])
                 poststim = tmp_iorg[poststim_ind]
@@ -261,13 +262,17 @@ if __name__ == "__main__":
                           " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
-                    plt.figure(r - skipnum)
+                    plt.figure(0)
+                    plt.subplot(2,5,r - skipnum+1)
 
                     plt.xlabel("Time (seconds)")
                     plt.ylabel("Response")
-                    plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum]/ np.amax(pop_iORG[0]), color=mapper.to_rgba(r - skipnum, norm=False),
+                    plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
                              label=file.name)
+
                     plt.show(block=False)
+                    plt.xlim([0, 4])
+                    plt.ylim([-5, 40])
                     #plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
                     r += 1
 
@@ -277,9 +282,9 @@ if __name__ == "__main__":
         dt = datetime.now()
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
-        plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
+        # plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  4])
-        plt.ylim([-0.1, 1.2]) #was 60
+        plt.ylim([-5, 60]) #was 60
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))

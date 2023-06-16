@@ -56,7 +56,7 @@ def save_tiff_stack(stack_path, stack_data, scalar_mapper=None):
 
     framelist = np.empty((stack_data.shape[2], stack_data.shape[0], stack_data.shape[1]))
     for f in range(stack_data.shape[-1]):
-        framelist[f, :, :] = stack_data[..., f].astype("uint8")
+        framelist[f, :, :] = stack_data[..., f]
 
     cv2.imwritemulti(str(stack_path), framelist)
 

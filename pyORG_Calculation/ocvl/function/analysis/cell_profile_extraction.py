@@ -333,7 +333,7 @@ def norm_profiles(temporal_profiles, norm_method="mean", rescaled=False, video_r
         return np.divide(temporal_profiles, framewise_norm[None, :])
 
 
-def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method="linear_std", display=False):
+def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method="linear_std", display=False, std_indices=None):
     """
     This function standardizes each temporal profile (here, the rows of the supplied data) according to the provided
     arguments.
@@ -346,11 +346,16 @@ def standardize_profiles(temporal_profiles, framestamps, stimulus_stamp, method=
                     each signal before stimulus_stamp, followed by a standardization based on that pre-stamp linear-fit
                     subtracted data. This was used in Cooper et al 2017/2020.
                     Current options include: "linear_std", "linear_vast", "relative_change", and "mean_sub"
+    :param std_indices: The range of indices to use when standardizing. Defaults to the full prestimulus range.
 
     :return: a NxM numpy matrix of standardized temporal profiles.
     """
 
-    prestimulus_idx = np.where(framestamps <= stimulus_stamp, True, False)
+    if std_indices is None:
+        prestimulus_idx = np.where(framestamps <= stimulus_stamp, True, False)
+    else:
+        prestimulus_idx = std_indices
+
     if len(prestimulus_idx) == 0:
         warnings.warn("Time before the stimulus framestamp doesn't exist in the provided list! No standardization performed.")
         return temporal_profiles

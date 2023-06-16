@@ -18,7 +18,7 @@ from ocvl.function.analysis.iORG_profile_analyses import signal_power_iORG, wave
 from ocvl.function.preprocessing.improc import norm_video
 from ocvl.function.utility.generic import PipeStages
 from ocvl.function.utility.meao import MEAODataset
-from ocvl.function.utility.resources import save_tiff_stack
+from ocvl.function.utility.resources import save_tiff_stack, save_video
 from ocvl.function.utility.temporal_signal_utils import reconstruct_profiles, densify_temporal_matrix, trim_video
 
 
@@ -228,9 +228,10 @@ if __name__ == "__main__":
                 #                                  summary="none", sigma=1)
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+                # save_tiff_stack(res_dir.joinpath(this_dirname+"_normvid.tif"),norm_video_data)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
-                                                 seg_mask="disk", summary="mean")
+                                                 seg_mask="disk", summary="median")
 
                 temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                      stimulus_stamp=stimulus_train[0], method="mean_sub")
@@ -312,7 +313,7 @@ if __name__ == "__main__":
                 todisp = True
 
                 indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                            framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=14,
+                                                            framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=18,
                                                             prestim_idx=prestim_ind, poststim_idx=poststim_ind)
                 # Have used 1-2 before.
                 indiv_fad[indiv_fad == 0] = np.nan
