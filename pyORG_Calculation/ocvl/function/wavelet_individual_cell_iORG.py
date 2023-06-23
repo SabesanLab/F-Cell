@@ -203,6 +203,8 @@ if __name__ == "__main__":
 
 
     # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
+    all_scales = np.full((reference_coord_data.shape[0], 3), np.nan)
+
     # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
         if loc == controlpath:
@@ -314,6 +316,9 @@ if __name__ == "__main__":
                     max_frmstamp = dataset.framestamps[-1]
 
                 del dataset, temp_profiles, stdize_profiles
+            else:
+                continue
+
 
         # Rows: Acquisitions
         # Cols: Framestamps
@@ -427,14 +432,15 @@ if __name__ == "__main__":
             cell_profiles[c] = []
             cell_framestamps[c] = []
 
-        peak_ska = pd.DataFrame(np.nanmean(peak_scale, axis=-1))
-        peak_ska.to_csv(res_dir.joinpath(file.name[0:-4] + "_peak_scales.csv"))
+        all_scales[0:peak_scale.shape[0], l-1] = np.nanmean(peak_scale, axis=-1)
 
         plt.figure(9)
         plt.hist(peak_scale.flatten(), bins=100)
-        plt.waitforbuttonpress()
+        plt.draw()
+        # plt.waitforbuttonpress()
 
-
+    peak_ska = pd.DataFrame(all_scales)
+    peak_ska.to_csv(searchpath.joinpath("peak_scales.csv"))
 
         # for c in range(len(reference_coord_data)):
         #     cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
