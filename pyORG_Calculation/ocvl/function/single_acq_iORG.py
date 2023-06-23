@@ -302,10 +302,10 @@ if __name__ == "__main__":
                                                      full_framestamp_range <= (stimulus_train[0] + int(0.5 * framerate))))
 
         # For Ram comparison 05/10/23
-        # opl_vals = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
-        #                        delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
-        # opl_vals=opl_vals.flatten()
-        # low_responders = (opl_vals<150)
+        opl_vals = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
+                               delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
+        opl_vals=opl_vals.flatten()
+        low_responders = (opl_vals<150)
         #
         # opl_full = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_full.csv",
         #                        delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
@@ -325,14 +325,14 @@ if __name__ == "__main__":
                 prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
 
             if np.sum(np.any(np.isfinite(all_cell_iORG[:, :, c]), axis=1)) >= (all_cell_iORG[:, :, c].shape[0]/2):
-                # if ~low_responders[c]:
-                #     todisp = False
-                # else:
-                #     todisp = True
-                todisp = True
+                if ~low_responders[c]:
+                    todisp = False
+                else:
+                    todisp = True
+                # todisp = False
 
                 indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                            framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=14,
+                                                            framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=18,
                                                             prestim_idx=prestim_ind, poststim_idx=poststim_ind)
                 # Have used 1-2 before.
                 indiv_fad[indiv_fad == 0] = np.nan
@@ -426,12 +426,13 @@ if __name__ == "__main__":
 
 
 
-        # plt.figure(42)
-        # plt.clf()
-        # # plt.plot(indiv_fad_iORG[:, prestim_ind[0]:poststim_ind[-1]].transpose())
-        # plt.hist(np.nanmean(indiv_fad[~low_responders,:], axis=-1),color="orange",bins=100)
-        # plt.hist(np.nanmean(indiv_fad[low_responders, :], axis=-1), color="b",bins=100)
-        # plt.show(block=False)
+        plt.figure(42)
+        plt.clf()
+        # plt.plot(indiv_fad_iORG[:, prestim_ind[0]:poststim_ind[-1]].transpose())
+        plt.hist(np.nanmedian(indiv_fad[~low_responders,:], axis=-1),color="orange",bins=100)
+        plt.hist(np.nanmedian(indiv_fad[low_responders, :], axis=-1), color="b",bins=100)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad_wlowresp.png"))
 
         plt.figure(44)
         plt.clf()
