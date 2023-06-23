@@ -199,8 +199,7 @@ if __name__ == "__main__":
                     stimulus_train = dataset.stimtrain_frame_stamps
                     ref_im = dataset.reference_im
 
-                    # reference_coord_data = refine_coord(ref_im, dataset.coord_data) # REINSTATE MEEEEE
-                    reference_coord_data = dataset.coord_data-1
+                    reference_coord_data = refine_coord(ref_im, dataset.coord_data) # REINSTATE MEEEEE
 
                     coorddist = pdist(reference_coord_data, "euclidean")
                     coorddist = squareform(coorddist)

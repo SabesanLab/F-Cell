@@ -175,7 +175,7 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold=None, displa
     temporal_data = temporal_profiles.copy()
 
     time = framestamps / fps
-    the_wavelet = wavelets.Wavelet(("gmw", {"gamma": 2, "beta": 1}))
+    the_wavelet = wavelets.Wavelet(("gmw", {"gamma": 3, "beta": 1}))
     # the_wavelet = wavelets.Wavelet(("hhhat", {"mu": 1}))
     # the_wavelet = wavelets.Wavelet(("bump", {"mu": 1, "s": 1.2}))
     # the_wavelet.viz()
@@ -187,13 +187,16 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold=None, displa
     if display:
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", temporal_data.shape[0]))
         plt.figure(12)
-        signal = plt.subplot(2, 2, 2)
-        waveletd3 = plt.subplot(2, 2, 3)
-        waveletthresh = plt.subplot(2, 2, 4)
-        signal.cla()
+
+
 
     for r in range(temporal_data.shape[0]):
         if display:
+            plt.clf()
+            signal = plt.subplot(2, 2, 2)
+            waveletd3 = plt.subplot(2, 2, 3)
+            waveletthresh = plt.subplot(2, 2, 4)
+
             signal.plot(time, temporal_data[r, :], color=mapper.to_rgba(r, norm=False), marker="o", markersize=2)
 
         if np.all(np.isfinite(temporal_data[r, :])):
@@ -214,9 +217,6 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold=None, displa
                 coi_im[s, 0:scale_ind] = 0
                 coi_im[s, -scale_ind:] = 0
 
-            if display:
-                waveletd3.imshow(mod_Wx)
-
             if sig_threshold is not None:
                 overthresh = mod_Wx > sig_threshold
                 mod_Wx[mod_Wx <= sig_threshold] = 0
@@ -224,15 +224,14 @@ def wavelet_iORG(temporal_profiles, framestamps, fps, sig_threshold=None, displa
 
                 if display:
                     waveletd3.imshow(mod_Wx)
-                    waveletthresh.imshow(
-                        np.reshape(overthresh, mod_Wx.shape))  # , extent=(0, framestamps[150], scales[0], scales[-1]))
+                    waveletthresh.imshow(np.reshape(overthresh, mod_Wx.shape))  # , extent=(0, framestamps[150], scales[0], scales[-1]))
                     plt.show(block=False)
-                    # plt.waitforbuttonpress()
+                    plt.waitforbuttonpress()
             else:
                 if display:
                     waveletd3.imshow(mod_Wx)
                     plt.show(block=False)
-                    # plt.waitforbuttonpress()
+                    plt.waitforbuttonpress()
 
             allWx.append(Wx)
             allScales = freq_scales
