@@ -177,7 +177,7 @@ if __name__ == "__main__":
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
-                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
 
                 # Clip out data beyond two seconds before and after.
                 # dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
@@ -256,10 +256,10 @@ if __name__ == "__main__":
                                                                       poststim_idx=poststim_ind)[1:3]
 
                     pop_iORG_recover[r] = 1 - ((final_val - prestim_amp) / pop_iORG_amp[r])
-                    pop_iORG_implicit[r] = 1000*pop_iORG_implicit[r] / dataset.framerate
+                    pop_iORG_implicit[r] = pop_iORG_implicit[r] / dataset.framerate
 
                     print("Signal metrics based iORG Amplitude: " + str(pop_iORG_amp[r]) +
-                          " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
+                          " Implicit time (s): " + str(pop_iORG_implicit[r]) +
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
                     plt.figure(0)
@@ -272,7 +272,7 @@ if __name__ == "__main__":
 
                     plt.show(block=False)
                     plt.xlim([0, 4])
-                    plt.ylim([-5, 40])
+                    # plt.ylim([-5, 40])
                     #plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
                     r += 1
 
@@ -284,7 +284,7 @@ if __name__ == "__main__":
 
         # plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0,  4])
-        plt.ylim([-5, 60]) #was 60
+        # plt.ylim([-5, 60]) #was 60
         #plt.legend()
 
         plt.savefig( res_dir.joinpath(this_dirname + "_pop_iORG_" + now_timestamp + ".svg"))
@@ -346,11 +346,11 @@ if __name__ == "__main__":
             max_frmstmp = poststim_loc[np.argmax(poststim)] - dataset.stimtrain_frame_stamps[0]
 
             final_val = np.mean(pooled_iORG[-5:])
-            pop_iORG_implicit[r] = 1000 * max_frmstmp / dataset.framerate
+            pop_iORG_implicit[r] = max_frmstmp / dataset.framerate
             pop_iORG_amp[r] = (poststim_amp - prestim_amp)
             pop_iORG_recover[r] = 1 - ((final_val - prestim_amp) / pop_iORG_amp[r])
 
-        print("Pooled iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (ms): " + str(pop_iORG_implicit[r]) +
+        print("Pooled iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (s): " + str(pop_iORG_implicit[r]) +
               " Recovery fraction: " + str(pop_iORG_recover[r]))
 
         pop_amp_dFrame = pd.DataFrame(np.concatenate((np.array(pop_iORG_amp, ndmin=2).transpose(),
@@ -364,7 +364,7 @@ if __name__ == "__main__":
         plt.plot(all_frmstamps / dataset.framerate, pooled_iORG)
         plt.vlines(dataset.stimtrain_frame_stamps[0] / dataset.framerate, -1, 10, color="red")
         plt.xlim([0, 6])
-        plt.ylim([-5, 60]) #was 1, 60
+        # plt.ylim([-5, 60]) #was 1, 60
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
