@@ -257,7 +257,7 @@ if __name__ == "__main__":
                     ref_im = dataset.reference_im
 
                     reference_coord_data = dataset.coord_data - 1
-                    reference_coord_data = refine_coord(ref_im, dataset.coord_data)  # REINSTATE MEEEEEEEEEEEEEEEEEEEEEEE
+                    # reference_coord_data = refine_coord(ref_im, dataset.coord_data)  # REINSTATE MEEEEEEEEEEEEEEEEEEEEEEE
 
                     all_scales = np.full((reference_coord_data.shape[0], 4), np.nan)
 
@@ -346,7 +346,7 @@ if __name__ == "__main__":
         peak_scale[:] = np.nan
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
-                if i<2: # REMOVE MEEEE
+                # if i<2: # REMOVE MEEEE
                     all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
                 # save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
@@ -364,8 +364,8 @@ if __name__ == "__main__":
                                                         sig_threshold_im, display=False)
 
                 print(c)
-                plt.figure(42)
-                plt.clf()
+                # plt.figure(42)
+                # plt.clf()
                 for t, t_cwt in enumerate(allcell_CWT):
 
                     if np.any(np.isfinite(t_cwt)):
@@ -396,11 +396,11 @@ if __name__ == "__main__":
                             # print(peak_dist)
 
                             # plt.suptitle(str(t))
-                            ax1 = plt.subplot(2, 5, t+1)
-                            ax1.imshow(cwt_mod)
-                            ax1.plot(stimulus_train[0]+cwt_window_start+peak_idx[maxvalind][1], peak_idx[maxvalind][0], "b*")
-                            ax2 = plt.subplot(2, 5, t+6)
-                            ax2.plot(all_cell_iORG[t, :, c], "r")
+                            # ax1 = plt.subplot(2, 5, t+1)
+                            # ax1.imshow(cwt_mod)
+                            # ax1.plot(stimulus_train[0]+cwt_window_start+peak_idx[maxvalind][1], peak_idx[maxvalind][0], "b*")
+                            # ax2 = plt.subplot(2, 5, t+6)
+                            # ax2.plot(all_cell_iORG[t, :, c], "r")
                             # plt.ylim((0, cwt_window.shape[0]))
 
 
@@ -415,7 +415,7 @@ if __name__ == "__main__":
                             # ax2.plot(all_cell_iORG[t, :, c], "r")
 
 
-                            plt.show(block=False)
+                            # plt.show(block=False)
                             # plt.draw()
                             # plt.waitforbuttonpress()
                         else:
@@ -432,7 +432,7 @@ if __name__ == "__main__":
                 # plt.show(block=False)
                 # plt.draw()
                 # plt.pause(0.1)
-                plt.waitforbuttonpress()
+                # plt.waitforbuttonpress()
                 # plt.close("all")
                 # indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
                 # indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
@@ -443,12 +443,13 @@ if __name__ == "__main__":
         print(l)
         all_scales[0:peak_scale.shape[0], l-1] = np.nanmean(peak_scale, axis=-1)
 
+
+
         plt.figure(9)
-        plt.hist(peak_scale.flatten(), bins=100)
+        plt.hist(np.nanmean(peak_scale, axis=-1), bins=100)
         plt.draw()
+        plt.waitforbuttonpress()
 
-
-    plt.waitforbuttonpress()
     peak_ska = pd.DataFrame(all_scales)
     peak_ska.to_csv(searchpath.joinpath("peak_scales.csv"))
 
