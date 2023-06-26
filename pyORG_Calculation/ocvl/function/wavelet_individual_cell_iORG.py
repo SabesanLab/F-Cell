@@ -196,9 +196,9 @@ if __name__ == "__main__":
 
 
         # For 95% significance.
-        sig_threshold = avg_all+np.sqrt(avg_var)*3.85 #3.85 for 95, for 97.5, 6.63 for 99th from Chi squared distribution
+        sig_threshold = avg_all+np.sqrt(avg_var)*2 #3.85 #3.85 for 95, for 97.5, 6.63 for 99th from Chi squared distribution
         sig_threshold_im = np.repeat(np.asmatrix(sig_threshold).transpose(), len(reconst_framestamps), axis=1)
-        sig_threshold_im[coi < 1] = np.amax(sig_threshold)
+        sig_threshold_im[coi < 1] = 100
         plt.figure(12)
         plt.plot(scales, sig_threshold)
         plt.gca().set_xscale("log")
@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
 
     # [ 0:"bob"  1:"moe" 2:"larry" 3:"curly"]
-
+    first = True
 
     # Loops through all locations in allFiles
     for l, loc in enumerate(allFiles):
@@ -230,7 +230,7 @@ if __name__ == "__main__":
         for file in allFiles[loc]:
 
             # Ignores the All_ACQ_AVG tif while running through the files in this location
-            if "ALL_ACQ_AVG" not in file.name: # REMOVE MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+            if "ALL_ACQ_AVG" not in file.name : # REMOVE MEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
                 # Waitbar stuff
                 pb["value"] = r
                 pb_label["text"] = "Processing " + file.name + "..."
@@ -256,7 +256,7 @@ if __name__ == "__main__":
                     stimulus_train = dataset.stimtrain_frame_stamps
                     ref_im = dataset.reference_im
 
-                    reference_coord_data = dataset.coord_data - 1
+                    # reference_coord_data = dataset.coord_data - 1
                     reference_coord_data = refine_coord(ref_im, dataset.coord_data)  # REINSTATE MEEEEEEEEEEEEEEEEEEEEEEE
 
                     all_scales = np.full((reference_coord_data.shape[0], 4), np.nan)
@@ -346,7 +346,7 @@ if __name__ == "__main__":
         peak_scale[:] = np.nan
         for c in range(len(reference_coord_data)):
             for i, profile in enumerate(mean_cell_profiles[c]):
-                if i<2: # REMOVE MEEEE
+                # if i<2: # REMOVE MEEEE
                     all_cell_iORG[i, cell_framestamps[c][i], c] = profile
 
                 # save_tiff_stack(res_dir.joinpath(allFiles[loc][i].name[0:-4] + "cell(" + str(reference_coord_data[c][0]) + "," +
@@ -395,17 +395,18 @@ if __name__ == "__main__":
                             # if cell_amp[c, t] < 0.6:
                             # print(peak_dist)
 
-                            # plt.suptitle(str(t))
+
                             ax1 = plt.subplot(2, 5, t+1)
                             ax1.imshow(cwt_mod)
+                            ax1.set_yticklabels(scales[np.linspace(0, len(scales)-1, 10, dtype="int")])
+
                             ax1.plot(stimulus_train[0]+cwt_window_start+peak_idx[maxvalind][1], peak_idx[maxvalind][0], "b*")
                             ax2 = plt.subplot(2, 5, t+6)
                             ax2.plot(all_cell_iORG[t, :, c], "r")
-                            # plt.ylim((0, cwt_window.shape[0]))
 
 
 
-                            # plt.figure(12, figsize=(cwt_window.shape[1] / 2, cwt_window.shape[0] / 2))
+                            # plt.figure(12, figsize=(cwt_winow.shape[1] / 2, cwt_window.shape[0] / 2))
                             # plt.clf()
                             # ax1 = plt.gca()
                             # ax1.imshow(cwt_phase, aspect='auto')
@@ -416,8 +417,8 @@ if __name__ == "__main__":
 
 
                             plt.show(block=False)
-                            # plt.draw()
-                            # plt.waitforbuttonpress()
+                            plt.draw()
+                            plt.waitforbuttonpress()
                         else:
                             mindist = np.nan
                             peak_scale[c, t] = np.nan
@@ -432,7 +433,7 @@ if __name__ == "__main__":
                 # plt.show(block=False)
                 # plt.draw()
                 # plt.pause(0.1)
-                plt.waitforbuttonpress()
+                # plt.waitforbuttonpress()
                 # plt.close("all")
                 # indiv_resp = pd.DataFrame(all_cell_iORG[:, :, c])
                 # indiv_resp.to_csv(res_dir.joinpath(file.name[0:-4] + "cell_" + str(c) + "_cell_profiles.csv"),
@@ -443,13 +444,17 @@ if __name__ == "__main__":
         print(l)
         all_scales[0:peak_scale.shape[0], l-1] = np.nanmean(peak_scale, axis=-1)
 
+        print(np.nanquantile(peak_scale, 0.95, axis=-0))
+        print(np.nanstd(np.nanquantile(peak_scale, 0.95, axis=-0)))
+
         plt.figure(9)
-        plt.hist(peak_scale.flatten(), bins=100)
+        plt.hist(np.nanquantile(peak_scale, 0.95, axis=-1), bins=100)
         plt.draw()
+        plt.waitforbuttonpress()
 
 
-    plt.waitforbuttonpress()
-    peak_ska = pd.DataFrame(all_scales)
+
+    peak_ska = pd.DataFrame(peak_scale)
     peak_ska.to_csv(searchpath.joinpath("peak_scales.csv"))
 
         # for c in range(len(reference_coord_data)):
