@@ -414,6 +414,6 @@ if __name__ == "__main__":
             w, h, x, y))  # This moving around is to make sure the dialogs appear in the middle of the screen.
     root.update()
 
-    run_generic_pipeline(pName, tkroot=root)
+    # run_generic_pipeline(pName, tkroot=root)
 
-    # run_meao_pipeline(pName, tkroot=root)
+    run_meao_pipeline(pName, tkroot=root)
