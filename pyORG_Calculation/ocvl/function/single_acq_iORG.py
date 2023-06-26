@@ -227,7 +227,7 @@ if __name__ == "__main__":
                 # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius+1,
                 #                                  summary="none", sigma=1)
 
-                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
                                                  seg_mask="disk", summary="mean")
@@ -302,13 +302,14 @@ if __name__ == "__main__":
                                                      full_framestamp_range <= (stimulus_train[0] + int(0.5 * framerate))))
 
         # For Ram comparison 05/10/23
-        opl_vals = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
+        opl_vals = pd.read_csv("\\\\134.48.93.176\\Projects\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_final_vals.csv",
                                delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
         opl_vals=opl_vals.flatten()
         low_responders = (opl_vals<150)
+        high_responders = (opl_vals > 450)
         #
-        # opl_full = pd.read_csv("P:\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_full.csv",
-        #                        delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
+        opl_full = pd.read_csv("\\\\134.48.93.176\\Projects\\RFC_Projects\\SabLab_Collab\\03_May_2023_LSO&OCT_ORG\\OPL_full.csv",
+                               delimiter=',', encoding="utf-8-sig", header=None).to_numpy()
 
 
         # plt.figure(43)
@@ -325,7 +326,7 @@ if __name__ == "__main__":
                 prestim_mean[c, i] = np.nanmean(all_cell_iORG[i, prestim_ind, c])
 
             if np.sum(np.any(np.isfinite(all_cell_iORG[:, :, c]), axis=1)) >= (all_cell_iORG[:, :, c].shape[0]/2):
-                if ~low_responders[c]:
+                if ~high_responders[c]:
                     todisp = False
                 else:
                     todisp = True
@@ -334,6 +335,11 @@ if __name__ == "__main__":
                 indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
                                                             framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=18,
                                                             prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+                if todisp:
+                    plt.subplot(2,2,2)
+                    plt.cla()
+                    plt.plot(opl_full[c,:])
+                    plt.waitforbuttonpress()
                 # Have used 1-2 before.
                 indiv_fad[indiv_fad == 0] = np.nan
                 fad_profiles[fad_profiles == 0] = np.nan
