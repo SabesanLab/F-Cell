@@ -273,10 +273,10 @@ def run_meao_pipeline(pName, tkroot):
             #             "\\\\134.48.93.176\\Raw Study Data\\00-64774\\MEAOSLO1\\20210824\\Processed\\Functional Pipeline\\apre_selected_stk.avi",
             #             a_im_proj.astype("uint8"), 29.4)
 
-            ref_im_proj, ref_xforms, inliers = optimizer_stack_align(ref_im_proj.astype("uint8"),
+            ref_im_proj, ref_xforms, inliers = optimizer_stack_align(flat_field(ref_im_proj.astype("uint8")),
                                                                 (weight_proj > 0).astype("uint8"),
                                                                 dist_ref_idx, determine_initial_shifts=True,
-                                                                dropthresh=0.0, transformtype="rigid")
+                                                                dropthresh=0.0, transformtype="affine")
 
             # Use the xforms from each type (reference/analysis) to do the alignment.
             # Inliers will be determined by the reference modality.
@@ -364,8 +364,8 @@ def run_meao_pipeline(pName, tkroot):
 
             cv2.imwrite(os.path.join(writepath, ref_zproj_fname), ref_zproj.astype("uint8"))
             cv2.imwrite(os.path.join(writepath, analysis_zproj_fname), analysis_zproj.astype("uint8"))
-            save_video(os.path.join(writepath, analysis_vid_fname), a_im_proj, 29.4)
-            save_video(os.path.join(writepath, ref_vid_fname), ref_im_proj, 29.4)
+            save_video(os.path.join(writepath, analysis_vid_fname), a_im_proj.astype("uint8"), 29.4)
+            save_video(os.path.join(writepath, ref_vid_fname), ref_im_proj.astype("uint8"), 29.4)
 
             del dataset
             del a_im_proj
