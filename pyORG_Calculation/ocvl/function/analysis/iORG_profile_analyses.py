@@ -427,9 +427,15 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
     # Remove heartbeats?
     finite_data = np.isfinite(temporal_profiles)
 
-    if np.all(~finite_data):
+    if np.all(~finite_data) or len(prestim_idx) == 0 or len(poststim_idx)==0:
         return np.full((temporal_profiles.shape[0]), np.nan), np.full((temporal_profiles.shape[0]), np.nan), \
                np.full((temporal_profiles.shape[0]), np.nan), np.full(temporal_profiles.shape, np.nan)
+
+    if prestim_idx is None:
+        prestim_idx = np.zeros((1,))
+
+    if poststim_idx is None:
+        poststim_idx = np.arange(1,temporal_profiles.shape[1])
 
     # First we filter the data with a notch filter (to possibly remove artifacts from breathing or other things.
     if notch_filter is not None:
@@ -533,6 +539,8 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
     grad_profiles = np.gradient(filtered_profiles, axis=1) # Don't need to factor in the dx, because it gets removed anyway in the next step.
 
     pre_abs_diff_profiles = np.abs(grad_profiles[:, prestim_idx])
+    if len(pre_abs_diff_profiles)<=1:
+        pre_abs_diff_profiles = np.zeros((1,1))
     cum_pre_abs_diff_profiles = np.nancumsum(pre_abs_diff_profiles, axis=1)
 
     post_abs_diff_profiles = np.abs(grad_profiles[:, poststim_idx])
