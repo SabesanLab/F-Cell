@@ -3,6 +3,7 @@ import warnings
 from pathlib import Path
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import os.path
 import pandas as pd
@@ -191,7 +192,7 @@ class MEAODataset:
 
 
 
-    def load_processed_data(self, force=False):
+    def load_processed_data(self, force=False, clip_top=0):
 
         # Establish our unpipelined filenames
         if self.stage is not PipeStages.RAW or force:
@@ -209,6 +210,21 @@ class MEAODataset:
                 res = load_video(self.mask_path)
                 self.mask_data = res.data / 255
                 self.mask_data[self.mask_data < 0] = 0
+
+                if clip_top != 0:
+                    kern = np.zeros((clip_top*2+1, clip_top*2+1), dtype=np.uint8)
+                    kern[:, clip_top] = 1
+
+                    for f in range(self.num_frames):
+                        # plt.figure(0)
+                        # plt.subplot(2, 1, 1)
+                        # plt.imshow(self.mask_data[:, :, f])
+                        self.mask_data[:,:,f] = cv2.erode(self.mask_data[:,:,f].astype("uint8"), kernel=kern, borderType=cv2.BORDER_CONSTANT, borderValue=0)
+                        # plt.subplot(2, 1, 2)
+                        # plt.imshow(self.mask_data[:, :, f])
+                        # plt.show()
+                        # plt.waitforbuttonpress()
+
                 self.video_data = (self.video_data * self.mask_data).astype("uint8")
             else:
                 warnings.warn("No processed mask data detected.")

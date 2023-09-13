@@ -27,7 +27,7 @@ from tkinter import filedialog, simpledialog
 from tkinter import ttk
 from scipy.ndimage import binary_dilation
 import pandas as pd
-
+from matplotlib import pyplot as plt
 from ocvl.function.preprocessing.improc import flat_field, weighted_z_projection, simple_image_stack_align, \
     optimizer_stack_align
 from ocvl.function.utility.generic import GenericDataset, PipeStages
@@ -39,7 +39,7 @@ def initialize_and_load_meao(file, a_mode, ref_mode):
     print(file)
     dataset = MEAODataset(file, analysis_modality=a_mode, ref_modality=ref_mode, stage=PipeStages.PROCESSED)
 
-    dataset.load_processed_data()
+    dataset.load_processed_data(clip_top=16)
 
     imp, wp = weighted_z_projection(dataset.video_data, dataset.mask_data)
 
@@ -276,7 +276,7 @@ def run_meao_pipeline(pName, tkroot):
             ref_im_proj, ref_xforms, inliers = optimizer_stack_align(ref_im_proj.astype("uint8"),
                                                                 (weight_proj > 0).astype("uint8"),
                                                                 dist_ref_idx, determine_initial_shifts=True,
-                                                                dropthresh=0.0, transformtype="rigid")
+                                                                dropthresh=0.0, transformtype="affine")
 
             # Use the xforms from each type (reference/analysis) to do the alignment.
             # Inliers will be determined by the reference modality.
