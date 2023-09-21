@@ -206,6 +206,8 @@ if __name__ == "__main__":
                     coorddist[coorddist == 0] = np.amax(coorddist.flatten())
                     mindist = np.amin( coorddist, axis=-1)
 
+                    num_sigs = np.zeros((reference_coord_data.shape[0], 1))
+
                     if not segmentation_radius:
                         segmentation_radius = np.round(np.nanmean(mindist) / 4) if np.round(np.nanmean(mindist) / 4) >= 1 else 1
 
@@ -236,10 +238,11 @@ if __name__ == "__main__":
                                                      stimulus_stamp=stimulus_train[0], method="mean_sub")
 
                 temp_profiles, good_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
-                                                 critical_region=np.arange(stimulus_train[0] - int(0.1 * framerate),
+                                                 critical_region=np.arange(stimulus_train[0] - int(0.2 * framerate),
                                                                            stimulus_train[1] + int(0.2 * framerate)),
                                                  critical_fraction=0.5)
 
+                num_sigs += good_profiles[:, np.newaxis]
                 # full_profiles[:, :, :, ~good_profiles] = np.nan
 
                 stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(temp_profiles,
@@ -317,6 +320,15 @@ if __name__ == "__main__":
                 # Have used 1-2 before.
                 indiv_fad[indiv_fad == 0] = np.nan
                 fad_profiles[fad_profiles == 0] = np.nan
+
+                for i in range(len(mean_cell_profiles[c])):
+                    plt.figure(0)
+                    plt.clf()
+                    plt.subplot(2, 5, i+1)
+                    plt.plot(full_framestamp_range, indiv_fad[c, i])
+                    plt.show(block=False)
+
+                plt.waitforbuttonpress()
 
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
