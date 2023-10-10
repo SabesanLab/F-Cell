@@ -177,7 +177,7 @@ if __name__ == "__main__":
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
-                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=False)
+                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
 
                 # Clip out data beyond two seconds before and after.
                 # dataset.video_data, dataset.framestamps = trim_video(dataset.video_data, dataset.framestamps,
@@ -185,7 +185,6 @@ if __name__ == "__main__":
 
                 if maxnum_cells is not None:
                     numiter=10000
-
                 else:
                     perm = np.arange(len(dataset.coord_data))
                 print("Analyzing " + str(len(perm)) + " cells.")
@@ -193,10 +192,9 @@ if __name__ == "__main__":
                 temp_profiles = extract_profiles(dataset.video_data, dataset.coord_data[perm, :], seg_radius=segmentation_radius,
                                                  display=False, sigma=1)
 
-
                 temp_profiles, valid_profiles = exclude_profiles(temp_profiles, dataset.framestamps,
                                                                  critical_region=np.arange(
-                                                                  dataset.stimtrain_frame_stamps[0] - int(0.1 * dataset.framerate),
+                                                                  dataset.stimtrain_frame_stamps[0] - int(0.2 * dataset.framerate),
                                                                   dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
                                                                  critical_fraction=0.1)
 
@@ -226,6 +224,11 @@ if __name__ == "__main__":
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms",
                                                        window_size=1)
 
+                plt.figure(9)
+                plt.plot(dataset.framestamps, tmp_incl)
+                plt.show(block=False)
+
+                # This is just to make them all at the same baseline.
                 tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
                                                 dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
 

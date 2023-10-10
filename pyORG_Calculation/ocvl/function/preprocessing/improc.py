@@ -62,13 +62,17 @@ def norm_video(video_data, norm_method="mean", rescaled=False):
 
     if norm_method == "mean":
         # Determine each frame's mean.
+        flattened_vid = video_data.flatten().astype("float32")
+        flattened_vid[flattened_vid == 0] = np.nan
+        all_norm = np.nanmean(flattened_vid)
+        del flattened_vid
+
         framewise_norm = np.empty([video_data.shape[-1]])
         for f in range(video_data.shape[-1]):
             frm = video_data[:, :, f].flatten().astype("float32")
             frm[frm == 0] = np.nan
             framewise_norm[f] = np.nanmean(frm)
 
-        all_norm = np.nanmean(framewise_norm)
         #plt.plot(framewise_norm/np.amax(framewise_norm))
     # plt.show()
     elif norm_method == "median":
