@@ -232,7 +232,7 @@ if __name__ == "__main__":
                 # save_tiff_stack(res_dir.joinpath(this_dirname+"_normvid.tif"),norm_video_data)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
-                                                 seg_mask="disk", summary="median")
+                                                 seg_mask="disk", summary="mean")
 
                 temp_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                      stimulus_stamp=stimulus_train[0], method="mean_sub")

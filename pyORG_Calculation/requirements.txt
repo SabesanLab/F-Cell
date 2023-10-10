@@ -10,3 +10,4 @@ pynufft>=2022.2.3
 joblib>=1.1.0
 scikit-image>=0.19.2
 Pillow>=9.1.1
+opencv-contrib-python>=4.3

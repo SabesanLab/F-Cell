@@ -3,9 +3,8 @@ from itertools import repeat
 
 import numpy as np
 import scipy as sp
-from matplotlib import pyplot as plt
+
 from scipy.interpolate import make_lsq_spline
-from scipy.ndimage import convolve1d
 from sklearn import linear_model
 from pynufft import NUFFT
 
@@ -69,9 +68,9 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
     fullrange = np.arange(framestamps[-1] + 1)
     finers = np.isfinite(temporal_profiles[c, :])
-    nummissing = ((framestamps[-1] +1) - len(framestamps)) + np.sum(np.invert(finers))
+    nummissing = int(((framestamps[-1] +1) - len(framestamps)) + np.sum(np.invert(finers)))
 
-    if threshold is None or nummissing/framestamps[-1] <= threshold:
+    if np.sum(finers) != 0 and (threshold is None or nummissing/framestamps[-1] <= threshold):
 
         sigmean = np.mean(temporal_profiles[c, finers])
         sigstd = np.std(temporal_profiles[c, finers])
@@ -87,13 +86,12 @@ def l1_compressed_sensing(temporal_profiles, framestamps, c, threshold=None):
 
         reconstruction[ reconstruction == 0 ] = np.nan
 
-        return reconstruction, nummissing
     else:
-        #print( "Missing " + str(100*(nummissing/framestamps[-1])) + "% of data from this profile. Removing...")
         reconstruction = densify_temporal_matrix(temporal_profiles[c, :], framestamps)
         reconstruction[:] = np.nan
         nummissing = np.nan
-        return reconstruction, nummissing
+
+    return reconstruction, nummissing
 
 def MS1_interp(temporal_profiles, framestamps, c, threshold=None, fwhm_size = 7):
 
@@ -173,13 +171,12 @@ def reconstruct_profiles(temporal_profiles, framestamps, method="L1", threshold=
         # Create a pool of threads for processing.
         with mp.Pool(processes=int(np.round(mp.cpu_count() / 2))) as pool:
 
-            reconst = pool.starmap_async(l1_compressed_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
-                                                                    range(temporal_profiles.shape[0]), repeat(threshold)))
-            res = reconst.get()
+            res = pool.starmap(l1_compressed_sensing, zip(repeat(temporal_profiles), repeat(framestamps),
+                                                          range(temporal_profiles.shape[0]), repeat(threshold)))
+
             for c, result in enumerate(res):
                 reconstruction[c, :] = np.array(result[0])
-                nummissing[c] = np.array(result[1])
-
+                nummissing[c] = float(result[1])
                 # if ~np.isnan(nummissing[c]):
                 #     plt.figure(66)
                 #     plt.clf()
