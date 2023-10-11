@@ -196,7 +196,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                 mask = np.reshape(mask, (coldims[0] * coldims[1], coldims[2]), order="F")
 
                 maskedout = np.where(mask == 0)
-                coordcolumn[maskedout] = 0 # Areas that are masked shouldn't be considered in the partial column test below.
+                coordcolumn[maskedout] = np.nan # Areas that are masked shouldn't be considered in the partial column test below.
                 # No partial columns allowed. If there are nans in the column, mark it to be wiped out entirely.
                 nani = np.any(np.isnan(coordcolumn), axis=0)
 

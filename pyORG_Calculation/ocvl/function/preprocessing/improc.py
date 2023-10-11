@@ -3,10 +3,12 @@ import warnings
 import cv2
 import numpy as np
 import SimpleITK as sitk
-from matplotlib import pyplot
+from matplotlib import pyplot, pyplot as plt
 from scipy.ndimage import binary_erosion
 from scipy.signal import fftconvolve
 from numpy.polynomial import Polynomial
+
+from ocvl.function.utility.resources import save_video, save_tiff_stack
 
 
 def flat_field_frame(dataframe, sigma, rescale=False):
@@ -73,8 +75,32 @@ def norm_video(video_data, norm_method="mean", rescaled=False):
             frm[frm == 0] = np.nan
             framewise_norm[f] = np.nanmean(frm)
 
-        #plt.plot(framewise_norm/np.amax(framewise_norm))
-    # plt.show()
+    if norm_method == "score":
+        # Determine each frame's mean.
+        flattened_vid = video_data.flatten().astype("float32")
+        flattened_vid[flattened_vid == 0] = np.nan
+        all_norm = np.nanmean(flattened_vid)
+        all_std = np.nanstd(flattened_vid)
+        del flattened_vid
+
+        framewise_norm = np.empty([video_data.shape[-1]])
+        framewise_std = np.empty([video_data.shape[-1]])
+        for f in range(video_data.shape[-1]):
+            frm = video_data[:, :, f].flatten().astype("float32")
+            frm[frm == 0] = np.nan
+            frm = np.log(frm)
+            framewise_norm[f] = np.exp(np.nanmean(frm)+0.5*np.nanvar(frm))
+            framewise_std[f] = np.sqrt(np.exp(2*np.nanmean(frm)+np.nanvar(frm)) * (np.exp(np.nanvar(frm))-1))
+
+        # Rescales the data into a zscore.
+        rescaled_vid = np.zeros(video_data.shape)
+        for f in range(video_data.shape[-1]):
+            frm = video_data[:, :, f].astype("float32")
+            frm[frm == 0] = np.nan # This is to prevent bad behavior when we do subtraction of the mean- e.g:
+                                   # 0 will become -framewise_norm, cats and dogs will live together; pandemonium.
+            rescaled_vid[:, :, f] = (frm - framewise_norm[f]) / framewise_std[f]
+
+        # save_tiff_stack("std_vid.tif", rescaled_vid)
     elif norm_method == "median":
         # Determine each frame's median.
         framewise_norm = np.empty([video_data.shape[-1]])
@@ -104,13 +130,12 @@ def norm_video(video_data, norm_method="mean", rescaled=False):
         for f in range(video_data.shape[-1]):
             rescaled_vid[:, :, f] = video_data[:, :, f].astype("float32") / ratio[f]
 
-        return rescaled_vid
-    else:
+    elif norm_method != "score":
         rescaled_vid = np.zeros(video_data.shape)
         for f in range(video_data.shape[-1]):
             rescaled_vid[:, :, f] = video_data[:, :, f].astype("float32") / framewise_norm[f]
 
-        return rescaled_vid
+    return rescaled_vid
 
 
 
