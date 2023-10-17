@@ -228,7 +228,8 @@ if __name__ == "__main__":
                 # full_profiles = extract_profiles(dataset.video_data, dataset.coord_data, seg_radius=segmentation_radius+1,
                 #                                  summary="none", sigma=1)
 
-                norm_video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+                norm_video_data = norm_video(dataset.video_data, norm_method="score", rescaled=True,
+                                                rescale_mean=70, rescale_std=35)
                 # save_tiff_stack(res_dir.joinpath(this_dirname+"_normvid.tif"),norm_video_data)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
@@ -312,7 +313,7 @@ if __name__ == "__main__":
                 #     todisp = False
                 # else:
                 #     todisp = True
-                todisp = True
+                todisp = False
 
                 indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
                                                             framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=18,
@@ -321,14 +322,14 @@ if __name__ == "__main__":
                 indiv_fad[indiv_fad == 0] = np.nan
                 fad_profiles[fad_profiles == 0] = np.nan
 
-                for i in range(len(mean_cell_profiles[c])):
-                    plt.figure(0)
-                    plt.clf()
-                    plt.subplot(2, 5, i+1)
-                    plt.plot(full_framestamp_range, indiv_fad[c, i])
-                    plt.show(block=False)
-
-                plt.waitforbuttonpress()
+                # for i in range(len(mean_cell_profiles[c])):
+                #     plt.figure(0)
+                #     plt.clf()
+                #     plt.subplot(2, 5, i+1)
+                #     plt.plot(full_framestamp_range, indiv_fad[c, i])
+                #     plt.show(block=False)
+                #
+                # plt.waitforbuttonpress()
 
 
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,

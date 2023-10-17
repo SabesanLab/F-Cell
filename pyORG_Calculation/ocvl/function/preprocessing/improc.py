@@ -59,7 +59,7 @@ def norm_video(video_data, norm_method="mean", rescaled=False, rescale_mean=None
     :param rescaled: Whether or not to keep the data at the original scale (only modulate the numbers in place). Useful
                      if you want the data to stay in the same units. Default: False. Options: True/False
     :param rescale_mean: The mean scaling target for rescaling- if None, will use the mean of all data (excluding 0s)
-    :param rescale_std:  The std devscaling target for rescaling- if None, will use the std dev of all data (excluding 0s).
+    :param rescale_std:  The std dev scaling target for rescaling- if None, will use the std dev of all data (excluding 0s).
                         ignored in all scaling methods except "score"
 
     :return: a NxMxF numpy matrix of normalized video data.
@@ -108,7 +108,7 @@ def norm_video(video_data, norm_method="mean", rescaled=False, rescale_mean=None
             rescaled_vid[:, :, f] = (frm - framewise_norm[f]) / framewise_std[f]
 
 
-            # save_tiff_stack("std_vid.tif", rescaled_vid)
+
     elif norm_method == "median":
         # Determine each frame's median.
         framewise_norm = np.empty([video_data.shape[-1]])
@@ -153,7 +153,7 @@ def norm_video(video_data, norm_method="mean", rescaled=False, rescale_mean=None
     #     frm[frm == 0] = np.nan
     #     reframewise_norm[f] = np.nanmean(frm)
     #     reframewise_std[f] = np.nanstd(frm)
-
+    #save_tiff_stack("std_vid.tif", rescaled_vid)
     return rescaled_vid
 
 

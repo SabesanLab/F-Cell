@@ -28,7 +28,7 @@ def pop_iORG(dataset):
                                                   critical_region=np.arange(
                                                       dataset.stimtrain_frame_stamps[0] - int(0.1 * dataset.framerate),
                                                       dataset.stimtrain_frame_stamps[1] + int(0.2 * dataset.framerate)),
-                                                  critical_fraction=0.4)
+                                                  critical_fraction=0.5)
 
     stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                            dataset.stimtrain_frame_stamps[0], method="mean_sub", display=False)
@@ -177,7 +177,8 @@ if __name__ == "__main__":
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
-                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True)
+                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True,
+                                                rescale_mean=70, rescale_std=35)
 
                 print("Analyzing " + str(len(dataset.coord_data)) + " cells.")
 
@@ -268,7 +269,7 @@ if __name__ == "__main__":
                           " Recovery fraction: " + str(pop_iORG_recover[r]))
 
                     plt.figure(0)
-                    plt.subplot(2,5,r - skipnum+1)
+                    # plt.subplot(2,5,r - skipnum+1)
 
                     plt.xlabel("Time (seconds)")
                     plt.ylabel("Response")
