@@ -229,7 +229,7 @@ if __name__ == "__main__":
                 #                                  summary="none", sigma=1)
 
                 norm_video_data = norm_video(dataset.video_data, norm_method="score", rescaled=True,
-                                                rescale_mean=70, rescale_std=35)
+                                             rescale_mean=70, rescale_std=35)
                 # save_tiff_stack(res_dir.joinpath(this_dirname+"_normvid.tif"),norm_video_data)
 
                 temp_profiles = extract_profiles(norm_video_data, dataset.coord_data, seg_radius=segmentation_radius,
@@ -296,9 +296,9 @@ if __name__ == "__main__":
         prestim_mean = np.full_like(cell_amp, np.nan)
 
         prestim_ind = np.flatnonzero(np.logical_and(full_framestamp_range < stimulus_train[0],
-                                                    full_framestamp_range >= (stimulus_train[0] - int(0.5 * framerate))))
+                                                    full_framestamp_range >= (stimulus_train[0] - int(1 * framerate))))
         poststim_ind = np.flatnonzero(np.logical_and(full_framestamp_range >= stimulus_train[0],
-                                                     full_framestamp_range <= (stimulus_train[0] + int(0.5 * framerate))))
+                                                     full_framestamp_range < (stimulus_train[0] + int(1 * framerate))))
 
 
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", all_cell_iORG.shape[0]))
@@ -399,9 +399,9 @@ if __name__ == "__main__":
 
 
         plt.figure(12)
-        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(-500, 800, 10), density=True)
+        plt.hist((np.nanmean(indiv_fad, axis=-1)), bins=np.arange(-300, 300, 5), density=True)
         plt.title("Maximum absolute deviation Median:" + str(np.nanmedian(indiv_fad.flatten())) )
-        #plt.xlim((0, 500))
+        # plt.xlim((0, 256))
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_mad.svg"))
 

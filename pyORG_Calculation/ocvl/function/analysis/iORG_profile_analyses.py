@@ -549,7 +549,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
     cum_pre_abs_diff_profiles[cum_pre_abs_diff_profiles == 0] = np.nan
     cum_post_abs_diff_profiles[cum_post_abs_diff_profiles == 0] = np.nan
     prefad = np.amax(cum_pre_abs_diff_profiles, axis=1)
-    postfad = np.amax(cum_post_abs_diff_profiles, axis=1)-prefad
+    postfad = np.amax(cum_post_abs_diff_profiles, axis=1)
 
     prestim = filtered_profiles[:, prestim_idx]
     poststim = np.abs(filtered_profiles[:, poststim_idx])
