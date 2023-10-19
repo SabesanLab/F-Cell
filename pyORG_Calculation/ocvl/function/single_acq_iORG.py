@@ -199,7 +199,7 @@ if __name__ == "__main__":
                     stimulus_train = dataset.stimtrain_frame_stamps
                     ref_im = dataset.reference_im
 
-                    reference_coord_data = refine_coord(ref_im, dataset.coord_data) # REINSTATE MEEEEE
+                    reference_coord_data = refine_coord(ref_im, dataset.coord_data, numiter=3) # REINSTATE MEEEEE
 
                     coorddist = pdist(reference_coord_data, "euclidean")
                     coorddist = squareform(coorddist)
@@ -296,9 +296,9 @@ if __name__ == "__main__":
         prestim_mean = np.full_like(cell_amp, np.nan)
 
         prestim_ind = np.flatnonzero(np.logical_and(full_framestamp_range < stimulus_train[0],
-                                                    full_framestamp_range >= (stimulus_train[0] - int(1 * framerate))))
+                                                    full_framestamp_range >= (stimulus_train[0] - int(0.5 * framerate))))
         poststim_ind = np.flatnonzero(np.logical_and(full_framestamp_range >= stimulus_train[0],
-                                                     full_framestamp_range < (stimulus_train[0] + int(1 * framerate))))
+                                                     full_framestamp_range < (stimulus_train[0] + int(0.5 * framerate))))
 
 
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", all_cell_iORG.shape[0]))

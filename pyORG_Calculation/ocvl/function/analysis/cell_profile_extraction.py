@@ -18,12 +18,12 @@ def refine_coord(ref_image, coordinates, search_radius=1, numiter=2):
     im_size = ref_image.shape
 
     # Generate an inclusion list for our coordinates- those that are unanalyzable should be excluded before analysis.
-    pluscoord = coordinates + search_radius
+    pluscoord = coordinates + search_radius*2*numiter # Include extra region to avoid edge effects
     includelist = pluscoord[:, 0] < im_size[1]
     includelist &= pluscoord[:, 1] < im_size[0]
     del pluscoord
 
-    minuscoord = coordinates - search_radius
+    minuscoord = coordinates - search_radius*2*numiter # Include extra region to avoid edge effects
     includelist &= minuscoord[:, 0] >= 0
     includelist &= minuscoord[:, 1] >= 0
     del minuscoord
@@ -31,22 +31,46 @@ def refine_coord(ref_image, coordinates, search_radius=1, numiter=2):
     coordinates = np.round(coordinates[includelist, :]).astype("int")
 
     for i in range(coordinates.shape[0]):
-        for iter in range(numiter):
-            coord = coordinates[i, :]
+        if includelist[i]:
+            for iter in range(numiter):
+                coord = coordinates[i, :]
 
-            ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
-                                     (coord[0] - search_radius):(coord[0] + search_radius + 1)]
+                ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
+                                         (coord[0] - search_radius):(coord[0] + search_radius + 1)]
 
-            minV, maxV, minL, maxL = cv2.minMaxLoc(ref_template)
+                minV, maxV, minL, maxL = cv2.minMaxLoc(ref_template)
 
-            maxL = np.array(maxL)-search_radius # Make relative to the center.
-            coordinates[i, :] = coord + maxL
+                maxL = np.array(maxL)-search_radius # Make relative to the center.
+                # print(coord)
+                coordinates[i, :] = coord + maxL
+                # print(" to: " + str(coordinates[i, :]))
+
+                # plt.figure(11)
+                # plt.clf()
+                # plt.imshow(ref_template)
+                # plt.plot(maxL[0]+search_radius,maxL[1]+search_radius,"r*")
+                # plt.show(block=False)
+                # plt.waitforbuttonpress()
+
+                if np.all(maxL == 0):
+                    # print("Unchanged. Breaking...")
+                    break
+
+            # plt.figure(12)
+            # plt.clf()
+            # plt.imshow(ref_image)
+            # plt.plot(coordinates[i, 0],coordinates[i, 1],"r*")
+            # plt.imshow( ref_image[(coordinates[i, 1] - 5):(coordinates[i, 1] + 5 + 1),
+            #             (coordinates[i, 0] - 5):(coordinates[i, 0] + 5 + 1)])
+            #
+            # plt.waitforbuttonpress()
+
 
 
     return coordinates
 
 
-def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=2):
+def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=2, threshold=0.3):
     ref_image = ref_image.astype("uint8")
     image_stack = image_stack.astype("uint8")
     #image_stack[image_stack == 0] = np.nan # Anything that is equal to 0 should be excluded from consideration.
@@ -81,21 +105,30 @@ def refine_coord_to_stack(image_stack, ref_image, coordinates, search_radius=2):
                                       :]
             stack_im = np.nanmean(stack_data, axis=-1).astype("uint8")
             ref_template = ref_image[(coord[1] - search_radius):(coord[1] + search_radius + 1),
-                                       (coord[0] - search_radius):(coord[0] + search_radius + 1)]
-
-
+                                     (coord[0] - search_radius):(coord[0] + search_radius + 1)]
 
             match_reg = cv2.matchTemplate(stack_im, ref_template, cv2.TM_CCOEFF_NORMED)
             minV, maxV, minL, maxL = cv2.minMaxLoc(match_reg)
             maxL = np.array(maxL) - search_radius  # Make relative to the center.
-            #print(coord)
-            coordinates[i, :] = coord + maxL
-            #print(coordinates[i, :])
-            # plt.figure(10)
-            # plt.imshow(stack_im)
-            # plt.figure(11)
-            # plt.imshow(match_reg)
-            # plt.show(block=False)
+            if threshold < maxV: # If the alignment is over our threshold (empirically, 0.3 works well), then do the alignment.
+                # print(coord)
+                coordinates[i, :] = coord + maxL
+                # print(" to: " +str(coordinates[i, :]))
+            # else:
+            #     print(maxV)
+            #     plt.figure(10)
+            #     plt.imshow(stack_im)
+            #     plt.figure(11)
+            #     plt.imshow(ref_template)
+            #
+            #     plt.figure(12)
+            #     stack_data = image_stack[(coordinates[i,1] - search_region):(coordinates[i,1] + search_region + 1),
+            #                  (coordinates[i,0] - search_region):(coordinates[i,0] + search_region + 1),
+            #                  :]
+            #     stack_im_realign = np.nanmean(stack_data, axis=-1).astype("uint8")
+            #     plt.imshow(stack_im_realign)
+            #     plt.show(block=False)
+            #     plt.waitforbuttonpress()
             #print(maxL)
     return coordinates
 

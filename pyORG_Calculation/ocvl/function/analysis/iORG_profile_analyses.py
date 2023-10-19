@@ -535,8 +535,8 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
     #         spfit = UnivariateSpline(framestamps[finite_data[i, :]], filtered_profiles[i, finite_data[i, :]]/maxval)
     #         spfit.set_smoothing_factor(0.5)
     #         spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
-
-    grad_profiles = np.gradient(filtered_profiles, axis=1) # Don't need to factor in the dx, because it gets removed anyway in the next step.
+#framestamps/framerate
+    grad_profiles = np.sqrt( (1/(framerate**2)) + (np.gradient(filtered_profiles, axis=1)**2)) # Don't need to factor in the dx, because it gets removed anyway in the next step.
 
     pre_abs_diff_profiles = np.abs(grad_profiles[:, prestim_idx])
     if len(pre_abs_diff_profiles)<=1:
