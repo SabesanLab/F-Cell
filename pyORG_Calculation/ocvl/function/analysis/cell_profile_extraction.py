@@ -229,7 +229,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
                 mask = np.reshape(mask, (coldims[0] * coldims[1], coldims[2]), order="F")
 
                 maskedout = np.where(mask == 0)
-                coordcolumn[maskedout] = np.nan # Areas that are masked shouldn't be considered in the partial column test below.
+                coordcolumn[maskedout] = 0 # Areas that are masked shouldn't be considered in the partial column test below.
                 # No partial columns allowed. If there are nans in the column, mark it to be wiped out entirely.
                 nani = np.any(np.isnan(coordcolumn), axis=0)
 
@@ -261,7 +261,7 @@ def extract_profiles(image_stack, coordinates=None, seg_mask="box", seg_radius=1
     return profile_data
 
 def exclude_profiles(temporal_profiles, framestamps,
-                     critical_region=None, critical_fraction=0.5, require_full_profile=True):
+                     critical_region=None, critical_fraction=0.5, require_full_profile=False):
     """
     A bit of code used to remove cells that don't have enough data in the critical region of a signal. This is typically
     surrounding a stimulus.
@@ -271,7 +271,7 @@ def exclude_profiles(temporal_profiles, framestamps,
     :param critical_region: A set of values containing the critical region of a signal- if a cell doesn't have data here,
                             then drop its entire signal from consideration.
     :param critical_fraction: The percentage of real values required to consider the signal valid.
-    :param require_full_profile:
+    :param require_full_profile: Require a full profile instead of merely a fraction of the critical region.
     :return: a NxM numpy matrix of pared-down profiles, where profiles that don't fit the criterion are dropped.
     """
 
@@ -297,7 +297,7 @@ def exclude_profiles(temporal_profiles, framestamps,
                 crit_remove += 1
 
     if critical_region is not None or require_full_profile:
-        print(str(crit_remove) + " cells were cleared due to missing data at stimulus delivery")
+        print(str(crit_remove) + "/"+str(temporal_profiles.shape[0])+" cells were cleared due to missing data at stimulus delivery")
 
     return temporal_profiles, good_profiles
 
