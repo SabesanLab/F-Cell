@@ -226,9 +226,14 @@ if __name__ == "__main__":
             cell_profiles[c] = []
             cell_framestamps[c] = []
 
+        # cell_power_iORG[119, :], numincl = signal_power_iORG(all_cell_iORG[:, :, 119], full_framestamp_range,
+        #                                                    dataset.stimtrain_frame_stamps, summary_method="rms",
+        #                                                      window_size=1, display=True)
+
         for c in range(len(reference_coord_data)):
             cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
-                                                               summary_method="rms", window_size=1)
+                                                               dataset.stimtrain_frame_stamps, summary_method="rms",
+                                                               window_size=1, display=False)
             prestim_ind = np.logical_and(full_framestamp_range < dataset.stimtrain_frame_stamps[0],
                                          full_framestamp_range >= (dataset.stimtrain_frame_stamps[0] - int(
                                              0.75 * dataset.framerate)))
@@ -408,23 +413,23 @@ if __name__ == "__main__":
 
 
         # plotting the cells with the min/med/max amplitude
-        # plt.figure(300)
-        # plt.ylim(-0.5, 1)
+        plt.figure(300)
+        plt.ylim(-20, 150)
         #
-        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-        #           np.transpose(norm_cell_power_iORG[266, :]),'b')
+        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
+                   np.transpose(norm_cell_power_iORG[119, :]),'b')
         #
         # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
         #          np.transpose(norm_cell_power_iORG[235, :]), 'g')
         #
         # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
         #          np.transpose(norm_cell_power_iORG[539, :]),'r')
-        # stim_rect = ptch.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
-        #               (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
-        # plt.gca().add_patch(stim_rect)
+        stim_rect = ptch.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
+                      (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
+        plt.gca().add_patch(stim_rect)
         #
-        # plt.savefig(res_dir.joinpath(this_dirname + "norm_min_med_max" + now_timestamp + ".svg"))
-        # plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "norm_min_med_max" + now_timestamp + ".svg"))
+        plt.show(block=False)
         # plt.close(plt.gcf())
 
         # output cell_power_iORG to csv (optional)
