@@ -22,7 +22,7 @@ from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
-def signal_power_iORG(temporal_profiles, framestamps, stimtrain, summary_method="var", window_size=1, fraction_thresh=0.25, display=False):
+def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1, fraction_thresh=0.25, display=False, stim_idx=None):
     """
     Calculates the iORG on a supplied dataset, using a variety of power based summary methods published in
     Cooper et. al. 2020, and Cooper et. al. 2017.
@@ -36,6 +36,8 @@ def signal_power_iORG(temporal_profiles, framestamps, stimtrain, summary_method=
                         1 (no window) to M/2. Default: 1
     :param fraction_thresh: The fraction of the values inside the sample window that must be finite in order for the power
                             to be calculated- otherwise, the value will be considered np.nan.
+    :param display: Display a plot of and pause following calculation of the signal power. (True/False) Default: False
+    :param stim_idx: If display is True, this variable stores the stimulus indices and overlays it on the power plots. Default: None
 
     :return: a 1xM population iORG signal
     """
@@ -163,9 +165,10 @@ def signal_power_iORG(temporal_profiles, framestamps, stimtrain, summary_method=
             plt.xlim((0,175))
             #plt.gca().set_box_aspect(1)
 
-        stim_rect = ptch.Rectangle((stimtrain[0], 0),
-                                   (stimtrain[1] - stimtrain[0]), 200,
-                                   color='gray', alpha=0.5)
+        if stim_idx:
+            stim_rect = ptch.Rectangle((stim_idx[0], 0),
+                                       (stim_idx[1] - stim_idx[0]), 200,
+                                       color='gray', alpha=0.5)
         plt.gca().add_patch(stim_rect)
         plt.subplot(1, 2, 2)
         plt.title("Signal power iORG")
@@ -174,9 +177,10 @@ def signal_power_iORG(temporal_profiles, framestamps, stimtrain, summary_method=
         #plt.xlim((0, framestamps[-1]))
         plt.xlim((0,175))
         #plt.gca().set_box_aspect(1)
-        stim_rect = ptch.Rectangle((stimtrain[0], 0),
-                                  (stimtrain[1] - stimtrain[0]), 200,
-                                  color='gray', alpha=0.5)
+        if stim_idx:
+            stim_rect = ptch.Rectangle((stim_idx[0], 0),
+                                      (stim_idx[1] - stim_idx[0]), 200,
+                                      color='gray', alpha=0.5)
         plt.gca().add_patch(stim_rect)
 
         plt.waitforbuttonpress()
