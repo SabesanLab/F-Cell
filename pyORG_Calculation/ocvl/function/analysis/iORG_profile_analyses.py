@@ -555,10 +555,11 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
     #         spfit.set_smoothing_factor(0.5)
     #         spline_filtered_profiles[i, finite_data[i, :]] = spfit(framestamps[finite_data[i, :]])*maxval
 #framestamps/framerate
+
     grad_profiles = np.sqrt( (1/(framerate**2)) + (np.gradient(filtered_profiles, axis=1)**2)) # Don't need to factor in the dx, because it gets removed anyway in the next step.
 
     pre_abs_diff_profiles = np.abs(grad_profiles[:, prestim_idx])
-    if len(pre_abs_diff_profiles)<=1:
+    if np.size(pre_abs_diff_profiles) <=1:
         pre_abs_diff_profiles = np.zeros((1,1))
     cum_pre_abs_diff_profiles = np.nancumsum(pre_abs_diff_profiles, axis=1)
 
@@ -574,8 +575,11 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
     poststim = np.abs(filtered_profiles[:, poststim_idx])
 
     prestim_val = np.nanmedian(prestim, axis=1)
-    poststim_val = np.nanquantile(poststim, [0.95], axis=1).flatten()
+    poststim_val = np.nanquantile(poststim, [0.99], axis=1).flatten()
     amplitude = np.abs(poststim_val - prestim_val)
+
+    final_val = np.nanmean(filtered_profiles[:,-5:], axis=1)
+    recovery = 1 - ((final_val-prestim_val)/amplitude)
 
     implicit_time = np.full_like(amplitude, np.nan)
     for i in range(temporal_profiles.shape[0]):
@@ -631,10 +635,13 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
 
 
         # plt.plot(framestamps[poststim_idx], np.nanmean(cum_post_abs_diff_profiles,axis=0),color="k")
-        print(str(postfad))
+        print("FAD:" +str(postfad))
+        print("Amplitude:" + str(amplitude))
+        print("Implicit Time:" + str(implicit_time))
+        print("Recovery Amplitude:" + str(recovery))
         plt.waitforbuttonpress()
 
-    return postfad, amplitude, implicit_time, np.nancumsum(np.abs(grad_profiles), axis=1)
+    return postfad, amplitude, implicit_time, np.nancumsum(np.abs(grad_profiles), axis=1), recovery
 
 
 def pooled_variance(data, axis=1):

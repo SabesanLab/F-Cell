@@ -198,11 +198,9 @@ if __name__ == "__main__":
                     print(file.name + " was dropped due to all cells being excluded.")
 
                 prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
-                                             dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(
-                                                 1 * dataset.framerate))))
+                                             dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(1 * dataset.framerate))))
                 poststim_ind = np.flatnonzero(np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
-                                              dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(
-                                                  1 * dataset.framerate))))
+                                              dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(1 * dataset.framerate))))
 
                 tmp_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
@@ -353,13 +351,12 @@ if __name__ == "__main__":
             pop_iORG_implicit[r] = np.NaN
             pop_iORG_recover[r] = np.NaN
         else:
-            poststim_amp = np.quantile(poststim, [0.95])
-            max_frmstmp = poststim_loc[np.argmax(poststim)] - dataset.stimtrain_frame_stamps[0]
-
-            final_val = np.mean(pooled_iORG[-5:])
-            pop_iORG_implicit[r] = max_frmstmp / dataset.framerate
-            pop_iORG_amp[r] = (poststim_amp - prestim_amp)
-            pop_iORG_recover[r] = 1 - ((final_val - prestim_amp) / pop_iORG_amp[r])
+            _, pop_iORG_amp[r], pop_iORG_implicit[r], _, pop_iORG_recover[r] = iORG_signal_metrics(pooled_iORG[None, :],
+                                                                                                dataset.framestamps,
+                                                                                                filter_type="none", display=False,
+                                                                                                prestim_idx=prestim_ind,
+                                                                                                poststim_idx=poststim_ind)
+            pop_iORG_implicit[r] /= dataset.framerate
 
         print("Pooled iORG Avg Amplitude: " + str(pop_iORG_amp[r]) + " Implicit time (s): " + str(pop_iORG_implicit[r]) +
               " Recovery fraction: " + str(pop_iORG_recover[r]))
