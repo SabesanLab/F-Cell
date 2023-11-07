@@ -7,6 +7,7 @@ import scipy
 from joblib._multiprocessing_helpers import mp
 from numpy.fft import fftshift
 from scipy import signal
+from matplotlib import patches as ptch
 from scipy.fft import fft
 from scipy.interpolate import UnivariateSpline
 from scipy.ndimage import center_of_mass, convolve1d, median_filter
@@ -21,7 +22,7 @@ from ocvl.function.utility.resources import save_tiff_stack
 from ocvl.function.utility.temporal_signal_utils import densify_temporal_matrix, reconstruct_profiles
 
 
-def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", window_size=1, fraction_thresh=0.25, display=False):
+def signal_power_iORG(temporal_profiles, framestamps, stimtrain, summary_method="var", window_size=1, fraction_thresh=0.25, display=False):
     """
     Calculates the iORG on a supplied dataset, using a variety of power based summary methods published in
     Cooper et. al. 2020, and Cooper et. al. 2017.
@@ -157,13 +158,27 @@ def signal_power_iORG(temporal_profiles, framestamps, summary_method="var", wind
             plt.subplot(1, 2, 1)
             plt.title("Raw data")
             plt.plot(framestamps, temporal_profiles[i, :], color=mapper.to_rgba(i, norm=False))
-            plt.ylim((-175, 175))
-            plt.xlim((0, framestamps[-1]))
+            plt.ylim((-200, 200))
+            #plt.xlim((0, framestamps[-1]))
+            plt.xlim((0,175))
+            #plt.gca().set_box_aspect(1)
+
+        stim_rect = ptch.Rectangle((stimtrain[0], 0),
+                                   (stimtrain[1] - stimtrain[0]), 200,
+                                   color='gray', alpha=0.5)
+        plt.gca().add_patch(stim_rect)
         plt.subplot(1, 2, 2)
         plt.title("Signal power iORG")
         plt.plot(framestamps, iORG, color='black')
-        plt.ylim((-175, 175))
-        plt.xlim((0, framestamps[-1]))
+        plt.ylim((-200, 200))
+        #plt.xlim((0, framestamps[-1]))
+        plt.xlim((0,175))
+        #plt.gca().set_box_aspect(1)
+        stim_rect = ptch.Rectangle((stimtrain[0], 0),
+                                  (stimtrain[1] - stimtrain[0]), 200,
+                                  color='gray', alpha=0.5)
+        plt.gca().add_patch(stim_rect)
+
         plt.waitforbuttonpress()
 
 
