@@ -296,9 +296,9 @@ if __name__ == "__main__":
         prestim_mean = np.full_like(cell_amp, np.nan)
 
         prestim_ind = np.flatnonzero(np.logical_and(full_framestamp_range < stimulus_train[0],
-                                                    full_framestamp_range >= (stimulus_train[0] - int(0.5 * framerate))))
+                                                    full_framestamp_range >= (stimulus_train[0] - int(1 * framerate))))
         poststim_ind = np.flatnonzero(np.logical_and(full_framestamp_range >= stimulus_train[0],
-                                                     full_framestamp_range < (stimulus_train[0] + int(0.5 * framerate))))
+                                                     full_framestamp_range < (stimulus_train[0] + int(1 * framerate))))
 
 
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", all_cell_iORG.shape[0]))
@@ -317,7 +317,7 @@ if __name__ == "__main__":
 
                 indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
                                                             framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=18,
-                                                            prestim_idx=prestim_ind, poststim_idx=poststim_ind)
+                                                            prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)
                 # Have used 1-2 before.
                 indiv_fad[indiv_fad == 0] = np.nan
                 fad_profiles[fad_profiles == 0] = np.nan

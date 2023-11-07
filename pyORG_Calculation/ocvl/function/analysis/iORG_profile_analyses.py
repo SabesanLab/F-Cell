@@ -565,7 +565,7 @@ def iORG_signal_metrics(temporal_profiles, framestamps, framerate=1, filter_type
         if np.any(whereabove) and np.any(np.isfinite(whereabove)):
             implicit_time[i] = (whereabove[0] + poststim_idx[0]-prestim_idx[-1])/framerate
 
-    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= (temporal_profiles.shape[0]/2) and np.nanmean(postfad) <=15:
+    if display and np.sum(np.any(np.isfinite(temporal_profiles), axis=1)) >= (temporal_profiles.shape[0]/2):# and np.nanmean(postfad) <=15:
         plt.figure(42)
         plt.clf()
         for i in range(temporal_profiles.shape[0]):

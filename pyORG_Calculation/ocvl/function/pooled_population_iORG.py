@@ -177,7 +177,7 @@ if __name__ == "__main__":
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
 
-                dataset.video_data = norm_video(dataset.video_data, norm_method="mean", rescaled=True,
+                dataset.video_data = norm_video(dataset.video_data, norm_method="score", rescaled=True,
                                                 rescale_mean=70, rescale_std=35)
 
                 print("Analyzing " + str(len(dataset.coord_data)) + " cells.")
