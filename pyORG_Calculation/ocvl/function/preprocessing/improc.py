@@ -294,7 +294,7 @@ def general_normxcorr2(template_im, reference_im, template_mask=None, reference_
     # Need this bit to avoid dividing by zero.
     tolerance = 1000*np.finfo(np.amax(denom)).eps
 
-    xcorr_out = np.zeros(numerator.shape, dtype=np.float)
+    xcorr_out = np.zeros(numerator.shape, dtype=float)
     xcorr_out[denom > tolerance] = numerator[denom > tolerance] / denom[denom > tolerance]
 
     # By default, the images have to overlap by more than 20% of their maximal overlap.
@@ -432,7 +432,7 @@ def relativize_image_stack(image_data, mask_data, reference_idx=0, numkeypoints=
         # if numkeypoints > 8000:
         #     print("Found "+ str(len(kp)) + " keypoints")
         # Normalize the features by L1; (make this RootSIFT) instead.
-        des /= (des.sum(axis=1, keepdims=True) + np.finfo(np.float).eps)
+        des /= (des.sum(axis=1, keepdims=True) + np.finfo(float).eps)
         des = np.sqrt(des)
         keypoints.append(kp)
         descriptors.append(des)
