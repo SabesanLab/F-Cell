@@ -231,7 +231,7 @@ if __name__ == "__main__":
         #                                                      window_size=1, display=True)
 
         for c in range(len(reference_coord_data)):
-            cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c], full_framestamp_range,
+            cell_power_iORG[c, :], numincl = signal_power_iORG(all_cell_iORG[:, :, c],
                                                                dataset.stimtrain_frame_stamps, summary_method="rms",
                                                                window_size=1, display=False)
             prestim_ind = np.logical_and(full_framestamp_range < dataset.stimtrain_frame_stamps[0],
@@ -263,41 +263,28 @@ if __name__ == "__main__":
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
         # clippedcoords = coordclip(coord_data, 10, 100, 'i')
 
-        # plt.figure(0)
-        # plt.clf()
-        # for a in range(all_cell_iORG.shape[0]):
-        #     plt.plot(full_framestamp_range, all_cell_iORG[a, :, c])
-        #     plt.plot(stimulus_train[0], poststim_amp, "rD")
-        # plt.hist(simple_amp)
-        # plt.plot(cell_power_iORG[c, :])
-        #   plt.show(block=False)
-        #   plt.waitforbuttonpress()
-        # plt.savefig(res_dir.joinpath(this_dirname +  + "_allcell_iORG_amp.png"))
-
-        # find the cells with the min, med, and max amplitude
-        min_amp = np.nanmin(simple_amp[0, :])
-        [min_amp_row, min_amp_col] = np.where(simple_amp == min_amp)
-        # print('min_amp ',min_amp)
-        med_amp = np.nanmedian(simple_amp[0, :])
-        near_med_amp = find_nearest(simple_amp[0, :], med_amp)
-        [med_amp_row, med_amp_col] = np.where(simple_amp == near_med_amp)
-
-        # print('med_amp ', med_amp)
-        max_amp = np.nanmax(simple_amp[0, :])
-        [max_amp_row, max_amp_col] = np.where(simple_amp == max_amp)
-        # print('max_amp ', max_amp)
 
         dt = datetime.now()
         now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
 
         plt.figure(1)
-        histbins = np.arange(start=0, stop=5.5, step=0.01) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
+        histbins = np.arange(start=0, stop=100, step=0.1) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
         plt.hist(simple_amp[:, 0], bins=histbins)
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_" + now_timestamp + ".png"))
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
         plt.close(plt.gcf())
+
+        plt.figure(18)
+        histbins = np.arange(start=0, stop=100, step=0.1) #Humans: -0.2, 1.5, 0.025 Animal: start=-0.1, stop=0.3, step=0.01
+        plt.hist(simple_amp[:, 0], bins=histbins, density=True, histtype="step", cumulative=True)
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_cumhist_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp_cumhist_" + now_timestamp + ".svg"))
+        plt.close(plt.gcf())
+
 
 
         plt.figure(40) # log hist
@@ -306,7 +293,16 @@ if __name__ == "__main__":
         # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_hist_" + now_timestamp + ".png"))
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp" + now_timestamp + ".svg"))
+        plt.close(plt.gcf())
+
+        plt.figure(48) # log hist
+        histbins_log = np.arange(start=0, stop=5.5, step=0.01)  # Humans: -0.2, 1.5, 0.025 Animal: start=-3, stop=-0.6, step=0.01 stop=round(np.nanmax(log_amp))
+        plt.hist(log_amp, bins=histbins_log, density=True, histtype="step", cumulative=True)
+        # plt.plot(cell_power_iORG[c, :], "k-", alpha=0.05)
+        plt.show(block=False)
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_log_amp_cumhist_" + now_timestamp + ".png"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_amp" + now_timestamp + ".svg"))
         plt.close(plt.gcf())
 
 
@@ -326,7 +322,6 @@ if __name__ == "__main__":
         hist_normie = Normalize(vmin=0.25, vmax=5.5)
         hist_mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie)
 
-        # simple_amp_norm = (simple_amp-histbins[0])/(histbins[-1] - histbins[0])
 
         plt.figure(2)
         vor = Voronoi(reference_coord_data)
@@ -334,12 +329,11 @@ if __name__ == "__main__":
         for c, cell in enumerate(vor.regions[1:]):
             if not -1 in cell:
                 poly = [vor.vertices[i] for i in cell]
-                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(simple_amp[c, 0]))
+                plt.fill(*zip(*poly), color=hist_mapper.to_rgba(log_amp[c, 0]))
         ax = plt.gca()
         ax.set_aspect("equal", adjustable="box")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi_" + now_timestamp + ".png"))
-        # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_voronoi.svg"))
+        plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_logvoronoi_" + now_timestamp + ".png"))
         plt.close(plt.gcf())
 
         fin_log_amp = np.isfinite(log_amp[:, 0].copy())
@@ -373,17 +367,16 @@ if __name__ == "__main__":
             transparent=True, dpi=72, bbox_inches="tight", pad_inches=0)
         plt.close(plt.gcf())
 
-        plt.figure(28)
-        plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
-        plt.scatter(reference_coord_data[fin_log_amp, 0], reference_coord_data[fin_log_amp, 1], s=(1 + (segmentation_radius * 2)),
+        #Voronoi and false color overlay colorbar
+        fig7, ax7 = plt.subplots()
+        ax7.set_aspect('equal')
+        tst = ax7.scatter(reference_coord_data[fin_log_amp, 0], reference_coord_data[fin_log_amp, 1], s=(1 + (segmentation_radius * 2)),
                     c=ColorTest, alpha=0.5)
-        ax = plt.gca()
-        plt.colorbar(cax=ax)
-        plt.show(block=False)
-        plt.savefig(
-            res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_colorbar" + now_timestamp + ".svg"),
-            transparent=True, dpi=72, bbox_inches="tight", pad_inches=0)
+        fig7.colorbar(plt.cm.ScalarMappable(cmap=plt.get_cmap("magma"), norm=hist_normie), ax7)
+        plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay_colorbar" + now_timestamp + ".svg"),
+            transparent=False, dpi=72, bbox_inches="tight", pad_inches=0)
         plt.close(plt.gcf())
+
 
         plt.figure(24)
         #plt.imshow(ref_im, cmap='gray', vmin=0, vmax=255)
@@ -401,7 +394,7 @@ if __name__ == "__main__":
         ax.axis('off')
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_indvallcell_iORG_falsecoloroverlay" + now_timestamp + ".svg"),
-                    transparent=True, dpi=72, bbox_inches = "tight", pad_inches = 0)
+                    transparent=False, dpi=72, bbox_inches = "tight", pad_inches = 0)
         plt.close(plt.gcf())
 
 
@@ -411,26 +404,6 @@ if __name__ == "__main__":
         for c in range(norm_cell_power_iORG.shape[0]):
             norm_cell_power_iORG[c,:] -= norm_cell_power_iORG[c,0]
 
-
-        # plotting the cells with the min/med/max amplitude
-        plt.figure(300)
-        plt.ylim(-20, 150)
-        #
-        plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-                   np.transpose(norm_cell_power_iORG[119, :]),'b')
-        #
-        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-        #          np.transpose(norm_cell_power_iORG[235, :]), 'g')
-        #
-        # plt.plot(np.reshape(full_framestamp_range, (stimulus_train[2], 1)).astype('float64'),
-        #          np.transpose(norm_cell_power_iORG[539, :]),'r')
-        stim_rect = ptch.Rectangle((dataset.stimtrain_frame_stamps[0], 0),
-                      (dataset.stimtrain_frame_stamps[1] - dataset.stimtrain_frame_stamps[0]), 1, color = 'gray', alpha = 0.5)
-        plt.gca().add_patch(stim_rect)
-        #
-        plt.savefig(res_dir.joinpath(this_dirname + "norm_min_med_max" + now_timestamp + ".svg"))
-        plt.show(block=False)
-        # plt.close(plt.gcf())
 
         # output cell_power_iORG to csv (optional)
         if outputcsv:
