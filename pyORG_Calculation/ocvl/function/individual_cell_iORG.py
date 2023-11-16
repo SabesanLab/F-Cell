@@ -233,7 +233,7 @@ if __name__ == "__main__":
             prestim_amp = np.nanmean(cell_power_iORG[c, 0:stimulus_train[0]])
             poststim_amp = np.nanmax(cell_power_iORG[c, stimulus_train[1]:(stimulus_train[1] + 10)])
 
-            simple_amp[l, c] = poststim_amp - prestim_amp
+            simple_amp[c, 0] = poststim_amp - prestim_amp
 
         # TODO: Calling the coordclip fxn to return the simple_amp that corresponds to a 100 cone ROI
         # clippedcoords = coordclip(coord_data, 10, 100, 'i')

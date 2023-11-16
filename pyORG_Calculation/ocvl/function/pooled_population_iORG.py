@@ -366,5 +366,5 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
-        plt.waitforbuttonpress()
+
 

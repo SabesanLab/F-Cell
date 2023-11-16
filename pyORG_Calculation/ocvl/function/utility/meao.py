@@ -38,16 +38,16 @@ class MEAODataset:
                     imname = filename
             elif stage is PipeStages.PIPELINED:
                 # First look for an image associated with this dataset
-                for filename in glob.glob( path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_cropped_piped_avg.tif") ):
+                for filename in glob.glob( path.join(p_name, common_prefix + "_" + self.analysis_modality + "?_extract_reg_cropped_piped.tif") ):
                     imname = filename
 
                 # If we don't have an image specific to this dataset, search for the all acq avg
                 if not imname:
-                    for filename in glob.glob(path.join(p_name,"*"+self.analysis_modality + "_ALL_ACQ_AVG.tif")):
+                    for filename in glob.glob(path.join(p_name,"*"+self.analysis_modality + "1_ALL_ACQ_AVG.tif")):
                         # print(filename)
                         imname = filename
             else:
-                imname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "1_extract_reg_avg.tif")
+                imname = path.join(p_name, common_prefix + "_" + self.analysis_modality + "_All_ACQ_AVG.tif")
 
         if not imname:
             #warnings.warn("Unable to detect viable average image file. Dataset functionality may be limited.")
