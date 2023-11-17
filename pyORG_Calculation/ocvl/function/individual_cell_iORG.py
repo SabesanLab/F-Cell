@@ -420,13 +420,19 @@ if __name__ == "__main__":
             outdata = pd.DataFrame(indiv_iORG_amp)
             outdata.to_csv(amp_dir, index=False)
 
-            log_amp_dir = res_dir.joinpath(this_dirname + "log10_cell_amplitude_" + now_timestamp + ".csv")
+            log_amp_dir = res_dir.joinpath(this_dirname + "log_cell_amplitude_" + now_timestamp + ".csv")
             outdata = pd.DataFrame(log_indiv_iORG_amp)
             outdata.to_csv(log_amp_dir, index=False)
 
-            log_amp_dir_p1 = res_dir.joinpath(this_dirname + "log10_cell_amplitude_plus1" + now_timestamp + ".csv")
-            outdata = pd.DataFrame(amp_plus1_log)
-            outdata.to_csv(log_amp_dir_p1, index=False)
+            log_cumhist = np.histogram(log_indiv_iORG_amp, bins=histbins_log, density=True)
+
+            log_cumhist_dir = res_dir.joinpath(this_dirname + "log_amplitude_cumhist" + now_timestamp + ".csv")
+            outdata = pd.DataFrame(log_cumhist)
+            outdata.to_csv(log_cumhist_dir, index=False)
+
+            # log_amp_dir_p1 = res_dir.joinpath(this_dirname + "log10_cell_amplitude_plus1" + now_timestamp + ".csv")
+            # outdata = pd.DataFrame(amp_plus1_log)
+            # outdata.to_csv(log_amp_dir_p1, index=False)
 
         print("Done!")
         print(stimulus_train)
