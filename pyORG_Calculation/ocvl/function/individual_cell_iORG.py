@@ -431,7 +431,7 @@ if __name__ == "__main__":
 
             log_cumhist = np.histogram(log_indiv_iORG_amp, bins=histbins_log, density=True)
 
-            log_cumhist_dir = res_dir.joinpath(this_dirname + "log_amplitude_cumhist" + now_timestamp + ".csv")
+            log_cumhist_dir = res_dir.joinpath(this_dirname + "_log_amplitude_cumhist_" + now_timestamp + ".csv")
             outdata = pd.DataFrame(log_cumhist)
             outdata.to_csv(log_cumhist_dir, index=False)
 
