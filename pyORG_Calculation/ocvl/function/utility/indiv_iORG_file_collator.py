@@ -3,6 +3,7 @@ from tkinter import filedialog, Tk
 
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 
 if __name__ == "__main__":
 
@@ -23,6 +24,7 @@ if __name__ == "__main__":
 
     if not pName:
         quit()
+    resultdir = Path(pName)
 
     allFiles = dict()
 
@@ -58,7 +60,7 @@ if __name__ == "__main__":
         for locfile in allFiles[locid]:
 
             stat_table = pd.read_csv(locfile, delimiter=",", header=0, encoding="utf-8-sig")
-            bins = stat_table.loc[1,:]
+            bins = stat_table.loc[1, :]
 
             subID.append(locfile.parent.name)
 
@@ -68,6 +70,21 @@ if __name__ == "__main__":
 
         all_cumhist=np.nancumsum(all_cumhist, axis=1)
         all_cumhist /= np.amax(all_cumhist.flatten()) # Normalize to 1 as its a probability density, not a probability mass, function
+
+        mean_cumhist = np.mean(all_cumhist, axis=0)
+        stddev_cumhist = np.std(all_cumhist, axis=0)
+        conf_interval = 2 * stddev_cumhist / np.sqrt(len(allFiles[locid]))
+
+        plt.figure(locid)
+        plt.fill_between(bins, mean_cumhist + conf_interval, color=[0, 0, 0, 0.3])
+        plt.fill_between(bins, mean_cumhist - conf_interval, color=[1, 1, 1, 1])
+        plt.plot(bins, mean_cumhist)
+        plt.title(locid)
+        plt.savefig(resultdir.joinpath(resultdir.name+ "_"+locid+"_mean_n_conf_cumulative_histogram.svg"))
+
+        plt.show(block=False)
+        #plt.waitforbuttonpress()
+
         indices = pd.MultiIndex.from_product([[locid], subID],
                                              names=["Location", "ID"])
         subframe = pd.DataFrame(all_cumhist, index=indices)
@@ -77,5 +94,6 @@ if __name__ == "__main__":
 
 
 print("Concatenate this, bitch")
-resultdir=Path(pName)
+
 all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
+plt.waitforbuttonpress()

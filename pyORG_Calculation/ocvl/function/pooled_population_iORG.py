@@ -365,6 +365,7 @@ if __name__ == "__main__":
                                                       np.array(pop_iORG_implicit, ndmin=2).transpose(),
                                                       np.array(pop_iORG_recover, ndmin=2).transpose()), axis=1),
                                       columns=["Amplitude", "Implicit time", "Recovery %"])
+        pop_amp_dFrame = pop_amp_dFrame.dropna(how="all") # Drop rows with all nans- no point in taking up space.
         pop_amp_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_stats_" + now_timestamp + ".csv"))
 
         plt.figure(10)

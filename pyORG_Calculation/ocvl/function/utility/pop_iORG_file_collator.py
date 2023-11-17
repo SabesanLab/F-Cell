@@ -45,39 +45,50 @@ if __name__ == "__main__":
             totFiles += 1
 
     all_data = pd.DataFrame()
-    pooled_data = pd.DataFrame()
+    all_pooled_data = pd.DataFrame()
 
-    f=0
-    allcoi = []
+
+
+
     # NEVER grow a dataframe rowwise
     # https://stackoverflow.com/questions/13784192/creating-an-empty-pandas-dataframe-and-then-filling-it
     for subid in allFiles:
 
         subframe = pd.DataFrame()
+        pooled_data = np.full((1, len(allFiles[subid])), np.nan)
+        loc = []
+        f = 0
         for file in allFiles[subid]:
 
-            stat_table = pd.read_csv(file, delimiter=",", header=0,encoding="utf-8-sig")
+            stat_table = pd.read_csv(file, delimiter=",", header=0,encoding="utf-8-sig", index_col=0)
+            stat_table = stat_table.dropna(how="all")  # Drop rows with all nans- no point in taking up space.
 
             splitfName = file.name.split("_")
 
             firstcoord = str(abs(float(splitfName[0].split(",")[0][1:])))
 
-            coi = stat_table[metric_header][0:-1]
-            indices = pd.MultiIndex.from_product([[file.parent.name], np.arange(0, len(coi)) ],
+            loc.append(firstcoord)
+            pooled_data[0, f] = (stat_table[metric_header].iloc[-1])
+
+            allcoi = stat_table[metric_header][0:-1]
+
+            indices = pd.MultiIndex.from_product([[file.parent.name], np.arange(0, len(allcoi))],
                                                  names=["ID", "Acquisition Number"])
-            coi.index = indices
-            coi = coi.rename(firstcoord)
-            coi = coi.to_frame()
+            allcoi.index = indices
+            allcoi = allcoi.rename(firstcoord)
+            allcoi = allcoi.to_frame()
 
-            subframe=pd.concat([subframe, coi], axis=1)
-
+            subframe=pd.concat([subframe, allcoi], axis=1)
 
             f+=1
 
         all_data=pd.concat([all_data, subframe])
+        pooled_data = pd.DataFrame(pooled_data, columns=loc, index=[subid.name])
+        all_pooled_data = pd.concat([all_pooled_data, pooled_data])
         print("wut")
 
 
 print("Concatenate this, bitch")
 resultdir=Path(pName)
 all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
+all_pooled_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_POOLED_"+metric_header+"_data.csv"))
