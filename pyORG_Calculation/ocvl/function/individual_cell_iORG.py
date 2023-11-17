@@ -79,11 +79,16 @@ if __name__ == "__main__":
         if "piped" in path.name:
             splitfName = path.name.split("_")
 
-            if path.parent not in allFiles:
-                allFiles[path.parent] = []
-                allFiles[path.parent].append(path)
-            else:
-                allFiles[path.parent].append(path)
+            if (path.parent.parent == searchpath or path.parent == searchpath):
+                if path.parent not in allFiles:
+                    allFiles[path.parent] = []
+                    allFiles[path.parent].append(path)
+
+                    if "control" in path.parent.name:
+                        # print("DETECTED CONTROL DATA AT: " + str(path.parent))
+                        controlpath = path.parent
+                else:
+                    allFiles[path.parent].append(path)
 
             totFiles += 1
 
