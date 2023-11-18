@@ -3,6 +3,7 @@ from tkinter import filedialog, Tk
 
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 
 if __name__ == "__main__":
 
@@ -23,6 +24,8 @@ if __name__ == "__main__":
 
     if not pName:
         quit()
+
+    resultdir = Path(pName)
 
     allFiles = dict()
 
@@ -46,6 +49,7 @@ if __name__ == "__main__":
 
     all_data = pd.DataFrame()
     all_pooled_data = pd.DataFrame()
+    all_SE = pd.DataFrame()
 
 
 
@@ -82,13 +86,63 @@ if __name__ == "__main__":
 
             f+=1
 
+        stddev = subframe.std()
+
         all_data=pd.concat([all_data, subframe])
         pooled_data = pd.DataFrame(pooled_data, columns=loc, index=[subid.name])
         all_pooled_data = pd.concat([all_pooled_data, pooled_data])
+
+        pooled_data = pd.DataFrame(stddev, columns=[subid.name+"_SE"]).T
+        all_SE = pd.concat([all_SE, pooled_data])
         print("wut")
 
+    all_data = all_data.sort_index(axis=1)
+    all_pooled_data = all_pooled_data.sort_index(axis=1)
+    all_SE = all_SE.sort_index(axis=1)
 
-print("Concatenate this, bitch")
-resultdir=Path(pName)
-all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
-all_pooled_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_POOLED_"+metric_header+"_data.csv"))
+    bins = np.full(len(all_pooled_data.columns), np.nan)
+    mean_data = np.full(len(all_pooled_data.columns), np.nan)
+    stddev_data = np.full(len(all_pooled_data.columns), np.nan)
+    conf_interval = np.full(len(all_pooled_data.columns), np.nan)
+
+    plt.figure(0)
+    i=0
+    for loc in all_pooled_data.columns:
+
+        bins[i] = float(loc)
+        mean_data[i] = all_pooled_data[loc].mean()
+        stddev_data[i] = all_pooled_data[loc].std()
+        num_data = all_pooled_data[loc].count()
+
+        conf_interval[i] = 2 * stddev_data[i] / np.sqrt(num_data)
+        i+=1
+        #plt.plot()
+
+    plt.figure(loc)
+    plt.fill_between(bins, mean_data + conf_interval, color=[0, 0, 0, 0.3])
+    plt.fill_between(bins, mean_data - conf_interval, color=[1, 1, 1, 1])
+    plt.plot(bins, mean_data)
+    plt.title("Population mean and confidence interval")
+    plt.xlim([0, 9])
+    plt.ylim([0, 50])
+    plt.savefig(resultdir.joinpath(resultdir.name + "_pop_iORG_mean_n_conf.svg"))
+
+    plt.figure()
+    for sub_id in all_pooled_data.index:
+        xval = all_pooled_data.loc[sub_id].index.to_numpy().astype(float)
+        yval = all_pooled_data.loc[sub_id].values
+        se = all_SE.loc[sub_id+"_SE"].values
+        plt.errorbar(xval, yval, yerr=se, ms=10, marker=".")
+
+    plt.legend(all_pooled_data.index, loc="lower left")
+    plt.xlim([0, 9])
+    plt.ylim([0, 50])
+    plt.savefig(resultdir.joinpath(resultdir.name + "_indiv_sub_pop_iORG_mean_n_conf.svg"))
+
+    plt.show(block=False)
+    print("Concatenate this, bitch")
+
+    all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
+    all_pooled_data = pd.concat([all_pooled_data, all_SE])
+    all_pooled_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_POOLED_"+metric_header+"_data.csv"))
+    plt.waitforbuttonpress()

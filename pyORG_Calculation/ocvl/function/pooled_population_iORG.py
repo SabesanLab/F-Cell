@@ -202,13 +202,13 @@ if __name__ == "__main__":
                 poststim_ind = np.flatnonzero(np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
                                               dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(1 * dataset.framerate))))
 
-                tmp_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
+                stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
 
-                stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(tmp_profiles,
-                                                                                       dataset.framestamps,
-                                                                                       method="L1",
-                                                                                       threshold=0.3)
+                # stdize_profiles, reconst_framestamps, nummissed = reconstruct_profiles(tmp_profiles,
+                #                                                                        dataset.framestamps,
+                #                                                                        method="L1",
+                #                                                                        threshold=0.3)
 
                 # plt.figure(9)
                 #
@@ -220,7 +220,7 @@ if __name__ == "__main__":
                 #         plt.show(block=False)
                 #         plt.waitforbuttonpress()
 
-                dataset.framestamps=reconst_framestamps
+                #dataset.framestamps=reconst_framestamps
 
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms",
                                                        window_size=1)
@@ -380,5 +380,5 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
-        #plt.waitforbuttonpress()
+        plt.waitforbuttonpress()
 
