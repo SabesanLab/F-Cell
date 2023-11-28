@@ -57,6 +57,8 @@ if __name__ == "__main__":
         f = 0
         subID = []
 
+        plt.figure(0)
+        plt.clf()
         for locfile in allFiles[locid]:
 
             stat_table = pd.read_csv(locfile, delimiter=",", header=0, encoding="utf-8-sig")
@@ -64,12 +66,19 @@ if __name__ == "__main__":
 
             subID.append(locfile.parent.name)
 
-            all_cumhist[f, :] = stat_table.loc[0, :]
+            cumhist = np.nancumsum(stat_table.loc[0, :])
+            cumhist /= np.amax(cumhist.flatten()) # Normalize to 1 as its a probability density, not a probability mass, function
 
+            all_cumhist[f, :] = cumhist
             f+=1
 
-        all_cumhist=np.nancumsum(all_cumhist, axis=1)
-        all_cumhist /= np.amax(all_cumhist.flatten()) # Normalize to 1 as its a probability density, not a probability mass, function
+            plt.plot(bins, cumhist)
+
+        # all_cumhist=np.nancumsum(all_cumhist, axis=1)
+        # all_cumhist /= np.amax(all_cumhist.flatten())
+        plt.show(block=False)
+        plt.legend(subID)
+        plt.savefig(resultdir.joinpath(resultdir.name + "_" + locid + "_all_cumulative_histograms.svg"))
 
         mean_cumhist = np.mean(all_cumhist, axis=0)
         stddev_cumhist = np.std(all_cumhist, axis=0)

@@ -51,8 +51,7 @@ if __name__ == "__main__":
     all_pooled_data = pd.DataFrame()
     all_SE = pd.DataFrame()
 
-
-
+    # plt.figure(42)
 
     # NEVER grow a dataframe rowwise
     # https://stackoverflow.com/questions/13784192/creating-an-empty-pandas-dataframe-and-then-filling-it
@@ -86,7 +85,9 @@ if __name__ == "__main__":
 
             f+=1
 
+        themean = subframe.mean()
         stddev = subframe.std()
+        # plt.plot(themean, stddev, "*")
 
         all_data=pd.concat([all_data, subframe])
         pooled_data = pd.DataFrame(pooled_data, columns=loc, index=[subid.name])
@@ -105,7 +106,7 @@ if __name__ == "__main__":
     stddev_data = np.full(len(all_pooled_data.columns), np.nan)
     conf_interval = np.full(len(all_pooled_data.columns), np.nan)
 
-    plt.figure(0)
+
     i=0
     for loc in all_pooled_data.columns:
 
@@ -116,9 +117,9 @@ if __name__ == "__main__":
 
         conf_interval[i] = 2 * stddev_data[i] / np.sqrt(num_data)
         i+=1
-        #plt.plot()
 
-    plt.figure(loc)
+
+    plt.figure(1)
     plt.fill_between(bins, mean_data + conf_interval, color=[0, 0, 0, 0.3])
     plt.fill_between(bins, mean_data - conf_interval, color=[1, 1, 1, 1])
     plt.plot(bins, mean_data)
@@ -127,17 +128,33 @@ if __name__ == "__main__":
     plt.ylim([0, 50])
     plt.savefig(resultdir.joinpath(resultdir.name + "_pop_iORG_mean_n_conf.svg"))
 
-    plt.figure()
+
+
+
     for sub_id in all_pooled_data.index:
         xval = all_pooled_data.loc[sub_id].index.to_numpy().astype(float)
         yval = all_pooled_data.loc[sub_id].values
+        isfini = np.isfinite(yval)
+        xval= xval[isfini]
+        yval = yval[isfini]
         se = all_SE.loc[sub_id+"_SE"].values
+        se= se[isfini]
+        plt.figure(2)
         plt.errorbar(xval, yval, yerr=se, ms=10, marker=".")
+        plt.figure(3)
+        plt.errorbar(xval, yval-yval[-2], yerr=se, ms=10, marker=".")
 
+    plt.figure(2)
     plt.legend(all_pooled_data.index, loc="lower left")
     plt.xlim([0, 9])
     plt.ylim([0, 50])
     plt.savefig(resultdir.joinpath(resultdir.name + "_indiv_sub_pop_iORG_mean_n_conf.svg"))
+
+    plt.figure(3)
+    plt.legend(all_pooled_data.index, loc="lower left")
+    plt.xlim([0, 9])
+    plt.ylim([-25, 25])
+    plt.savefig(resultdir.joinpath(resultdir.name + "_indiv_sub_pop_iORG_mean_n_conf_firstsub.svg"))
 
     plt.show(block=False)
     print("Concatenate this, bitch")
