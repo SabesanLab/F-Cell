@@ -137,6 +137,8 @@ def run_demotion_pipeline(pName, tkroot):
 
 
 
+# Need to try this:
+# https://mathematica.stackexchange.com/questions/199928/removing-horizontal-noise-artefacts-from-a-sem-image
 def run_meao_pipeline(pName, tkroot):
     root = tkroot
     a_mode = simpledialog.askstring(title="Input the analysis modality string: ",
