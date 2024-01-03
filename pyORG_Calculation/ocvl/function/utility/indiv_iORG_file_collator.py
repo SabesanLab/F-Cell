@@ -46,6 +46,7 @@ if __name__ == "__main__":
 
             totFiles += 1
 
+
     all_data = pd.DataFrame()
 
     # NEVER grow a dataframe rowwise, or baby Jesus will cry
@@ -102,7 +103,54 @@ if __name__ == "__main__":
         print("wut")
 
 
-print("Concatenate this, bitch")
+    print("Concatenate this, bitch")
+    all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
 
-all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
+    # Do the same as above, but expressly looking at the 50th percentile on a per-subject basis
+    allSubFiles = dict()
+    totSubFiles = 0
+    for path in searchpath.rglob("*.csv"):
+        if "log_amplitude_cumhist" in path.name:
+            splitfName = path.name.split("_")
+
+            if (path.parent.parent == searchpath or path.parent == searchpath):
+                if path.parent not in allSubFiles:
+                    allSubFiles[path.parent] = []
+                    allSubFiles[path.parent].append(path)
+                else:
+                    allSubFiles[path.parent].append(path)
+
+            totSubFiles += 1
+
+    plt.figure(42)
+    subID = []
+    for subid in allSubFiles:
+
+        fiftperc = []
+        loc = []
+        subID.append(subid.name)
+
+        f = 0
+        for file in allSubFiles[subid]:
+            splitfName = file.name.split("_")
+
+            firstcoord = abs(float(splitfName[0].split(",")[0][1:]))
+
+            stat_table = pd.read_csv(file, delimiter=",", header=0, encoding="utf-8-sig")
+            bins = stat_table.loc[1, :].to_numpy()
+
+            cumhist = np.nancumsum(stat_table.loc[0, :])
+            cumhist /= np.amax(cumhist.flatten())
+
+            fiftyloc = np.flatnonzero(cumhist>0.5)
+            fiftperc.append(bins[fiftyloc[0]])
+            loc.append(firstcoord)
+            f+=1
+
+        plt.plot(loc, fiftperc,".-")
+        plt.show(block=False)
+    plt.legend(subID)
+
+
+
 plt.waitforbuttonpress()
