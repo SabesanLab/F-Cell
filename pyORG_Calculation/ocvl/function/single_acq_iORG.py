@@ -315,7 +315,7 @@ if __name__ == "__main__":
                 #     todisp = True
                 todisp = False
 
-                indiv_fad[c, :], _, _, fad_profiles = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
+                indiv_fad[c, :], _, _, fad_profiles, _ = iORG_signal_metrics(all_cell_iORG[:, :, c], full_framestamp_range,
                                                             framerate, filter_type="MS1", notch_filter=None, display=todisp, fwhm_size=18,
                                                             prestim_idx=prestim_ind, poststim_idx=poststim_ind-3)
                 # Have used 1-2 before.
@@ -384,13 +384,13 @@ if __name__ == "__main__":
         # plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logmad_cumulative.svg"))
 
         plt.figure(111)
-        plt.hist(np.log(cell_power_amp), bins=np.arange(0, 5.5, 0.1), density=True)
+        plt.hist(np.log(cell_power_amp), bins=np.arange(0, 5.5, 0.05), density=True)
         plt.title("RMS power log amplitude")
         plt.show(block=False)
         plt.savefig(res_dir.joinpath(this_dirname + "_allcell_iORG_rms_logamp.svg"))
 
         plt.figure(112)
-        plt.hist(np.log(cell_power_amp), bins=np.arange(0, 5.5, 0.1), density=True, histtype="step",
+        plt.hist(np.log(cell_power_amp), bins=np.arange(0, 5.5, 0.05), density=True, histtype="step",
                  cumulative=True, label=loc.name)
         plt.title("RMS power log amplitude cumulative")
         plt.legend(loc="best")

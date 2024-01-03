@@ -131,66 +131,41 @@ class MEAODataset:
         elif self.stage is PipeStages.ANALYSIS_READY:
             self.load_analysis_ready_data()
 
+    def load_raw_data(self):
+
+        res = load_video(self.video_path)
+
+        self.framerate = res.metadict["framerate"]
+        self.num_frames = res.data.shape[-1]
+        self.width = res.data.shape[1]
+        self.height = res.data.shape[0]
+        self.video_data = res.data
+
+        if os.path.exists(self.mask_path):
+            res = load_video(self.mask_path)
+            self.mask_data = res.data / 255
+            self.mask_data[self.mask_data < 0] = 0
+        else:
+            warnings.warn("No processed mask data detected.")
+
+        # Load the reference video data.
+        if os.path.exists(self.ref_video_path) and self.ref_video_path != self.mask_path:
+            res = load_video(self.ref_video_path)
+            self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+        elif self.ref_video_path == self.video_path:
+            self.ref_video_data = self.video_data
+        else:
+            warnings.warn("No processed reference video data detected.")
+
+        # Load our text data.
+        metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
+        metadata.columns = metadata.columns.str.strip()
+
+
     def load_analysis_ready_data(self, raw_profiles, postprocessed_profiles=np.empty([1])):
         if self.stage is PipeStages.ANALYSIS_READY:
             self.raw_profile_data = raw_profiles
             self.postproc_profile_data = postprocessed_profiles
-
-    def load_pipelined_data(self):
-        if self.stage is PipeStages.PIPELINED:
-            res = load_video(self.video_path)
-
-            self.framerate = res.metadict["framerate"]
-            self.num_frames = res.data.shape[-1]
-            self.width = res.data.shape[1]
-            self.height = res.data.shape[0]
-            self.video_data = res.data
-
-            if os.path.exists(self.mask_path):
-                res = load_video(self.mask_path)
-                self.mask_data = res.data / 255
-                self.mask_data[self.mask_data < 0] = 0
-                self.video_data = (self.video_data * self.mask_data).astype("uint8")
-            else:
-                pass
-                # warnings.warn("No pipelined mask data detected.")
-
-            # Load the reference video data.
-            if os.path.exists(self.ref_video_path):
-                res = load_video(self.ref_video_path)
-                self.ref_video_data = (res.data * self.mask_data).astype("uint8")
-            else:
-                pass
-                # warnings.warn("No pipelined reference video data detected.")
-
-            # Load our text data, if we can.
-            if Path(self.metadata_path).is_file():
-                metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
-                metadata.columns = metadata.columns.str.strip()
-
-                self.framestamps = metadata["FrameStamps"].to_numpy()-1 # Subtract one, because they're stored where 1 is the first index.
-                #self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__) # Should probably carry this forward
-            elif Path(self.metadata_path[0:-4]+"_acceptable_frames.csv").is_file():
-                self.framestamps = np.squeeze(pd.read_csv(self.metadata_path[0:-4]+"_acceptable_frames.csv", delimiter=',', header=None,
-                                              encoding="utf-8-sig").to_numpy())
-            else:
-                self.framestamps = np.arange(0, self.num_frames)
-
-            if self.image_path:
-                self.reference_im = cv2.imread(self.image_path, cv2.IMREAD_GRAYSCALE)
-
-            if self.coord_path:
-                self.coord_data = pd.read_csv(self.coord_path, delimiter=',', header=None,
-                                              encoding="utf-8-sig").to_numpy()
-                # print(self.coord_data)
-
-            if self.stimtrain_path: # [ 58 2 106 ] (176?) -> [ 58 60 176 ]
-                self.stimtrain_frame_stamps = np.cumsum(np.squeeze(pd.read_csv(self.stimtrain_path, delimiter=',', header=None,
-                                                          encoding="utf-8-sig").to_numpy()))
-            else:
-                self.stimtrain_frame_stamps = self.num_frames-1
-
-
 
     def load_processed_data(self, force=False, clip_top=0):
 
@@ -325,3 +300,60 @@ class MEAODataset:
             #     # Press Q on keyboard to  exit
             #     if cv2.waitKey(25) & 0xFF == ord('q'):
             #         break
+
+
+    def load_pipelined_data(self):
+        if self.stage is PipeStages.PIPELINED:
+            res = load_video(self.video_path)
+
+            self.framerate = res.metadict["framerate"]
+            self.num_frames = res.data.shape[-1]
+            self.width = res.data.shape[1]
+            self.height = res.data.shape[0]
+            self.video_data = res.data
+
+            if os.path.exists(self.mask_path):
+                res = load_video(self.mask_path)
+                self.mask_data = res.data / 255
+                self.mask_data[self.mask_data < 0] = 0
+                self.video_data = (self.video_data * self.mask_data).astype("uint8")
+            else:
+                pass
+                # warnings.warn("No pipelined mask data detected.")
+
+            # Load the reference video data.
+            if os.path.exists(self.ref_video_path):
+                res = load_video(self.ref_video_path)
+                self.ref_video_data = (res.data * self.mask_data).astype("uint8")
+            else:
+                pass
+                # warnings.warn("No pipelined reference video data detected.")
+
+            # Load our text data, if we can.
+            if Path(self.metadata_path).is_file():
+                metadata = pd.read_csv(self.metadata_path, delimiter=',', encoding="utf-8-sig")
+                metadata.columns = metadata.columns.str.strip()
+
+                self.framestamps = metadata["FrameStamps"].to_numpy()-1 # Subtract one, because they're stored where 1 is the first index.
+                #self.reference_frame_idx = min(range(len(ncc)), key=ncc.__getitem__) # Should probably carry this forward
+            elif Path(self.metadata_path[0:-4]+"_acceptable_frames.csv").is_file():
+                self.framestamps = np.squeeze(pd.read_csv(self.metadata_path[0:-4]+"_acceptable_frames.csv", delimiter=',', header=None,
+                                              encoding="utf-8-sig").to_numpy())
+            else:
+                self.framestamps = np.arange(0, self.num_frames)
+
+            if self.image_path:
+                self.reference_im = cv2.imread(self.image_path, cv2.IMREAD_GRAYSCALE)
+
+            if self.coord_path:
+                self.coord_data = pd.read_csv(self.coord_path, delimiter=',', header=None,
+                                              encoding="utf-8-sig").to_numpy()
+                # print(self.coord_data)
+
+            if self.stimtrain_path: # [ 58 2 106 ] (176?) -> [ 58 60 176 ]
+                self.stimtrain_frame_stamps = np.cumsum(np.squeeze(pd.read_csv(self.stimtrain_path, delimiter=',', header=None,
+                                                          encoding="utf-8-sig").to_numpy()))
+            else:
+                self.stimtrain_frame_stamps = self.num_frames-1
+
+

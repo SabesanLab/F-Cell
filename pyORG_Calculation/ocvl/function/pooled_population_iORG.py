@@ -332,6 +332,10 @@ if __name__ == "__main__":
         #pooled_stddev_iORG = np.sqrt(pooled_var_iORG)
         all_frmstamps = np.arange(max_frmstamp+1)
 
+        pop_data_dFrame = pd.DataFrame(np.concatenate((np.array(all_iORG, ndmin=2).transpose(),
+                                                      np.array(pooled_iORG, ndmin=2).transpose()), axis=1))
+        pop_data_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_signals_" + now_timestamp + ".csv"))
+
         plt.figure(9)
         plt.plot(all_frmstamps, np.nansum(all_incl, axis=0))
         plt.show(block=False)
