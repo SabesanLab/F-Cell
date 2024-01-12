@@ -48,6 +48,7 @@ if __name__ == "__main__":
 
 
     all_data = pd.DataFrame()
+    all_means = pd.DataFrame()
 
     # NEVER grow a dataframe rowwise, or baby Jesus will cry
     # https://stackoverflow.com/questions/13784192/creating-an-empty-pandas-dataframe-and-then-filling-it
@@ -100,57 +101,77 @@ if __name__ == "__main__":
         subframe = pd.DataFrame(all_cumhist, index=indices)
 
         all_data=pd.concat([all_data, subframe])
+        all_means=pd.concat([all_means, pd.DataFrame(mean_cumhist[np.newaxis, :], index=[locid], columns=bins)])
         print("wut")
 
 
     print("Concatenate this, bitch")
     all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
+    all_means.to_csv(resultdir.joinpath(resultdir.name + "_collated_" + metric_header + "_meandata.csv"))
 
-    # Do the same as above, but expressly looking at the 50th percentile on a per-subject basis
-    allSubFiles = dict()
-    totSubFiles = 0
-    for path in searchpath.rglob("*.csv"):
-        if "log_amplitude_cumhist" in path.name:
-            splitfName = path.name.split("_")
 
-            if (path.parent.parent == searchpath or path.parent == searchpath):
-                if path.parent not in allSubFiles:
-                    allSubFiles[path.parent] = []
-                    allSubFiles[path.parent].append(path)
-                else:
-                    allSubFiles[path.parent].append(path)
 
-            totSubFiles += 1
+    # Do the same as above, but expressly looking at the Xth percentile on a per-subject basis compared to our normative baseline.
+    normie_path = searchpath.joinpath("Normal_collated_Amplitude_meandata.csv")
+    if normie_path.is_file():
 
-    plt.figure(42)
-    subID = []
-    for subid in allSubFiles:
+        perc_cutoff = 0.05
 
-        fiftperc = []
-        loc = []
-        subID.append(subid.name)
+        normie_table = pd.read_csv(normie_path, index_col=0).sort_index()
+        normie_dat = normie_table.to_numpy()
+        above_cut = np.argmax(normie_dat > perc_cutoff, axis=1, keepdims=True)
 
-        f = 0
-        for file in allSubFiles[subid]:
-            splitfName = file.name.split("_")
+        normie_locs = normie_table.index.to_numpy().astype(float)
+        normie_vals = normie_table.columns.to_numpy()[above_cut.flatten()].astype(float)
 
-            firstcoord = abs(float(splitfName[0].split(",")[0][1:]))
+        allSubFiles = dict()
+        totSubFiles = 0
+        for path in searchpath.rglob("*.csv"):
+            if "log_amplitude_cumhist" in path.name:
+                splitfName = path.name.split("_")
 
-            stat_table = pd.read_csv(file, delimiter=",", header=0, encoding="utf-8-sig")
-            bins = stat_table.loc[1, :].to_numpy()
+                if (path.parent.parent == searchpath or path.parent == searchpath):
+                    if path.parent not in allSubFiles:
+                        allSubFiles[path.parent] = []
+                        allSubFiles[path.parent].append(path)
+                    else:
+                        allSubFiles[path.parent].append(path)
 
-            cumhist = np.nancumsum(stat_table.loc[0, :])
-            cumhist /= np.amax(cumhist.flatten())
+                totSubFiles += 1
 
-            fiftyloc = np.flatnonzero(cumhist>0.5)
-            fiftperc.append(bins[fiftyloc[0]])
-            loc.append(firstcoord)
-            f+=1
+        plt.figure(42)
+        subID = []
+        for subid in allSubFiles:
 
-        plt.plot(loc, fiftperc,".-")
-        plt.show(block=False)
-    plt.legend(subID)
+            fiftperc = []
+            loc = []
+            subID.append(subid.name)
 
+            f = 0
+            for file in allSubFiles[subid]:
+                splitfName = file.name.split("_")
+
+                firstcoord = abs(float(splitfName[0].split(",")[0][1:]))
+
+                normie_loc_ind = np.argmin(np.round(abs(firstcoord-normie_locs)))
+
+                stat_table = pd.read_csv(file, delimiter=",", header=0, encoding="utf-8-sig")
+                bins = stat_table.loc[1, :].to_numpy()
+
+                cumhist = np.nancumsum(stat_table.loc[0, :])
+                cumhist /= np.amax(cumhist.flatten())
+
+                # Find the percentage of cones in this subject that are within the normative percentage we set above.
+                perc_healthy = 100.0*(1-cumhist[np.flatnonzero(bins >= normie_vals[normie_loc_ind])[0]]+0.05)
+
+                fiftperc.append(perc_healthy)
+                loc.append(firstcoord)
+                f+=1
+
+            plt.plot(loc, fiftperc,".-")
+            plt.show(block=False)
+            plt.savefig(resultdir.joinpath(resultdir.name + "_percent_overnormie.svg"))
+        plt.legend(subID)
 
 
 plt.waitforbuttonpress()
