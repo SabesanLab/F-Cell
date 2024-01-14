@@ -75,10 +75,10 @@ if __name__ == "__main__":
     for locid in allFiles:
 
         if normie_path.is_file():
-            normie_loc_ind = np.argmin(np.round(abs(abs(float(locid)) - normie_locs)))
+            normie_loc_ind = np.argmin(abs(abs(float(locid)) - normie_locs))
             thisloc = normie_locs[normie_loc_ind]
         else:
-            thisloc = locid
+            thisloc = float(locid)
 
         if str(thisloc) not in subID:
             subID[str(thisloc)] = []
@@ -136,8 +136,6 @@ if __name__ == "__main__":
 
 
     print("Concatenate this, bitch")
-    all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
-    all_means.to_csv(resultdir.joinpath(resultdir.name + "_collated_" + metric_header + "_meandata.csv"))
 
 
     if normie_path.is_file():
@@ -172,7 +170,7 @@ if __name__ == "__main__":
 
                 firstcoord = abs(float(splitfName[0].split(",")[0][1:]))
 
-                normie_loc_ind = np.argmin(np.round(abs(firstcoord-normie_locs)))
+                normie_loc_ind = np.argmin(abs(firstcoord-normie_locs))
 
                 stat_table = pd.read_csv(file, delimiter=",", header=0, encoding="utf-8-sig")
                 bins = stat_table.loc[1, :].to_numpy()
@@ -182,7 +180,9 @@ if __name__ == "__main__":
 
                 # Find the percentage of cones in this subject that are within the normative percentage we set above.
                 perc_healthy = 100.0*(1-cumhist[np.flatnonzero(bins >= normie_vals[normie_loc_ind])[0]])
+                print(normie_locs[normie_loc_ind])
                 print(cumhist[np.flatnonzero(bins >= normie_vals[normie_loc_ind])[0]])
+                print(perc_healthy)
 
                 fiftperc.append(perc_healthy)
                 loc.append(firstcoord)
@@ -205,5 +205,6 @@ if __name__ == "__main__":
         perc_data.to_csv(resultdir.joinpath(resultdir.name + "_percent_overnormie_data.csv"))
 
 
-
+all_data.to_csv(resultdir.joinpath(resultdir.name+"_collated_"+metric_header+"_data.csv"))
+all_means.to_csv(resultdir.joinpath(resultdir.name + "_collated_" + metric_header + "_meandata.csv"))
 plt.waitforbuttonpress()
