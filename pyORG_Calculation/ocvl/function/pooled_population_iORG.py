@@ -7,6 +7,7 @@ from tkinter import Tk, filedialog, ttk, HORIZONTAL, simpledialog
 
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import pdist, squareform
 
@@ -138,6 +139,8 @@ if __name__ == "__main__":
         pop_iORG_amp[:] = np.nan
         pop_iORG_num = []
         framestamps = []
+        mean_frame_test = []
+        mean_frame_tmp = []
         max_frmstamp = 0
         plt.figure(0)
         plt.clf()
@@ -177,6 +180,27 @@ if __name__ == "__main__":
                 dataset.coord_data = reference_coord_data
                 
                 dataset.coord_data = refine_coord_to_stack(dataset.video_data, dataset.reference_im, reference_coord_data)
+
+                # Adding code to drop frames with poor SNR here
+                mean_frame_test = np.empty(np.size(dataset.video_data, 2))
+                mean_frame_test[:] = np.nan
+
+                for i in range(np.size(dataset.video_data, 2)):
+                    mean_frame_test[i] = np.average(dataset.video_data[:, :, i])
+
+                # looking at distributions of frame means
+                #plt.figure(4)
+                #plt.clf()
+                #plt.hist(mean_frame_test)
+                #plt.show(block=False)
+
+                # Using kmeans clustering to remove "bad frames"
+                kmeans = KMeans(n_clusters=2, random_state=int(np.mean(mean_frame_test)))
+                frame_means_df = pd.DataFrame(np.transpose(mean_frame_test), columns=['frame means'])
+                frame_means_df['label'] = kmeans.fit_predict(frame_means_df[['frame means']])
+                idx_remove_frames = frame_means_df.index[frame_means_df['label']==frame_means_df['label'].max()]
+                dataset.video_data[:, :, idx_remove_frames] = 0
+
 
                 dataset.video_data = norm_video(dataset.video_data, norm_method="score", rescaled=True,
                                                 rescale_mean=70, rescale_std=35)
@@ -277,6 +301,7 @@ if __name__ == "__main__":
 
                     plt.show(block=False)
                     plt.xlim([0, 4])
+
                     # plt.ylim([-5, 40])
                     #plt.savefig(res_dir.joinpath(file.name[0:-4] + "_pop_iORG.png"))
                     r += 1
@@ -385,5 +410,5 @@ if __name__ == "__main__":
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
         plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
         print("Done!")
-        plt.waitforbuttonpress()
+        # plt.waitforbuttonpress()
 
