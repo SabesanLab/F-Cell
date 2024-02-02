@@ -192,24 +192,8 @@ if __name__ == "__main__":
 
                 mean_frame_dFrame = pd.DataFrame(np.row_stack((dataset.framestamps, mean_frame_test)))
 
-                tmp_dir = res_dir.joinpath("SinglePlots")
-                tmp_dir.mkdir(exist_ok=True)
 
-                dt = datetime.now()
-                now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
-
-                prestim_mean_ind = np.flatnonzero(dataset.framestamps < dataset.stimtrain_frame_stamps[0])
-                poststim_mean_ind = np.flatnonzero(dataset.framestamps >= dataset.stimtrain_frame_stamps[0])
-
-
-                prestim_mean_pix = np.mean(mean_frame_test[prestim_mean_ind])
-                poststim_mean_pix = np.mean(mean_frame_test[poststim_mean_ind])
-
-                prestim_Q1 = np.percentile(mean_frame_test[prestim_mean_ind], 25)
-                poststim_Q1 = np.percentile(mean_frame_test[poststim_mean_ind], 25)
-
-
-                idx_remove_frames = np.concatenate(((mean_frame_test[prestim_mean_ind]<prestim_Q1),(mean_frame_test[poststim_mean_ind]<poststim_Q1)), axis=0)
+                idx_remove_frames = mean_frame_test <= 35
                 dataset.video_data[:, :, idx_remove_frames] = 0
 
                 #mean_frame_dFrame.to_csv(tmp_dir.joinpath("Video_MeanFrames_000_" + now_timestamp + ".csv"))
@@ -280,9 +264,9 @@ if __name__ == "__main__":
                 tmp_iorg, tmp_incl = signal_power_iORG(stdize_profiles, dataset.framestamps, summary_method="rms",
                                                        window_size=1)
 
-                plt.figure(9)
-                plt.plot(dataset.framestamps, tmp_incl)
-                plt.show(block=False)
+                # plt.figure(9)
+                # plt.plot(dataset.framestamps, tmp_incl)
+                # plt.show(block=False)
 
                 # This is just to make them all at the same baseline.
                 tmp_iorg = standardize_profiles(tmp_iorg[None, :], dataset.framestamps,
@@ -394,9 +378,9 @@ if __name__ == "__main__":
                                                       np.array(pooled_iORG, ndmin=2).transpose()), axis=1))
         pop_data_dFrame.to_csv(res_dir.joinpath(this_dirname + "_pop_iORG_signals_" + now_timestamp + ".csv"))
 
-        plt.figure(9)
-        plt.plot(all_frmstamps, np.nansum(all_incl, axis=0))
-        plt.show(block=False)
+        # plt.figure(9)
+        # plt.plot(all_frmstamps, np.nansum(all_incl, axis=0))
+        # plt.show(block=False)
 
         prestim_ind = np.logical_and(all_frmstamps < dataset.stimtrain_frame_stamps[0],
                                      all_frmstamps >= (dataset.stimtrain_frame_stamps[0] - int(1 * dataset.framerate)))
