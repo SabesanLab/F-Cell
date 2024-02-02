@@ -185,8 +185,34 @@ if __name__ == "__main__":
                 mean_frame_test = np.empty(np.size(dataset.video_data, 2))
                 mean_frame_test[:] = np.nan
 
+                dataset.video_data = np.where(dataset.video_data == 0, np.nan, dataset.video_data)
+
                 for i in range(np.size(dataset.video_data, 2)):
-                    mean_frame_test[i] = np.average(dataset.video_data[:, :, i])
+                    mean_frame_test[i] = np.nanmean(dataset.video_data[:, :, i])
+
+                mean_frame_dFrame = pd.DataFrame(np.row_stack((dataset.framestamps, mean_frame_test)))
+
+                tmp_dir = res_dir.joinpath("SinglePlots")
+                tmp_dir.mkdir(exist_ok=True)
+
+                dt = datetime.now()
+                now_timestamp = dt.strftime("%Y_%m_%d_%H_%M_%S")
+
+                prestim_mean_ind = np.flatnonzero(dataset.framestamps < dataset.stimtrain_frame_stamps[0])
+                poststim_mean_ind = np.flatnonzero(dataset.framestamps >= dataset.stimtrain_frame_stamps[0])
+
+
+                prestim_mean_pix = np.mean(mean_frame_test[prestim_mean_ind])
+                poststim_mean_pix = np.mean(mean_frame_test[poststim_mean_ind])
+
+                prestim_Q1 = np.percentile(mean_frame_test[prestim_mean_ind], 25)
+                poststim_Q1 = np.percentile(mean_frame_test[poststim_mean_ind], 25)
+
+
+                idx_remove_frames = np.concatenate(((mean_frame_test[prestim_mean_ind]<prestim_Q1),(mean_frame_test[poststim_mean_ind]<poststim_Q1)), axis=0)
+                dataset.video_data[:, :, idx_remove_frames] = 0
+
+                #mean_frame_dFrame.to_csv(tmp_dir.joinpath("Video_MeanFrames_000_" + now_timestamp + ".csv"))
 
                 # looking at distributions of frame means
                 #plt.figure(4)
@@ -195,11 +221,11 @@ if __name__ == "__main__":
                 #plt.show(block=False)
 
                 # Using kmeans clustering to remove "bad frames"
-                kmeans = KMeans(n_clusters=2, random_state=int(np.mean(mean_frame_test)))
-                frame_means_df = pd.DataFrame(np.transpose(mean_frame_test), columns=['frame means'])
-                frame_means_df['label'] = kmeans.fit_predict(frame_means_df[['frame means']])
-                idx_remove_frames = frame_means_df.index[frame_means_df['label']==frame_means_df['label'].max()]
-                dataset.video_data[:, :, idx_remove_frames] = 0
+                # kmeans = KMeans(n_clusters=4, random_state=int(np.mean(mean_frame_test)))
+                # frame_means_df = pd.DataFrame(np.transpose(mean_frame_test), columns=['frame means'])
+                # frame_means_df['label'] = kmeans.fit_predict(frame_means_df[['frame means']])
+                # idx_remove_frames = frame_means_df.index[frame_means_df['label']==frame_means_df['label'].max()]
+                # dataset.video_data[:, :, idx_remove_frames] = 0
 
 
                 dataset.video_data = norm_video(dataset.video_data, norm_method="score", rescaled=True,
@@ -223,9 +249,13 @@ if __name__ == "__main__":
                     print(file.name + " was dropped due to all cells being excluded.")
 
                 prestim_ind = np.flatnonzero(np.logical_and(dataset.framestamps < dataset.stimtrain_frame_stamps[0],
-                                             dataset.framestamps >= (dataset.stimtrain_frame_stamps[0] - int(1 * dataset.framerate))))
+                                                            dataset.framestamps >= (
+                                                                    dataset.stimtrain_frame_stamps[0] - int(
+                                                                1 * dataset.framerate))))
                 poststim_ind = np.flatnonzero(np.logical_and(dataset.framestamps >= dataset.stimtrain_frame_stamps[1],
-                                              dataset.framestamps < (dataset.stimtrain_frame_stamps[1] + int(1 * dataset.framerate))))
+                                                             dataset.framestamps < (
+                                                                     dataset.stimtrain_frame_stamps[1] + int(
+                                                                 1 * dataset.framerate))))
 
                 stdize_profiles = standardize_profiles(temp_profiles, dataset.framestamps,
                                                        dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
@@ -259,6 +289,8 @@ if __name__ == "__main__":
                                                 dataset.stimtrain_frame_stamps[0], method="mean_sub", std_indices=prestim_ind)
 
                 tmp_iorg = np.squeeze(tmp_iorg)
+
+
 
                 poststim_loc = dataset.framestamps[poststim_ind]
                 prestim_amp = np.nanmedian(tmp_iorg[prestim_ind])
