@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
         for file in allFiles[loc]:
 
-            if "ALL_ACQ_AVG" not in file.name and r >= skipnum:
+            if "ALL_ACQ_AVG" not in file.name and r >= skipnum and "mask" not in file.name:
                 pb["value"] = r
                 pb_label["text"] = "Processing " + file.name + "..."
                 pb.update()

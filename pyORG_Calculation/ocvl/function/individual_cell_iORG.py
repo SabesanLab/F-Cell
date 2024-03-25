@@ -130,7 +130,7 @@ if __name__ == "__main__":
         for file in allFiles[loc]:
 
             # Ignores the All_ACQ_AVG tif while running through the files in this location
-            if "ALL_ACQ_AVG" not in file.name:
+            if "ALL_ACQ_AVG" not in file.name and "mask" not in file.name:
                 # Waitbar stuff
                 pb["value"] = r
                 pb_label["text"] = "Processing " + file.name + "..."

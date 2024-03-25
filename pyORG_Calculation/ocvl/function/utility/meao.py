@@ -300,6 +300,7 @@ class MEAODataset:
             self.framestamps = self.framestamps[inliers]
             self.video_data = self.video_data[..., inliers]
             self.mask_data = self.mask_data[..., inliers]
+            self.num_frames = self.video_data.shape[-1] # Need to do this before loop below (video data has been filtered)
 
             (rows, cols) = self.video_data.shape[0:2]
 
@@ -315,7 +316,6 @@ class MEAODataset:
             self.video_data = self.video_data.astype("uint8")
             self.ref_video_data = self.ref_video_data.astype("uint8")
 
-            self.num_frames = self.video_data.shape[-1]
             # save_video("//134.48.93.176/Raw Study Data/00-64774/MEAOSLO1/20210824/Processed/Functional Pipeline/", dataset[f].video_data, 29.4)
             # for i in range(this_data.shape[-1]):
             #     # Display the resulting frame
