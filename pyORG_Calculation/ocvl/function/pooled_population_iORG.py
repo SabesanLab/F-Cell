@@ -145,7 +145,7 @@ if __name__ == "__main__":
         mapper = plt.cm.ScalarMappable(cmap=plt.get_cmap("viridis", len(allFiles[loc])))
         segmentation_radius = None
 
-        for file in allFiles[loc]:
+        for nfile,file in enumerate(allFiles[loc]):
 
             if "ALL_ACQ_AVG" not in file.name and r >= skipnum and "mask" not in file.name:
                 pb["value"] = r
@@ -274,6 +274,10 @@ if __name__ == "__main__":
                     plt.plot(dataset.framestamps/dataset.framerate, pop_iORG[r - skipnum], color=mapper.to_rgba(r - skipnum, norm=False),
                              label=file.name)
 
+                    csv_name=res_dir.joinpath(file.name[0:-4] + "pop_iORG_%2d.csv"%nfile);
+                    df=pd.DataFrame({'x':dataset.framestamps/dataset.framerate, 'y':pop_iORG[r-skipnum]);
+                    df.to_csv(csv_name,index=None)
+
                     plt.show(block=False)
                     plt.xlim([0, 4])
                     # plt.ylim([-5, 40])
@@ -377,8 +381,13 @@ if __name__ == "__main__":
         plt.xlabel("Time (seconds)")
         plt.ylabel("Response")
         plt.show(block=False)
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".png"))
-        plt.savefig(res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp + ".svg"))
+        filename_base=res_dir.joinpath(this_dirname + "_pooled_pop_iORG_" + now_timestamp
+        plt.savefig(filename_base + ".png"))
+        plt.savefig(filename_base + ".svg"))
+
+        df=pd.DataFrame({'x':all_frmstamps/dataset.framerate, 'y':pooled_iORG});
+        df.to_csv(filename_base + ".csv",index=None)
+
         print("Done!")
         plt.waitforbuttonpress()
 
